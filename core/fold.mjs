@@ -25,6 +25,7 @@ function newSession(doc, at) {
     turns: [],
     tasks: [],
     asks: [],
+    briefs: [],
     reviews: [],
     segments: [],
   };
@@ -199,6 +200,24 @@ export function fold(events) {
         ask.closedAt = ev.at;
         break;
       }
+      // The brief a reviewer reads has to be a ledger fact, otherwise the verdict
+      // below can only pin bytes generated after the reading -- a document
+      // nobody answered. Handing out and answering are two lines, one reader.
+      case "review.brief": {
+        const session = sessionOf(doc, ev);
+        const segment = segmentById(session, ev.segment);
+        if (sealed(segment))
+          noway(`段 ${segment.id} 已经封存：要再审先打回（judge --rework --why "…"）`);
+        session.briefs.push({
+          segment: segment.id,
+          brief: ev.brief,
+          briefDigest: ev.briefDigest,
+          at: ev.at,
+          by: ev.by ?? null,
+          answeredBy: null,
+        });
+        break;
+      }
       case "review.log": {
         const session = sessionOf(doc, ev);
         const segment = segmentById(session, ev.segment);
@@ -231,6 +250,9 @@ export function fold(events) {
           at: ev.at,
           voidedAt: null,
         });
+        // Keep the pair traceable: which handed-out document this verdict answers.
+        const handed = session.briefs.find((one) => one.brief === ev.brief && one.segment === segment.id);
+        if (handed) handed.answeredBy = id;
         segment.reviewAt = ev.at;
         segment.reviewBy = ev.by;
         segment.reviewVerdict = ev.verdict;

@@ -110,6 +110,11 @@ export const lastDelivery = (session, segment) => {
   return times[times.length - 1] ?? null;
 };
 
+// The document the reviewer is holding for this segment: the last one handed
+// out. A verdict answers this one or it is answering something nobody read.
+export const lastBrief = (session, segmentId) =>
+  session.briefs.filter((one) => one.segment === segmentId).at(-1) ?? null;
+
 export const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
   const last = lastDelivery(session, segment);
@@ -293,6 +298,18 @@ export function nextAction(doc, config) {
     }
   }
   if (state === "missing") {
+    // A handed-out brief that nobody answered decides what the next step is:
+    // the reviewer's job is the verdict, not another piece of paper.
+    const handed = lastBrief(session, segment.id);
+    const waiting = handed && !session.reviews.some((one) => one.brief === handed.brief);
+    if (waiting) {
+      return {
+        who: "reviewer",
+        what: "落结论",
+        text: `${segment.id} 的任务书已经出过：${handed.brief}（${count.total} 条都交付了）`,
+        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass|fail`,
+      };
+    }
     return {
       who: "reviewer",
       what: voidedReview(session, segment) ? "重审" : "审这一段",

@@ -7,23 +7,22 @@
 ```
 $ cd examples/contract && deed state
 状态 · 执行
-会话 S02 · 开于 11-23 00:59 · 2 轮 · 3 段
-  段 S02.3 · 开于 11-23 00:59 · 2 条（未做 1 · 已交付 0）· 要审 · 结论还没落盘
+会话 S02 · 开于 11-23 04:49 · 2 轮 · 3 段
+  段 S02.3 · 开于 11-23 04:49 · 2 条（未做 1 · 已交付 0）· 要审 · 结论还没落盘
     … T6 给面板加跨会话历史  ·  能翻看已签收那一期的全部轮次
     ○ T7 让陌生人只读六行就能动手  ·  照 NOTES.md 从 init 走到 sign
   待裁 A2 · 这一段要不要现在判？
   欠着 · 延后 T6 · 放弃 —
   签收 差：当前段还没判决；还有 1 条待裁（A2）
-  已收口 · S01 · 示例账本立起来 · 签收 · 11-23 00:59
-  门槛改过 · review · 11-23 00:59 · user · init 收下的门槛
-  门槛改过 · gates · 11-23 00:59 · user · init 收下的门槛
-  门槛改过 · board · 11-23 00:59 · user · init 收下的门槛
+  已收口 · S01 · 示例账本立起来 · 签收 · 11-23 04:49
+  门槛改过 · review · 11-23 04:49 · user · init 收下的门槛
+  门槛改过 · gates · 11-23 04:49 · user · init 收下的门槛
+  门槛改过 · board · 11-23 04:49 · user · init 收下的门槛
 
 下一步 · user · 裁定：A2 · 这一段要不要现在判？（我理解成：等 T7 交付再判）
   deed ask resolve A2 --decision "…"
 
-账本 33 条 · .deed\log
-```
+账本 37 条 · .deed\log
 
 再钉一次指纹（`deed verify`，是另一条命令，不在 `state` 的输出里）：
 
@@ -48,7 +47,7 @@ Node ≥ 22，纯 ESM，零依赖。
 git clone <this> deed && cd deed
 node cli/deed.mjs help            # 就地可用
 npm link                          # 之后在任意目录敲 deed
-npm test                          # 67 条，半分钟以内（每条都起真进程）
+npm test                          # 70 条，半分钟以内（每条都起真进程）
 ```
 
 ## 接进一个工作区
@@ -68,7 +67,7 @@ deed init \
 | --- | --- |
 | `.deed/config.json` | 审查路径声明 `review.required` / `review.exempt`，门命令 `gates`，面板端口 |
 | `.deed/log/` | 账本目录。第一条事件落下后才有 `YYYY-MM.jsonl`：一次事实一条事件，只追加 |
-| `.deed/review/` | 审查任务书。每个结论新写一份（文件名带时间戳，重名加 `-2`），旧的不覆盖；它的 sha256 记进账本 |
+| `.deed/review/` | 审查任务书。出任务书时写一份（文件名带时间戳，重名加 `-2`），旧的不覆盖；交出去这件事记成账本事件（`review.brief` + sha256） |
 | `.deed/workspace.json` | 上一次交付时的内容指纹。第一次 `task done` 才生成，用来算「这一交付实际动了哪些路径」 |
 
 门槛在 init 之后不是冻住的：`deed init --force --exempt "docs/**" --why "为什么改"` 改得动，
@@ -91,10 +90,12 @@ deed init \
 - 要做事先 `deed task add "承诺" --criteria "做完的标准" --files core/a.mjs,cli/b.mjs`（逗号分隔、正斜杠）；做完 `deed task done <T> --evidence "命令与结果" --digest <工作区里的文件>`。
 - 拿不准就问 `deed ask "…" --reading "我理解成…" --why "为什么得你定"`，只有用户能 `ask resolve`。
 - `deed state` 只说下一步是谁；照着做，不要自己另排优先级。
-- 要审的段：`deed review --segment S0x.N` 出任务书（不写结论），审查者照它落 `--by "谁" --verdict pass|fail`；
+- 要审的段：`deed review --segment S0x.N` 出任务书（记一条 `review.brief`，不写结论），审查者照它落 `--by "谁" --verdict pass|fail`；
   结论要求这一段已经全部交付（还有未做的会被拒），并且是这一段的最后一份结论。
-- 结论与它读的那份任务书绑定：落结论时任务书的 sha256 一起进账本（`briefDigest`，必填）；
-  `deed verify` 会重算核对，任务书被改、丢了或账本没记指纹，都要先打回再重审。
+- 只有交出去过的任务书才能被回答：没出过任务书就落结论会被拒；交出去之后那份字节被改过、或文件不在了，
+  结论也落不下来（`deed review --segment S0x.N` 另出一份，旧的那条记录留着让 `verify` 报）。
+- 结论钉的是交出去那一刻的 sha256（`briefDigest`，必填），不是落结论时现写的一份；
+  `deed verify` 会重算核对。
 - 用户判决 `deed judge --pass`／`deed judge --rework T1,T2 --why "…"`，签收 `deed sign --words "<用户原话>"`。
 - 身份是约定不是鉴权：`--by`、`who`、`sign` 记的是自述，账本保证"谁说过什么"可回溯，不保证"说的人是谁"。
 - 交付证据每条都带 `--digest <工作区里的文件>`：说得清做了什么，也钉得住当时的内容；没钉的证据仍在账本里，但会挡住要审段的判决。
@@ -103,7 +104,7 @@ deed init \
 ## 一段的走法
 
 ```
-tick ──► task add ──► task done ──► review（出任务书）──► review --verdict ──►
+tick ──► task add ──► task done ──► review（出任务书 · 记 review.brief）──► review --verdict ──►
                                                     │
    judge --pass ──► (下一条任务写入时开新段) ──► … ──► sign
         ▲                │
@@ -116,6 +117,8 @@ tick ──► task add ──► task done ──► review（出任务书）�
 - **判决与签收分开**：判决是段级、频繁、便宜，可以只判当前这批；签收是会话级、稀有，要求判决已过且没有剩余承诺。
 - **一个段只有一份有效的审查结论**：新结论落盘时，在案的那份作废——账本行不改写（只追加），作废是折叠时算出来的：投影上标 `voidedAt`／`voidedBy`，它不再算数；判过的不合格不能被后来的 pass 顶掉——先 `judge --rework` 把活放回桌面，重新交付、重新审，才判得动。只能回打最新那段，跨段打回被拒。
 - **结论必须晚于交付**：`review` 拒绝还有未做任务的段；判决拒绝"结论早于最后一次交付"的段（那是回答了旧内容）。
+- **出任务书本身是事实**：任务书在账本外，账本记它的路径与 sha256（`review.brief`）。没有这条记录，
+  账本就说不清一份结论读的是哪份纸；只有它落过账，结论才可能对得上审查者手里的字节。
 - **任务只有三种活法**：做完（`done` → `accepted`）、延后（`defer`）、放弃（`drop`）。延后与放弃都要写 `--why`，都算结清、不挡签收，但会在 `deed state` 的"欠着"一行常驻，带进下一期。
 
 ## 每一步谁动手
@@ -148,12 +151,14 @@ tick ──► task add ──► task done ──► review（出任务书）�
 | `--digest` 指到工作区外面、或指一个目录 | `task done`（只认工作区里的普通文件） |
 | 改门槛却不说为什么 | `init`（`--why` 必填，改动进账本） |
 | 手工改 `.deed/config.json` 而不收进账本 | `deed verify`（`门槛对不上`，exit 1；判据根本不读那个文件） |
-| 任务书被改过、丢了、或账本没记它的指纹 | `deed verify`（重算 sha256；exit 1，修法是打回后重审，任务书当场重写） |
+| 任务书被改过、丢了、或账本没记它的指纹 | `deed verify`（重算 sha256；exit 1，修法是打回后重审或另出一份） |
+| 没出任务书就落结论 | `review`（"这一段还没有任务书"；结论只能回答交出去过的那一份） |
+| `.deed/review/` 里躺着一份账本没记过的纸 | `deed verify`（`任务书没人认领`；手写的读它不算数） |
 
 ## 另外三条命令
 
 ```bash
-deed verify      # 重算证据、任务书与门槛：证据报"路径越界""证据过期""没钉内容"，任务书报"越界""对不上""不在了""没指纹"，门槛报"对不上"，有坏的就 exit 1
+deed verify      # 重算证据、任务书与门槛：证据报"路径越界""证据过期""没钉内容"，任务书报"越界""对不上""不在了""没人发过""没人认领"，门槛报"对不上"，有坏的就 exit 1
 deed doctor      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法
 deed gate        # 按账本里的 gates 顺序跑门命令，第一条不过就停，报名字与退出码
 ```
@@ -171,14 +176,14 @@ deed serve          # http://127.0.0.1:7317，账本一变页面自己变（SSE�
 ## 目录
 
 ```
-core/events.mjs   14 种事件的形状与必填校验
+core/events.mjs   15 种事件的形状与必填校验
 core/fold.mjs     事件 → 会话 / 段 / 任务 / 待裁 / 门槛（纯函数，兼任语义闸门）
 core/rules.mjs    判据：要不要审、能不能判、能不能签、下一步是谁、文件与账本差在哪
 cli/store.mjs     账本读写、配置、并发锁
 cli/deed.mjs      命令面；每个动作先折后写
 board/render.mjs  账本 → 一页 HTML（纯函数）
 board/serve.mjs   本机只读服务 + SSE
-design/DESIGN.md  权威设计：三层结构、不变式、八条硬规则、判据表
+design/DESIGN.md  权威设计：三层结构、不变式、九条硬规则、判据表
 docs/deed-architecture.html   完整架构图（单文件，手工维护，规矩见 docs/README.md）
 support/lib.mjs   测试用的临时工作区
 examples/         示例账本 + 重放脚本（node examples/rebuild.mjs）
@@ -188,7 +193,8 @@ examples/         示例账本 + 重放脚本（node examples/rebuild.mjs）
 
 - **没有多工作区总览**：一屏只回答"这个工作区现在到哪一步"。跨项目汇总故意不做。
 - **审查结论是文本，不是签名链**：任务书、结论、指纹都落盘可回溯，但没有密钥签名。任务书是账本外的普通文件，
-  谁都能改；账本只记它的 sha256，`deed verify` 能发现改动，发现之前它不算证据。
+  谁都能改；账本记它的路径与 sha256，`deed verify` 能发现改动，发现之前它不算证据。谁改的、谁发的，
+  账本仍然不知道——它只保证"结论对得上审查者被交出去的那一份"。
 - **证据会过期**：`deed verify` 重算指纹，改了代码不重跑就报"证据过期"。它不会自动跑。
 - **账本坏了不自愈**：追加写不修历史；一条读不懂的行只能整行挪进 `.deed/log/rejected/`，`deed doctor` 会说清楚。
 - **并发靠一把文件锁**：同一工作区的两个进程排队，最多等 10 秒；锁里写着持有者的 pid 与开始时间，

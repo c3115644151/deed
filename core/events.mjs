@@ -10,6 +10,7 @@ export const EVENT_KINDS = [
   "ask.raise",
   "ask.resolve",
   "ask.withdraw",
+  "review.brief",
   "review.log",
   "judge.pass",
   "judge.rework",
@@ -71,6 +72,14 @@ export function validateEvent(ev, at) {
     case "ask.withdraw":
       need(ev, "id");
       need(ev, "why");
+      break;
+    // Handing the brief out is a fact, not a side effect: without it the
+    // ledger cannot say which document a verdict answered.
+    case "review.brief":
+      need(ev, "segment");
+      need(ev, "brief");
+      if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
+        throw new Error("review.brief 的 briefDigest 要是任务书的 sha256（64 位小写 hex）：" + ev.briefDigest);
       break;
     case "review.log":
       need(ev, "segment");
