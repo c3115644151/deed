@@ -225,6 +225,16 @@ export function fold(events) {
         const missing = session.tasks.filter((one) => one.segment === segment.id && one.status === "todo");
         if (missing.length > 0)
           noway(`段 ${segment.id} 还有没交付的（${missing.map((one) => one.id).join("、")}）：结论只能落在交付之后`);
+        // 谁做的活不能由谁自己清账：那样结论就是交付自己的说法。身份是自述，
+        // 所以这里堵的是默认路径（同一个标签两头都用），不是刻意换名字的人。
+        const ownWork = session.tasks
+          .filter((one) => one.segment === segment.id)
+          .filter((one) => one.evidence.some((proof) => proof.by === ev.by))
+          .map((one) => one.id);
+        if (ownWork.length > 0)
+          noway(
+            `段 ${segment.id} 的 ${ownWork.join("、")} 是 ${ev.by} 交付的：同一个人不能判自己交付的段（换一个 --by，或让用户判）`,
+          );
         const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
         const latest = live[live.length - 1] ?? null;
         // A fail is a decision about this delivery. It is not a draft that a

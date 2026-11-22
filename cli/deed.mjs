@@ -45,6 +45,7 @@ import {
 } from "./store.mjs";
 import { start } from "../board/serve.mjs";
 import { BLOCK as AGENTS_BLOCK, wordsNotice } from "./words.mjs";
+import { hookNotice, silenceNotice } from "./heartbeat.mjs";
 
 const ROOT = process.cwd();
 const sameJson = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -866,6 +867,9 @@ const commands = {
         const loose = briefTrouble(briefs);
         const words = wordsNotice(ROOT);
         if (words) console.log("  接入 · " + words);
+        const last = events[events.length - 1];
+        const silence = silenceNotice(last?.at, stamp0);
+        console.log("  心跳 · " + hookNotice(ROOT) + (silence ? " · " + silence : ""));
         if (loose > 0)
           console.log(
             "  任务书对不上 " + loose + " 份（不算坏账，deed verify 看细节）：" +

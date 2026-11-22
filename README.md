@@ -163,9 +163,11 @@ tick ──► task add ──► task done ──► review（出任务书 · �
 
 ```bash
 deed verify      # 重算证据、任务书与门槛：证据报"路径越界""证据过期""没钉内容"，任务书报"越界""对不上""不在了""没人发过""没人认领"，门槛报"对不上"，有坏的就 exit 1
-deed doctor      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法
+deed doctor      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法。顺带两行：`接入`（工作区规则文件里有没有 `deed state`）、`心跳`（认得的宿主配置里跑不跑 `deed tick`，账本最后一条是几点的）
 deed gate        # 按账本里的 gates 顺序跑门命令，第一条不过就停，报名字与退出码
 ```
+
+`心跳` 这一行是 deed 唯一读本机时钟的地方：它说"账本最后一条 11-23 04:49（2 小时前）"，只说差值、不说好坏——跑长任务、人离开一会儿都正常。钩子装没装是硬事实（读 `.claude/settings.json`、`.codex/config.toml` 这几种认得的配置，里面有没有 `deed tick`），账本冷了多久只是提示。
 
 ## 看一眼
 
@@ -187,7 +189,7 @@ cli/store.mjs     账本读写、配置、并发锁
 cli/deed.mjs      命令面；每个动作先折后写
 board/render.mjs  账本 → 一页 HTML（纯函数）
 board/serve.mjs   本机只读服务 + SSE
-design/DESIGN.md  权威设计：三层结构、不变式、九条硬规则、判据表
+design/DESIGN.md  权威设计：三层结构、不变式、十条硬规则、判据表、不做与暂不做
 docs/deed-architecture.html   完整架构图（单文件，手工维护，规矩见 docs/README.md）
 support/lib.mjs   测试用的临时工作区
 examples/         示例账本 + 重放脚本（node examples/rebuild.mjs）

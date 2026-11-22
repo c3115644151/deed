@@ -665,3 +665,33 @@ test("a gate command is run in order, and the first failure stops it", () => {
   assert.equal(gate.status, 1);
   assert.match(gate.stderr, /退出码 3/);
 });
+
+// 身份是自述：账本剩不下"两个不同的人"这层保证，能查的只有"同一只手"。
+test("the hand that delivered a segment cannot write its verdict", () => {
+  const cwd = workspace("self-review");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "改折叠", "--criteria", "总账能重放", "--files", "core/fold.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "跑了 16 条", "--digest", proof(cwd), "--by", "agent");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "先把任务书交出去");
+  const self = deed(cwd, "review", "--segment", "S01.1", "--by", "agent", "--verdict", "pass");
+  assert.equal(self.status, 1, "交付者不能判自己交付的段");
+  assert.match(self.stderr, /同一个人不能判自己交付的段/);
+  assert.equal(kinds(cwd).filter((one) => one === "review.log").length, 0, "被拒的结论不进账本");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+});
+
+// 心跳只说两件能查的事：认得的宿主配置里有没有跑 deed tick，账本冷了多久。
+test("doctor says whether anything is keeping the record warm", () => {
+  const cwd = workspace("heartbeat");
+  deed(cwd, "init", "--said", "开始");
+  const before = deed(cwd, "doctor");
+  assert.equal(before.status, 0);
+  assert.match(before.stdout, /心跳 · 未接：/);
+  assert.match(before.stdout, /账本最后一条 .+（/);
+  fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "deed tick" }] } }));
+  const after = deed(cwd, "doctor");
+  assert.match(after.stdout, /心跳 · 已接/);
+  assert.doesNotMatch(deed(cwd, "state").stdout, /分钟前/, "状态页不读时钟，只有体检读");
+});
+
