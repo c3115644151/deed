@@ -44,6 +44,7 @@ import {
   writeSnapshot,
 } from "./store.mjs";
 import { start } from "../board/serve.mjs";
+import { BLOCK as AGENTS_BLOCK, wordsNotice } from "./words.mjs";
 
 const ROOT = process.cwd();
 const sameJson = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -53,7 +54,7 @@ const sha = (buffer) => crypto.createHash("sha256").update(buffer).digest("hex")
 // Flags that carry no value. Everything else must be followed by one: a value
 // that starts with -- is almost always a forgotten quote, and silently storing
 // "true" would turn evidence into a word nobody can check later.
-const BOOLEAN_FLAGS = new Set(["pass", "force"]);
+const BOOLEAN_FLAGS = new Set(["pass", "force", "print-agents"]);
 
 function parse(argv) {
   const flags = {};
@@ -410,6 +411,13 @@ function writeBrief(plan, brief) {
 const commands = {
   init(argv) {
     const { flags, words } = parse(argv);
+    // Printing the block is the only way deed helps a workspace describe it
+    // without writing into files it does not own; it must therefore work before
+    // init has touched anything, and must not touch anything itself.
+    if (flags["print-agents"]) {
+      console.log(AGENTS_BLOCK);
+      return;
+    }
     const p = ensureDirs(ROOT);
     const { doc: before } = load();
     const ledger = before.config;             // 账本里的门槛：判据只认这个
@@ -840,6 +848,8 @@ const commands = {
         if (stale.length > 0) console.log("  证据过期 " + stale.length + " 处（不算坏账）：" + stale.map((s) => s.id).join("、"));
         const briefs = auditBriefs(doc);
         const loose = briefTrouble(briefs);
+        const words = wordsNotice(ROOT);
+        if (words) console.log("  接入 · " + words);
         if (loose > 0)
           console.log(
             "  任务书对不上 " + loose + " 份（不算坏账，deed verify 看细节）：" +
@@ -900,6 +910,7 @@ const commands = {
 const HELP = [
   "deed · 工作区里的议事与执行机制",
   "",
+  "deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区",
   "deed init [--said \"…\"] [--review \"src/**,…\"] [--exempt \"docs/**\"] [--port 7317]",
   "deed tick --who user|agent --said \"…\" [--did \"…\"] [--session S01]",
   "deed task add \"<承诺>\" --criteria \"<做完的标准>\" [--files \"src/a.mjs,docs/b.md\"]",

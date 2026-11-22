@@ -206,6 +206,7 @@ export function renderBoard(doc, config, options = {}) {
     '<p class="nwhat">' + esc(step.what) + "　" + esc(step.text) + "</p>" +
     '<code class="ncmd">' + esc(step.command) + "</code>" +
     "</section>" +
+    (options.notice ? '<p class="notice">' + esc(options.notice) + "</p>" : "") +
     '<div class="stack">' + ordered.map((session) => periodSheet(doc, session, config, zone)).join("") + "</div>" +
     '<footer class="colophon">' +
     "<span>账本 .deed/log · 只读</span>" +
@@ -249,6 +250,7 @@ body {
 .nwhat { margin: 0; font-size: 22px; line-height: 1.4; letter-spacing: .02em; }
 .ncmd { grid-column: 2; font-family: var(--mono); font-size: 12px; color: var(--seal); background: rgba(157,43,29,.05); border-left: 3px solid var(--seal); padding: 6px 10px; overflow-wrap: anywhere; }
 
+.notice { margin: 12px 0 0; padding-left: 156px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--grass); }
 .stack { margin-top: 34px; }
 .period { display: grid; grid-template-columns: 116px 1fr; gap: 0 26px; padding: 22px 0 30px; border-bottom: 1px solid var(--rule); }
 .period.shut { opacity: .9; }

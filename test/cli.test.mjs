@@ -45,6 +45,27 @@ test("init refuses to overwrite a workspace that is already bound", () => {
   assert.equal(kinds(cwd).length, 4);
 });
 
+test("init --print-agents hands over the rules without writing into the workspace", () => {
+  const cwd = workspace("print-agents");
+  const said = deed(cwd, "init", "--print-agents");
+  assert.equal(said.status, 0);
+  assert.match(said.stdout, /deed state/, "那段里得点名查下一步的命令");
+  assert.match(said.stdout, /deed tick/);
+  assert.equal(fs.existsSync(path.join(cwd, ".deed")), false, "只打印，不建账本");
+  assert.equal(fs.existsSync(path.join(cwd, "AGENTS.md")), false, "规则归属人，deed 不替它写文件");
+});
+
+test("doctor keeps saying it until the workspace tells its agents where to ask", () => {
+  const cwd = workspace("doctor-words");
+  deed(cwd, "init", "--said", "开始");
+  assert.match(deed(cwd, "doctor").stdout, /接入 · 这个工作区没有 AGENTS\.md/);
+  fs.writeFileSync(path.join(cwd, "AGENTS.md"), "# 管理\n\n下一步看 `deed state`。\n");
+  const told = deed(cwd, "doctor");
+  assert.equal(told.status, 0);
+  assert.match(told.stdout, /账本干净/);
+  assert.doesNotMatch(told.stdout, /接入 · /, "已经写清楚了就别再念，否则这句提示会变成噪音");
+});
+
 test("a turn must say what was said", () => {
   const cwd = workspace("tick");
   deed(cwd, "init", "--said", "开始");

@@ -8,6 +8,7 @@ import path from "node:path";
 import { fold } from "../core/fold.mjs";
 import { pressure, reading, countIn, currentSession, openSegment, nextAction, pendingAsks, signBlockers } from "../core/rules.mjs";
 import { readEvents } from "../cli/store.mjs";
+import { wordsNotice } from "../cli/words.mjs";
 import { renderBoard, when } from "./render.mjs";
 
 function snapshot(root) {
@@ -48,7 +49,9 @@ export function handler(root) {
       let html;
       try {
         const { doc, events, config } = snapshot(root);
-        html = renderBoard(doc, config, { zone: zoneOfMachine(), events: events.length });
+        // The notice is an input, not a lookup: the page still renders from what
+        // the caller hands it, so the same facts always produce the same bytes.
+        html = renderBoard(doc, config, { zone: zoneOfMachine(), events: events.length, notice: wordsNotice(root) });
       } catch (error) {
         res.writeHead(500, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         res.end(req.method === "HEAD" ? "" : brokenPage(error));

@@ -104,6 +104,7 @@ init（写 config + 记第一轮）
 | 动作 | 谁 | 作用 |
 |---|---|---|
 | `deed init` | 人 | 首次：把门槛写进账本（三条 `config.change` 基线）并记第一轮；`--force` 改门槛要带 `--why`，改动同样记为 `config.change`，文件只是跟着写出来的镜像 |
+| `deed init --print-agents` | 人 / agent | 打印一段可粘贴的规则（点明 `deed state` 等命令）；只打印，不建账本、不写工作区 |
 | `deed tick` | 机制 / agent | 记一轮（谁、说了什么、做了什么）；只有它能开会话 |
 | `deed task add/done/defer/drop` | agent | 承诺、交付（done 必须带证据）、延后、放弃（后两者带理由） |
 | `deed ask` | agent | 把模糊需求变成待裁项，必须写清"我理解成什么、为什么不确定" |
@@ -118,6 +119,8 @@ init（写 config + 记第一轮）
 | `deed serve` | 任意 | 只读面板（SSE 自刷新） |
 
 没有 `start`、没有 `park`、没有 `back`。会话不由人建，就没有"建"的命令。
+
+**规则文件不归 deed**：仓库的 `AGENTS.md`（或 `CLAUDE.md`）属于管这个仓库的人，deed 读它、不写它。读出来的结论只有一条——里面有没有 `deed state`；没有就每次 `deed doctor` 提一句、面板顶端挂同一句，直到有人把那段粘进去。这条提示不算坏账，也不改任何事实：账本照样可折叠，判断照样出得来。
 
 ## 8. 数据形态
 

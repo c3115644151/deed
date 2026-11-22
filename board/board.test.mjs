@@ -85,6 +85,9 @@ test("the page names the next actor instead of listing everything", () => {
 
 test("serving is read-only and says so", async () => {
   const root = workspace("serve");
+  // The workspace already tells its agents where the ledger is, so the page
+  // has nothing to add -- and the bytes stay comparable to a bare render.
+  fs.writeFileSync(path.join(root, "AGENTS.md"), "看下一步：deed state\n");
   for (const event of configEvents) append(root, event);
   for (const event of events) append(root, event);
   const server = start(root, 0);
@@ -117,6 +120,30 @@ test("serving is read-only and says so", async () => {
     assert.equal(stream.statusCode, 200);
     assert.match(stream.headers["content-type"], /text\/event-stream/);
     stream.destroy();
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("a notice is an input to the page, not something the page looks up", () => {
+  assert.doesNotMatch(render(), /class="notice"/);
+  const told = { zone, events: ledger, notice: "AGENTS.md 里没提 deed state" };
+  const html = renderBoard(doc, config, told);
+  assert.match(html, /<p class="notice">AGENTS\.md 里没提 deed state<\/p>/);
+  assert.equal(html, renderBoard(fold(events), config, told), "同一份事实与同一条提示，还是同一页");
+});
+
+test("a workspace that never told its agents where to ask gets one line on the page", async () => {
+  const root = workspace("notice");
+  for (const event of configEvents) append(root, event);
+  for (const event of events) append(root, event);
+  const server = start(root, 0);
+  await new Promise((resolve) => server.once("listening", resolve));
+  const port = server.address().port;
+  try {
+    assert.match((await get(port, "/")).body, /<p class="notice">这个工作区没有 AGENTS\.md/);
+    fs.writeFileSync(path.join(root, "AGENTS.md"), "## 账在 deed\n- 看下一步：\`deed state\`\n");
+    assert.doesNotMatch((await get(port, "/")).body, /class="notice"/, "写进去之后就不该再念");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

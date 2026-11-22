@@ -82,7 +82,8 @@ deed init \
 
 **已有工作区**：init 不搬旧历史，也不需要。第一轮 `tick` 就是你现在这句话；之前的事留在它原来的地方，账本从今天开始记。
 
-接完在宿主的 `AGENTS.md` 里钉这几行，让下一位 agent 知道规矩（这是整套东西唯一需要人粘贴的部分）：
+接完在宿主的规则文件里钉一段，让下一位 agent 知道规矩。`deed init --print-agents` 打印的就是下面这段，原样粘进 `AGENTS.md`（或 `CLAUDE.md`）——
+deed 不替你写那个文件：它属于管理这个仓库的人。没粘不报错，但 `deed doctor` 每次都会提一句「接入 · …」，面板顶上也会挂着同一句，直到有人写进去。
 
 ```md
 ## 治理
@@ -90,15 +91,15 @@ deed init \
 - 要做事先 `deed task add "承诺" --criteria "做完的标准" --files core/a.mjs,cli/b.mjs`（逗号分隔、正斜杠）；做完 `deed task done <T> --evidence "命令与结果" --digest <工作区里的文件>`。
 - 拿不准就问 `deed ask "…" --reading "我理解成…" --why "为什么得你定"`，只有用户能 `ask resolve`。
 - `deed state` 只说下一步是谁；照着做，不要自己另排优先级。
-- 要审的段：`deed review --segment S0x.N` 出任务书（记一条 `review.brief`，不写结论），审查者照它落 `--by "谁" --verdict pass|fail`；
-  结论要求这一段已经全部交付（还有未做的会被拒），并且是这一段的最后一份结论。
-- 只有交出去过的任务书才能被回答：没出过任务书就落结论会被拒；交出去之后那份字节被改过、或文件不在了，
-  结论也落不下来（`deed review --segment S0x.N` 另出一份，旧的那条记录留着让 `verify` 报）。
-- 结论钉的是交出去那一刻的 sha256（`briefDigest`，必填），不是落结论时现写的一份；
-  `deed verify` 会重算核对。
+- 要审的段：`deed review --segment S0x.N` 出任务书（记一条 `review.brief`，不写结论），审查者照它落 `--by "谁" --verdict pass|fail`；结论要求这一段已经全部交付（还有未做的会被拒），并且是这一段的最后一份结论。
+- 只有交出去过的任务书才能被回答：没出过任务书就落结论会被拒；交出去之后那份字节被改过、或文件不在了，结论也落不下来（`deed review --segment S0x.N` 另出一份，旧的那条记录留着让 `verify` 报）。
+- 结论钉的是交出去那一刻的 sha256（`briefDigest`，必填），不是落结论时现写的一份；`deed verify` 会重算核对。
 - 用户判决 `deed judge --pass`／`deed judge --rework T1,T2 --why "…"`，签收 `deed sign --words "<用户原话>"`。
 - 身份是约定不是鉴权：`--by`、`who`、`sign` 记的是自述，账本保证"谁说过什么"可回溯，不保证"说的人是谁"。
 - 交付证据每条都带 `--digest <工作区里的文件>`：说得清做了什么，也钉得住当时的内容；没钉的证据仍在账本里，但会挡住要审段的判决。
+- 查：`deed verify`（证据与指纹）、`deed doctor`（账本能否折叠）、`deed serve`（本机只读面板）。
+
+没有落进账本的动作不算发生过；状态是推出来的，不用手写。
 ```
 
 ## 一段的走法
