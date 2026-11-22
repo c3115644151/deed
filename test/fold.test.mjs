@@ -11,7 +11,7 @@ const review = (n, segment, verdict = "pass", findings = []) => ({
   v: 1, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict, brief: "b.md", findings,
 });
 const judgePass = (n, segment) => ({ v: 1, at: T(n), k: "judge.pass", s: null, segment, by: "user" });
-const rework = (n, segment, tasks, why = "不够") => ({ v: 1, at: T(n), k: "judge.rework", s: null, segment, tasks, why });
+const rework = (n, segment, tasks, why = "不够", by = "qa") => ({ v: 1, at: T(n), k: "judge.rework", s: null, segment, tasks, why, by });
 const sign = (n, words = "可以", title = "第一期") => ({ v: 1, at: T(n), k: "sign", s: null, words, title, by: "user" });
 
 test("the first recorded turn opens a session by itself", () => {

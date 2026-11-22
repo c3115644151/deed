@@ -1,0 +1,4 @@
+# 账本、任务书、证据都钉字节 sha256（core/digest.mjs 对 content 求指纹）。
+# Git 默认会按平台把换行改写一遍：Windows 上一次 checkout 就能让 verify 报
+# 「任务书被改过」，而文件其实一个字符都没动。所以这里一律不做换行转换。
+* -text

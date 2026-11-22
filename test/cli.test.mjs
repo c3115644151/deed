@@ -95,12 +95,12 @@ test("delivery needs evidence, and the reviewer decides what counts", () => {
   assert.equal(deed(cwd, "task", "add", "改折叠函数", "--criteria", "同样的账本折出同样的文档", "--files", "core/fold.mjs").status, 0);
   assert.equal(deed(cwd, "task", "done", "T1").status, 1, "没有证据不算交付");
   assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "node --test 25/25", "--digest", proof(cwd)).status, 0);
-  const blocked = deed(cwd, "judge", "--pass");
+  const blocked = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(blocked.status, 1, "碰了要审的路径就要审查");
   assert.match(blocked.stderr, /要审|审查/);
   assert.equal(deed(cwd, "review").status, 0, "先出任务书");
   assert.equal(deed(cwd, "review", "--by", "reviewer", "--verdict", "pass").status, 0);
-  assert.equal(deed(cwd, "judge", "--pass").status, 0);
+  assert.equal(deed(cwd, "judge", "--pass", "--by", "user").status, 0);
 });
 
 test("handing the brief out is a fact, and a verdict answers that document", () => {
@@ -218,17 +218,57 @@ test("verify names the brief nobody handed out and the file nobody claims", () =
 test("signing needs a judgement and the user own words", () => {
   const cwd = workspace("sign");
   deed(cwd, "init", "--said", "开始");
-  assert.equal(deed(cwd, "sign", "--words", "可以").status, 1, "什么都没交付不能签收");
+  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 1, "什么都没交付不能签收");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  assert.equal(deed(cwd, "sign", "--words", "可以").status, 1, "段还没判");
-  deed(cwd, "judge", "--pass");
-  assert.equal(deed(cwd, "sign").status, 1, "签收要留原话");
-  assert.equal(deed(cwd, "sign", "--words", "可以，就这样", "--title", "上手").status, 0);
+  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 1, "段还没判");
+  deed(cwd, "judge", "--pass", "--by", "user");
+  assert.equal(deed(cwd, "sign", "--by", "user").status, 1, "签收要留原话");
+  assert.equal(deed(cwd, "sign", "--words", "可以，就这样", "--title", "上手", "--by", "user").status, 0);
   const signed = readEvents(cwd).find((one) => one.k === "sign");
   assert.equal(signed.words, "可以，就这样");
   assert.equal(signed.title, "上手");
 });
+
+// 账本替人签过名：judge --pass 与 sign 以前默认写 by: "user"，于是 agent 交付、
+// 判决、签收一条龙之后，记录上写着是用户按的。名字现在必须由写者给。
+test("a piped judgement or signing names the hand that typed it", () => {
+  const cwd = workspace("name-it");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  const unnamed = deed(cwd, "judge", "--pass");
+  assert.equal(unnamed.status, 1, "管道里跑的判决不能自动记成用户按的");
+  assert.match(unnamed.stderr, /--by/);
+  assert.equal(deed(cwd, "judge", "--pass", "--by", "agent:claude").status, 0);
+  const typed = deed(cwd, "sign", "--words", "可以");
+  assert.equal(typed.status, 1, "签收同理");
+  assert.match(typed.stderr, /--by/);
+  assert.equal(readEvents(cwd).filter((one) => one.k === "sign").length, 0, "被拒的签收一行都不落");
+});
+
+// 4 MB 以上没称重的文件以前直接跳过：只声明文档的交付能把它盖过去，段还判"免审"。
+test("a file too large to weigh still counts as a change", () => {
+  const cwd = workspace("unweighed");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "# a\n");
+  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "src", "fixture.bin"), Buffer.alloc(4_000_001));
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "文档写完了").status, 0, "交付本身不被挡");
+  const delivery = readEvents(cwd).find((one) => one.k === "task.done");
+  assert.ok(delivery.changed.includes("src/fixture.bin"), "没称重的文件也是改动：" + delivery.changed);
+  assert.match(deed(cwd, "state").stdout, /要审/, "碰撞了要审的路径，段不能再叫免审");
+});
+
+// PowerShell 5.1 会把 --did "" 变成裸开关，账本落 did: true，读起来像"这轮做过事"。
+test("a turn cannot record a did it never wrote", () => {
+  assert.throws(() => validateEvent({ k: "turn", who: "user", said: "开始", did: 5 }), /did/);
+  assert.ok(validateEvent({ k: "turn", who: "user", said: "开始", did: true }));
+  assert.ok(validateEvent({ k: "turn", who: "user", said: "开始", did: "跑了一遍测试" }));
+});
+
 
 // The slip the review found: an action that fold refuses must leave nothing behind.
 test("a refused action never reaches the ledger, and the workspace keeps working", () => {
@@ -241,7 +281,7 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.equal(unknown.status, 1, "点名不存在的任务要被拒");
   assert.match(unknown.stderr, /没有任务|不在/);
   assert.equal(readEvents(cwd).length, before, "被拒的动作一个字节也没写进去");
-  deed(cwd, "judge", "--pass");
+  deed(cwd, "judge", "--pass", "--by", "user");
   const sealed = deed(cwd, "task", "done", "T1", "--evidence", "判过之后又改");
   assert.equal(sealed.status, 1, "判过的段不能再往任务上写");
   assert.match(sealed.stderr, /已封存/);
@@ -256,8 +296,8 @@ test("a closed period cannot be written into, and no verb invents a new one", ()
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "judge", "--pass");
-  deed(cwd, "sign", "--words", "可以");
+  deed(cwd, "judge", "--pass", "--by", "user");
+  deed(cwd, "sign", "--words", "可以", "--by", "user");
   const after = readEvents(cwd).length;
   const stray = deed(cwd, "task", "add", "又一件", "--criteria", "x");
   assert.equal(stray.status, 1, "签收之后不能靠 task add 开新期");
@@ -294,7 +334,7 @@ test("verify reports evidence pinned to content that has since changed, and hold
   const stale = deed(cwd, "verify");
   assert.equal(stale.status, 1);
   assert.match(stale.stdout, /证据过期/);
-  const judge = deed(cwd, "judge", "--pass");
+  const judge = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(judge.status, 1, "钉住的内容变了,这一条不能再当证据");
   assert.match(judge.stderr, /过期/);
 });
@@ -304,8 +344,8 @@ test("a rework after a verdict reopens the newest segment instead of starting ov
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "judge", "--pass");
-  assert.equal(deed(cwd, "judge", "--rework", "T1", "--why", "少了一节").status, 0);
+  deed(cwd, "judge", "--pass", "--by", "user");
+  assert.equal(deed(cwd, "judge", "--rework", "T1", "--why", "少了一节", "--by", "qa").status, 0);
   const doc = readEvents(cwd);
   assert.equal(doc.filter((one) => one.k === "judge.rework").length, 1);
   assert.equal(doc.filter((one) => one.s === "S01" && one.k === "task.add").length, 1, "打回不开新段");
@@ -365,7 +405,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   deed(cwd, "task", "add", "改折叠", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
-  const blocked = deed(cwd, "judge", "--pass");
+  const blocked = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(blocked.status, 1, "改文件不改变判据");
   assert.match(blocked.stderr, /要审|审查/);
   const drift = deed(cwd, "verify");
@@ -379,7 +419,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   assert.equal(last.why, "全部免审，只留文档");
   assert.deepEqual(last.to.required, [], "账本记的是改成什么样");
   assert.deepEqual(last.to.exempt, ["**"]);
-  assert.equal(deed(cwd, "judge", "--pass").status, 0, "账本放开了才算放开");
+  assert.equal(deed(cwd, "judge", "--pass", "--by", "user").status, 0, "账本放开了才算放开");
 });
 
 test("a config.json saved with a BOM reads the same as one without", () => {
@@ -439,13 +479,13 @@ test("a later pass cannot overwrite a standing fail; the work has to come back f
   const overturn = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass");
   assert.equal(overturn.status, 1, "在案的不合格不能被一条 pass 顶掉");
   assert.match(overturn.stderr, /不合格/);
-  const judge = deed(cwd, "judge", "--pass");
+  const judge = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(judge.status, 1);
-  assert.equal(deed(cwd, "judge", "--rework", "T1", "--why", "补并发证据").status, 0);
+  assert.equal(deed(cwd, "judge", "--rework", "T1", "--why", "补并发证据", "--by", "qa").status, 0);
   assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "跑了 8 个并发", "--digest", proof(cwd)).status, 0);
   deed(cwd, "review", "--segment", "S01.1");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
-  const after = deed(cwd, "judge", "--pass");
+  const after = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(after.status, 0, "重新审过、重新交付之后才判得动");
 });
 
@@ -532,7 +572,7 @@ test("a conclusion that lands before a later delivery goes stale, and the state 
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
   assert.match(state.stdout, /结论过期/, "审的是旧内容，状态里不能还写审查通过");
-  const judge = deed(cwd, "judge", "--pass");
+  const judge = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(judge.status, 1, "结论过期就不该判得动");
   assert.match(judge.stderr, /结论早于最后一次交付/);
 });
@@ -544,8 +584,8 @@ test("a rework leaves no standing verdict behind", () => {
   deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
   deed(cwd, "review", "--segment", "S01.1");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass");
-  deed(cwd, "judge", "--rework", "T1", "--why", "证据不够");
-  const skipped = deed(cwd, "judge", "--pass");
+  deed(cwd, "judge", "--rework", "T1", "--why", "证据不够", "--by", "qa");
+  const skipped = deed(cwd, "judge", "--pass", "--by", "user");
   assert.equal(skipped.status, 1, "打回之后没人再审，不能直接封段");
   assert.match(skipped.stderr, /作废|重新审/);
 });
@@ -557,7 +597,7 @@ test("a rework names every task it was given, in either spelling", () => {
   deed(cwd, "task", "add", "二", "--criteria", "c", "--files", "docs/b.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   deed(cwd, "task", "done", "T2", "--evidence", "写完了");
-  deed(cwd, "judge", "--rework", "T1", "T2", "--why", "两处都要补");
+  deed(cwd, "judge", "--rework", "T1", "T2", "--why", "两处都要补", "--by", "qa");
   const state = deed(cwd, "state");
   assert.match(state.stdout, /○ T1/);
   assert.match(state.stdout, /○ T2/);
@@ -622,8 +662,8 @@ test("--session that names no period is refused by every verb that takes one", (
   for (const args of [
     ["task", "done", "T1", "--evidence", "写完了", "--session", "S99"],
     ["review", "--segment", "S01.1", "--session", "S99"],
-    ["judge", "--pass", "--session", "S99"],
-    ["sign", "--words", "可以", "--session", "S99"],
+    ["judge", "--pass", "--by", "user", "--session", "S99"],
+    ["sign", "--words", "可以", "--by", "user", "--session", "S99"],
   ]) {
     const refused = deed(cwd, ...args);
     assert.equal(refused.status, 1, args.join(" ") + " 要点名真存在的会话");

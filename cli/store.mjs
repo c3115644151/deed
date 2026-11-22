@@ -170,6 +170,13 @@ export function writeConfig(root, config) {
 const SKIP_DIRS = new Set([".deed", ".git", "node_modules", ".shots", ".idea", ".vscode"]);
 const MAX_HASH_BYTES = 4_000_000;
 
+// A file too large to hash is not "unchanged", it is "not weighed". It keeps a
+// marker made of its size: a new one, or one whose size moved, still reads as a
+// change, so a task cannot cover it by declaring only the files it did touch.
+// What the marker cannot see is a same-size edit inside such a file; that is the
+// one blind spot this snapshot is allowed to have, and it is written down.
+const unweighed = (size) => "!size:" + size;
+
 function scanWorkspace(root) {
   const found = new Map();
   const walk = (dir) => {
@@ -193,11 +200,17 @@ function scanWorkspace(root) {
       } catch {
         continue;
       }
-      if (size > MAX_HASH_BYTES) continue;
+      const relative = path.relative(root, full).split(path.sep).join("/");
+      if (size > MAX_HASH_BYTES) {
+        found.set(relative, unweighed(size));
+        continue;
+      }
       try {
-        found.set(path.relative(root, full).split(path.sep).join("/"), crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex"));
+        found.set(relative, crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex"));
       } catch {
-        /* unreadable file: it cannot be evidence of a change either */
+        // Recorded rather than dropped: a file this delivery could not read is a
+        // path it cannot vouch for, and vouching for it silently is the bug.
+        found.set(relative, "!unreadable");
       }
     }
   };
@@ -230,8 +243,8 @@ export function writeSnapshot(root, files) {
     let seen;
     try {
       const full = path.join(root, file);
-      if (fs.statSync(full).size > MAX_HASH_BYTES) continue;
-      seen = crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex");
+      const size = fs.statSync(full).size;
+      seen = size > MAX_HASH_BYTES ? unweighed(size) : crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex");
     } catch {
       continue;
     }

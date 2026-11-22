@@ -312,6 +312,16 @@ const REVIEW_LABEL = {
   stale: "结论过期 · 审的是旧内容，要重审",
 };
 
+// 账本替人签过名：判决和签收以前默认写 by: "user"，于是 agent 交付、判决、
+// 签收一条龙之后，记录上写着是用户按的。名字现在必须由写者给；只有真的在终端
+// 里敲（stdin 与 stdout 都是 tty）才允许默认 "user"——那是"有个人在键盘前"这个
+// 事实，不是"这个人是用户"这个推断。
+function signer(flags, act) {
+  if (flags.by) return flags.by;
+  if (process.stdin.isTTY && process.stdout.isTTY) return "user";
+  fail(act + "不是从终端敲的：deed 不会替你写「用户按的」。写 --by「谁」（比如 agent:claude）");
+}
+
 function printState() {
   const { doc, events } = load();
   const config = doc.config;
@@ -733,7 +743,7 @@ const commands = {
           fail("这一段有证据过期（" + stale.map((s) => s.id + " 钉在 " + s.path).join("、") + "），钉住的内容已经变了：重新交付再判");
         const blockers = judgeBlockers(doc.config, one, seg);
         if (blockers.length > 0) fail("这一段还不能判：" + blockers.join("；"));
-        const after = transact(flags, () => ({ k: "judge.pass", s: one.id, segment: seg.id, by: flags.by ?? "user" })).doc;
+        const after = transact(flags, () => ({ k: "judge.pass", s: one.id, segment: seg.id, by: signer(flags, "判决") })).doc;
         console.log("判决通过 · " + seg.id + " · 段已封存");
         const step = nextAction(after, after.config);
         console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
@@ -746,12 +756,14 @@ const commands = {
         const named2 = [...split(flags.rework), ...words].filter(Boolean);
         if (named2.length === 0) fail("judge --rework 要点名要重做的任务");
         if (!flags.why) fail("judge --rework 要说清为什么：--why \"…\"");
-        transact(flags, () => ({ k: "judge.rework", s: one.id, segment: seg.id, tasks: named2, why: flags.why }));
-        console.log("打回 · " + seg.id + " · " + named2.join("、") + " · " + flags.why);
+        // 撕掉一张判决纸和签发一张纸一样要署名：否则账本只记得谁判过，不记得谁推翻的。
+        if (!flags.by) fail("judge --rework 要写清谁打回的：--by \"…\"");
+        transact(flags, () => ({ k: "judge.rework", s: one.id, segment: seg.id, tasks: named2, why: flags.why, by: flags.by }));
+        console.log("打回 · " + seg.id + " · " + named2.join("、") + " · " + flags.by + " · " + flags.why);
         console.log("  段没封，补完再判；上一份审查结论已经作废");
         return;
       }
-      fail("judge 只认 --pass 或 --rework <任务…> --why \"…\"");
+      fail("judge 只认 --pass 或 --rework <任务…> --why \"…\" --by \"…\"");
     });
   },
 
@@ -764,7 +776,7 @@ const commands = {
       if (blockers.length > 0) fail("还不能签收：" + blockers.join("；"));
       if (!flags.words) fail("签收要留用户原话：--words \"…\"");
       const title = flags.title ?? period(doc);
-      transact(flags, () => ({ k: "sign", s: one.id, words: flags.words, title, by: "user" }));
+      transact(flags, () => ({ k: "sign", s: one.id, words: flags.words, title, by: signer(flags, "签收") }));
       console.log("签收 · " + one.id + " · " + title + " · 「" + flags.words + "」");
       const owed = debt(one);
       if (owed.deferred.length + owed.dropped.length > 0)
@@ -974,7 +986,7 @@ const HELP = [
   "deed review [--segment S01.1]            出任务书（记一条 review.brief），打印路径",
   "deed review --segment S01.1 --by \"谁\" --verdict pass|fail [--finding \"…\"]",
   "deed judge --pass [--segment S01.1]",
-  "deed judge --rework T1,T2 --why \"…\" [--segment S01.1]",
+  "deed judge --rework T1,T2 --why \"…\" --by \"…\" [--segment S01.1]",
   "deed sign --words \"<用户原话>\" [--title \"<这一期的名字>\"]",
   "deed shelve --why \"…\"",
   "deed state",

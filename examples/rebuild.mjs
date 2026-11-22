@@ -32,8 +32,8 @@ deed("task", "done", "T2", "--evidence", "照着 NOTES.md 走了一遍：六条�
 
 deed("review", "--segment", "S01.1");
 deed("review", "--segment", "S01.1", "--by", "reviewer:independent", "--verdict", "pass");
-deed("judge", "--pass");
-deed("sign", "--words", "可以，示例就这样", "--title", "示例账本立起来");
+deed("judge", "--pass", "--by", "user");
+deed("sign", "--words", "可以，示例就这样", "--title", "示例账本立起来", "--by", "user");
 
 deed("tick", "--who", "user", "--said", "再补一段：让门、打回、欠账各出现一次");
 deed("task", "add", "让门说出失败在哪", "--criteria", "一条命令就能看到是哪条命令、退出码几", "--files", ".deed/config.json");
@@ -42,17 +42,17 @@ deed("task", "add", "让面板跟着账本动", "--criteria", "GET / 与渲染�
 deed("task", "done", "T4", "--evidence", "board 测试 6/6 · curl /state 200 · POST 405", "--digest", ".deed/config.json");
 deed("review", "--segment", "S02.1");
 deed("review", "--segment", "S02.1", "--by", "reviewer:independent", "--verdict", "pass");
-deed("judge", "--pass");
+deed("judge", "--pass", "--by", "user");
 
 deed("task", "add", "把说明和账本对上", "--criteria", "README 的六行能走完一整轮", "--files", "NOTES.md");
 deed("task", "done", "T5", "--evidence", "按说明跑了一遍：init 到 sign", "--digest", "NOTES.md");
 deed("review", "--segment", "S02.2");
 deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "fail", "--finding", "说明里没写 --digest：证据没钉内容，过期了查不出来");
-deed("judge", "--rework", "T5", "--why", "补 --digest，重跑一遍");
+deed("judge", "--rework", "T5", "--why", "补 --digest，重跑一遍", "--by", "agent:main");
 deed("task", "done", "T5", "--evidence", "重跑：每条证据都钉在一份文件上", "--digest", "NOTES.md");
 deed("review", "--segment", "S02.2");
 deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "pass");
-deed("judge", "--pass");
+deed("judge", "--pass", "--by", "user");
 
 deed("ask", "示例账本要不要跟着示例一起提交？", "--reading", "一起提交：它是看得见的事实", "--why", "看不见的账本等于没有");
 deed("ask", "resolve", "A1", "--decision", "一起提交，账本随仓库走");

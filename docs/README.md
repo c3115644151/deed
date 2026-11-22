@@ -4,8 +4,9 @@
 
 它与 `design/DESIGN.md` 的关系：DESIGN 是文字权威，这张图是同一套结构的一次性速览；两者冲突时改图。
 
-生成它用的是一次性的 archify 流水线（规格在 `.archify/architecture-deed-20261122-2215/candidate.json`），
-archify 不在本仓库里。那张图跑过它的四门（validate / deliver / check / browser-check），
+生成它用的是一次性的 archify 流水线，那份规格（`.archify/…/candidate.json`）随临时目录一起没进仓库，
+所以这张图现在是**手维护**的源文件：改它就直接改 HTML，别指望能重新生成。
+当初它跑过 archify 的四门（validate / deliver / check / browser-check），
 但之后图被手工改过（审查任务书的文件名带时间戳，标签跟着改），所以当初的验收回执对不上现在的字节 —— 那些回执已经删掉，不留过期证据。
 
 改图的规矩：只用内联字体与内联脚本，不加外部资源；改完在浏览器里真开一次，确认 1440 宽无横向溢出、暗色可读。

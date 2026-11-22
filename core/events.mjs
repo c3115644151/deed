@@ -53,6 +53,11 @@ export function validateEvent(ev, at) {
       need(ev, "who");
       if (!WHO.includes(ev.who)) throw new Error(`轮次的 who 只能是 user 或 agent：${ev.who}`);
       need(ev, "said");
+      // 空参数会被有些 shell 吞掉（PowerShell 5.1 会把 --did "" 变成裸开关），
+      // 于是 did 落成 true，账本读起来像"这轮做过事"。类型也要查：这不是记轮的人
+      // 说错了，是一行会被误读的事实。
+      if (ev.did !== undefined && typeof ev.did !== "boolean" && typeof ev.did !== "string")
+        throw new Error("turn 的 did 要写成一句话，或者 true/false");
       break;
     case "task.add":
       need(ev, "id");
@@ -113,6 +118,10 @@ export function validateEvent(ev, at) {
     case "judge.rework":
       need(ev, "segment");
       need(ev, "why");
+      // Tearing up a verdict is a decision about someone else's work: it needs
+      // the same signature as handing one out, or the record shows who judged
+      // and never who overruled.
+      need(ev, "by");
       break;
     case "sign":
       need(ev, "words");

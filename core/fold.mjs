@@ -249,7 +249,7 @@ export function fold(events) {
         // both claim to be the current one.
         for (const one of live) {
           one.voidedAt = ev.at;
-          one.voidedBy = id;
+          one.supersededBy = id;
         }
         session.reviews.push({
           id,
@@ -261,6 +261,8 @@ export function fold(events) {
           findings: ev.findings ?? [],
           at: ev.at,
           voidedAt: null,
+          voidedBy: null,
+          supersededBy: null,
         });
         // Keep the pair traceable: which handed-out document this verdict answers.
         const handed = session.briefs.find((one) => one.brief === ev.brief && one.segment === segment.id);
@@ -317,7 +319,11 @@ export function fold(events) {
         }
         // The verdict answered the old delivery; after a rework it is not a
         // fact about the new one, so it stays in the ledger but stops counting.
-        for (const review of session.reviews) if (review.segment === segment.id) review.voidedAt = ev.at;
+        for (const review of session.reviews)
+          if (review.segment === segment.id) {
+            review.voidedAt = ev.at;
+            review.voidedBy = ev.by;
+          }
         segment.reviewVerdict = null;
         segment.reviewAt = null;
         segment.reviewBy = null;
