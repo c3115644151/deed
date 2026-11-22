@@ -408,6 +408,20 @@ function writeBrief(plan, brief) {
   return brief;
 }
 
+// 接过之后能立刻做完的几件事。一次说全，省得 agent 再翻文档去猜；
+// 每一件都是可选的：没人做，账本照样能往下走。
+function optionalBlock(config) {
+  const port = config.board.port;
+  return [
+    " 接下来这几件都能现在做完（都可选，不做也不会坏）：",
+    "   规则     deed init --print-agents  → 原样粘进 AGENTS.md 或 CLAUDE.md（deed 不写那个文件）",
+    "   面板     deed serve                → 本机只读 http://127.0.0.1:" + port,
+    "   体检     deed doctor               → 账本坏在哪、接入还缺什么",
+    "   门槛     deed gate                 → 看这个工作区的门（没有门时它会说没有，并给一行写法）",
+    "   改门槛   deed init --force --review \"…\" --exempt \"…\" --port " + port + " --why \"为什么改\"",
+  ];
+}
+
 const commands = {
   init(argv) {
     const { flags, words } = parse(argv);
@@ -429,6 +443,7 @@ const commands = {
         console.log("  注意：磁盘上的门槛和账本不一致（" + drift.map((one) => one.key).join("、") + "）；判据只认账本，deed verify 会报出来。");
       console.log("  要收下磁盘上的值：deed init --force --why \"为什么改\"");
       console.log("  要改门槛：deed init --force --review \"…\" --exempt \"…\" --why \"为什么改\"（改动会记进账本）");
+      for (const line of optionalBlock(ledger ?? disk ?? DEFAULT_CONFIG)) console.log(line);
       return;
     }
     // What this run did not name stays what the workspace already chose: a
@@ -477,6 +492,7 @@ const commands = {
     const step = nextAction(after, after.config);
     console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
     console.log("  " + step.command);
+    for (const line of optionalBlock(config)) console.log(line);
   },
 
   tick(argv) {

@@ -103,7 +103,7 @@ init（写 config + 记第一轮）
 
 | 动作 | 谁 | 作用 |
 |---|---|---|
-| `deed init` | 人 | 首次：把门槛写进账本（三条 `config.change` 基线）并记第一轮；`--force` 改门槛要带 `--why`，改动同样记为 `config.change`，文件只是跟着写出来的镜像 |
+| `deed init` | 人 | 首次：把门槛写进账本（三条 `config.change` 基线）并记第一轮；`--force` 改门槛要带 `--why`，改动同样记为 `config.change`，文件只是跟着写出来的镜像。收尾把剩下的可选项一次列全（规则、面板、体检、门槛、改门槛，各带命令与去处）——一轮就能做完，不做也不影响判据 |
 | `deed init --print-agents` | 人 / agent | 打印一段可粘贴的规则（点明 `deed state` 等命令）；只打印，不建账本、不写工作区 |
 | `deed tick` | 机制 / agent | 记一轮（谁、说了什么、做了什么）；只有它能开会话 |
 | `deed task add/done/defer/drop` | agent | 承诺、交付（done 必须带证据）、延后、放弃（后两者带理由） |

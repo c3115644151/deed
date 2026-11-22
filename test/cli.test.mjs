@@ -42,7 +42,18 @@ test("init refuses to overwrite a workspace that is already bound", () => {
   const again = deed(cwd, "init", "--said", "又一次");
   assert.equal(again.status, 0);
   assert.match(again.stdout, /已经接过钩子/);
+  assert.match(again.stdout, /deed serve/, "已经接过的也要说一次剩下的可选项");
   assert.equal(kinds(cwd).length, 4);
+});
+
+test("init says what else can be done, so one round can finish it", () => {
+  const cwd = workspace("init-optional");
+  const out = deed(cwd, "init", "--said", "开始", "--port", "7420");
+  assert.equal(out.status, 0);
+  for (const one of ["deed init --print-agents", "deed serve", "deed doctor", "deed gate", "deed init --force"])
+    assert.ok(out.stdout.includes(one), one + " 应该出现在 init 的反馈里");
+  assert.match(out.stdout, /127\.0\.0\.1:7420/, "面板地址用这个工作区的端口");
+  assert.match(out.stdout, /都可选/, "说清楚不做也不会坏");
 });
 
 test("init --print-agents hands over the rules without writing into the workspace", () => {
