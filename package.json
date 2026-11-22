@@ -1,0 +1,17 @@
+{
+  "name": "deed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "deed": "cli/deed.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "state": "node cli/deed.mjs state",
+    "board": "node cli/deed.mjs serve"
+  }
+}

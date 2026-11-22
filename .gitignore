@@ -1,0 +1,17 @@
+node_modules/
+
+# The ledger is a shared fact, not run data: it is committed.
+# Only the transient lock is ignored.
+.deed/log/lock
+
+# Screenshots of the board are working notes, not part of the deliverable.
+.shots/
+
+# Test workspaces when TEMP is not usable. Not a deliverable.
+.deed-test/
+
+# Scratch workspaces used while proving a behavior by hand (drift checks etc.).
+.tmp/
+
+# Archify diagram working directory (the exported single-file HTML is the deliverable).
+.archify/

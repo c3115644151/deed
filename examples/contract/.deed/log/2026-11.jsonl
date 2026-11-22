@@ -1,0 +1,33 @@
+{"v":1,"at":"2026-11-22T16:59:27.952Z","k":"config.change","s":null,"key":"review","from":null,"to":{"required":[".deed/config.json","NOTES.md"],"exempt":[]},"why":"init 收下的门槛","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:27.955Z","k":"config.change","s":null,"key":"gates","from":null,"to":{"commit":[],"check":[]},"why":"init 收下的门槛","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:27.957Z","k":"config.change","s":null,"key":"board","from":null,"to":{"port":7317},"why":"init 收下的门槛","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:27.963Z","k":"turn","s":null,"who":"user","said":"给这个示例工作区接上 deed"}
+{"v":1,"at":"2026-11-22T16:59:28.067Z","k":"turn","s":"S01","who":"user","said":"先做账本，别急着加门","did":"读了 README 与 DESIGN"}
+{"v":1,"at":"2026-11-22T16:59:28.176Z","k":"task.add","s":"S01","id":"T1","title":"接上这个工作区","criteria":"deed state 说得出这一期在做什么","files":[".deed/config.json"]}
+{"v":1,"at":"2026-11-22T16:59:28.306Z","k":"task.done","s":"S01","id":"T1","evidence":"deed state 读出 S01 讨论态与 1 轮","by":"agent","digest":"41f128fae3c1facdd37d5f43ed5649f37072dd75be5d1b142839586a1988c3f2","digestPath":".deed/config.json","changed":[]}
+{"v":1,"at":"2026-11-22T16:59:28.436Z","k":"task.add","s":"S01","id":"T2","title":"写下这份示例在演示什么","criteria":"陌生人读 NOTES.md 就知道怎么照着走","files":["NOTES.md"]}
+{"v":1,"at":"2026-11-22T16:59:28.542Z","k":"task.done","s":"S01","id":"T2","evidence":"照着 NOTES.md 走了一遍：六条命令都成功","by":"agent","digest":"992816ffb8ac48d1dd61d652664f6275df1574cfbcc021cc4fff1195f405685c","digestPath":"NOTES.md","changed":[]}
+{"v":1,"at":"2026-11-22T16:59:28.645Z","k":"review.log","s":"S01","segment":"S01.1","by":"reviewer:independent","verdict":"pass","brief":".deed/review/S01.1-11230059.md","briefDigest":"aa4aef221349a60b026469e5be943d753639ff8a7f718ecac13a6e0c184d4848","findings":[]}
+{"v":1,"at":"2026-11-22T16:59:28.748Z","k":"judge.pass","s":"S01","segment":"S01.1","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:28.850Z","k":"sign","s":"S01","words":"可以，示例就这样","title":"示例账本立起来","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:28.956Z","k":"turn","s":null,"who":"user","said":"再补一段：让门、打回、欠账各出现一次"}
+{"v":1,"at":"2026-11-22T16:59:29.064Z","k":"task.add","s":"S02","id":"T3","title":"让门说出失败在哪","criteria":"一条命令就能看到是哪条命令、退出码几","files":[".deed/config.json"]}
+{"v":1,"at":"2026-11-22T16:59:29.164Z","k":"task.done","s":"S02","id":"T3","evidence":"deed gate 在空 gates 时说「这个工作区没有门」","by":"agent","digest":"41f128fae3c1facdd37d5f43ed5649f37072dd75be5d1b142839586a1988c3f2","digestPath":".deed/config.json","changed":[]}
+{"v":1,"at":"2026-11-22T16:59:29.267Z","k":"task.add","s":"S02","id":"T4","title":"让面板跟着账本动","criteria":"GET / 与渲染字节一致；SSE 推 change","files":[".deed/config.json"]}
+{"v":1,"at":"2026-11-22T16:59:29.369Z","k":"task.done","s":"S02","id":"T4","evidence":"board 测试 6/6 · curl /state 200 · POST 405","by":"agent","digest":"41f128fae3c1facdd37d5f43ed5649f37072dd75be5d1b142839586a1988c3f2","digestPath":".deed/config.json","changed":[]}
+{"v":1,"at":"2026-11-22T16:59:29.486Z","k":"review.log","s":"S02","segment":"S02.1","by":"reviewer:independent","verdict":"pass","brief":".deed/review/S02.1-11230059.md","briefDigest":"4c743177eb591ea9ad33de6d8a89e01e0ad823b062e7f8553d6b7e10fca1e764","findings":[]}
+{"v":1,"at":"2026-11-22T16:59:29.588Z","k":"judge.pass","s":"S02","segment":"S02.1","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:29.691Z","k":"task.add","s":"S02","id":"T5","title":"把说明和账本对上","criteria":"README 的六行能走完一整轮","files":["NOTES.md"]}
+{"v":1,"at":"2026-11-22T16:59:29.809Z","k":"task.done","s":"S02","id":"T5","evidence":"按说明跑了一遍：init 到 sign","by":"agent","digest":"992816ffb8ac48d1dd61d652664f6275df1574cfbcc021cc4fff1195f405685c","digestPath":"NOTES.md","changed":[]}
+{"v":1,"at":"2026-11-22T16:59:29.920Z","k":"review.log","s":"S02","segment":"S02.2","by":"reviewer:independent","verdict":"fail","brief":".deed/review/S02.2-11230059.md","briefDigest":"0386ca3ef9f6d4d8d0709ae46d00b11bdc78caa1bca092b59dd360af80cbf80a","findings":["说明里没写 --digest：证据没钉内容，过期了查不出来"]}
+{"v":1,"at":"2026-11-22T16:59:30.023Z","k":"judge.rework","s":"S02","segment":"S02.2","tasks":["T5"],"why":"补 --digest，重跑一遍"}
+{"v":1,"at":"2026-11-22T16:59:30.135Z","k":"task.done","s":"S02","id":"T5","evidence":"重跑：每条证据都钉在一份文件上","by":"agent","digest":"992816ffb8ac48d1dd61d652664f6275df1574cfbcc021cc4fff1195f405685c","digestPath":"NOTES.md","changed":[]}
+{"v":1,"at":"2026-11-22T16:59:30.244Z","k":"review.log","s":"S02","segment":"S02.2","by":"reviewer:independent","verdict":"pass","brief":".deed/review/S02.2-11230059-2.md","briefDigest":"4ba167888d4a6d6e35ec373286e1e2a69b71ef744450e79c343e27f91c9692ba","findings":[]}
+{"v":1,"at":"2026-11-22T16:59:30.342Z","k":"judge.pass","s":"S02","segment":"S02.2","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:30.447Z","k":"ask.raise","s":"S02","id":"A1","text":"示例账本要不要跟着示例一起提交？","reading":"一起提交：它是看得见的事实","why":"看不见的账本等于没有"}
+{"v":1,"at":"2026-11-22T16:59:30.553Z","k":"ask.resolve","s":"S02","id":"A1","decision":"一起提交，账本随仓库走","by":"user"}
+{"v":1,"at":"2026-11-22T16:59:30.666Z","k":"task.add","s":"S02","id":"T6","title":"给面板加跨会话历史","criteria":"能翻看已签收那一期的全部轮次","files":[".deed/config.json"]}
+{"v":1,"at":"2026-11-22T16:59:30.781Z","k":"task.defer","s":"S02","id":"T6","why":"先让机制稳，视图等下一轮"}
+{"v":1,"at":"2026-11-22T16:59:30.888Z","k":"task.add","s":"S02","id":"T7","title":"让陌生人只读六行就能动手","criteria":"照 NOTES.md 从 init 走到 sign","files":["NOTES.md"]}
+{"v":1,"at":"2026-11-22T16:59:30.989Z","k":"turn","s":"S02","who":"agent","said":"打回的那一段补完了，说明也改了","did":"判过 S02.1、S02.2，重审后封段"}
+{"v":1,"at":"2026-11-22T16:59:31.091Z","k":"ask.raise","s":"S02","id":"A2","text":"这一段要不要现在判？","reading":"等 T7 交付再判","why":"还差一条没交付"}

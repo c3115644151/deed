@@ -1,0 +1,16 @@
+{
+  "review": {
+    "required": [
+      ".deed/config.json",
+      "NOTES.md"
+    ],
+    "exempt": []
+  },
+  "gates": {
+    "commit": [],
+    "check": []
+  },
+  "board": {
+    "port": 7317
+  }
+}
