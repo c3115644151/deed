@@ -6,6 +6,8 @@
 // here first, and the CLI folds before it appends, so a refused action never
 // reaches the ledger. Nothing outside this file decides what can be written.
 
+import { UnknownKindError } from "./events.mjs";
+
 const noway = (message) => {
   throw new Error(message);
 };
@@ -342,7 +344,8 @@ export function fold(events) {
         break;
       }
       default:
-        noway(`未知事件：${ev.k}`);
+        // 不认得的类型不一定是坏行：账本可能比程序新（w 记着写者版本）。
+        throw new UnknownKindError(ev.k, ev.w);
     }
   }
   return doc;

@@ -695,3 +695,44 @@ test("doctor says whether anything is keeping the record warm", () => {
   assert.doesNotMatch(deed(cwd, "state").stdout, /分钟前/, "状态页不读时钟，只有体检读");
 });
 
+
+// 账本可能比程序新：这一行是别人写下的真事，只是这本程序读不懂。
+// 两种情形的话术和动作相反（升级 vs 挪走），所以不能共用一套。
+const writeLines = (cwd, extra) => {
+  const file = fs.readdirSync(path.join(cwd, ".deed", "log")).find((one) => one.endsWith(".jsonl"));
+  fs.appendFileSync(path.join(cwd, ".deed", "log", file), extra.map((one) => JSON.stringify(one) + "\n").join(""));
+};
+
+test("a ledger written by a newer deed says so instead of calling itself broken", () => {
+  const cwd = workspace("newer-ledger");
+  deed(cwd, "init", "--said", "开始");
+  writeLines(cwd, [{ v: 1, at: new Date().toISOString(), k: "task.block", s: "S01", id: "T1", why: "0.9 才有的事件", w: "9.9.9" }]);
+  const doctor = deed(cwd, "doctor");
+  assert.equal(doctor.status, 1, "读不动就是读不动：不猜语义");
+  assert.match(doctor.stdout, /账本比 deed 新/);
+  assert.match(doctor.stdout, /升级 deed/);
+  assert.doesNotMatch(doctor.stdout, /移到 \.deed\/log\/rejected/, "账本新的时候指去挪走，等于让人删真事");
+  const state = deed(cwd, "state");
+  assert.equal(state.status, 1);
+  assert.match(state.stderr, /账本比 deed 新/);
+});
+
+test("an invented kind with no writer version is still a broken line", () => {
+  const cwd = workspace("hand-written-kind");
+  deed(cwd, "init", "--said", "开始");
+  writeLines(cwd, [{ v: 1, at: new Date().toISOString(), k: "task.block", s: "S01", id: "T1", why: "手写的" }]);
+  const doctor = deed(cwd, "doctor");
+  assert.equal(doctor.status, 1);
+  assert.match(doctor.stdout, /账本坏了/);
+  assert.match(doctor.stdout, /没有写者版本/);
+  assert.match(doctor.stdout, /rejected/);
+});
+
+test("every line records the deed that wrote it", () => {
+  const cwd = workspace("writer-version");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "改折叠", "--criteria", "总账能重放");
+  const written = readEvents(cwd).map((one) => one.w);
+  assert.ok(written.length >= 5);
+  assert.ok(written.every((one) => /^\d+\.\d+\.\d+$/.test(one)), "没有写者版本的账本，以后说不清是账本新还是这一行坏了");
+});

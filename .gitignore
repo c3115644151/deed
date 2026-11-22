@@ -10,6 +10,10 @@ node_modules/
 # Test workspaces when TEMP is not usable. Not a deliverable.
 .deed-test/
 
+# os.tmpdir() 在这台机器上会回 "undefined\temp"：拿它拼路径就会写进仓库根目录。
+# 真的临时目录不存在时就该落 .deed-test/，这一条只是兜住手写脚本的那一下。
+/undefined/
+
 # Scratch workspaces used while proving a behavior by hand (drift checks etc.).
 .tmp/
 

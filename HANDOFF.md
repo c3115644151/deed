@@ -82,6 +82,18 @@ S01 接上工作区 → 审 → 判 → 签；S02 三段，第二段演一次"�
 第五轮复核（同一批修完后再跑）判**通过**：合并语义、删除仍记 `changed`、并发不丢路径、宽限用例有分辨力、数字口径与实际一致，
 只剩一条方向安全的残余（扫描早于锁可能让同一路径多报一次 `changed`，只会多要一次审，不会误放行）。
 
+## 第十一轮：账本比程序新，不是账本坏了（用户点的那条，已改）
+
+- **症状（实测复原）**：账本里有一行事件类型当前版本不认得——只有一种来路，**账本比程序新**（别人用新版 deed 写了新事件，你还在跑旧版）。当时三处入口都说成坏账：`doctor` 打"账本坏了 · 第 5 行 · 未知事件：task.block"，并给出唯一人工修法"把这一行整行移到 `.deed/log/rejected/` 下"；`state`／`verify` 只吐一句"deed: 未知事件：task.block"就 exit 1。**指错路比报错严重**：照做就把别人写下的真事当垃圾扔了，扔完账本还看起来干净。
+- **治本：让这句话有据可依**（`cli/version.mjs`）。每一行多一个 `w`——写它的 deed 版本（`cli/deed.mjs` 的 `transact` 落笔时从 package.json 盖上；`core/` 不读文件，仍然纯）。`v` 是事件含义的版本（1，只做加法），`w` 是写者版本。
+- **两条相反的路**：`w` 比当前新 → 账本比 deed 新（升级就能读，**别删也别挪**，仍 exit 1：折不动就是折不动，语义不猜）；没有 `w`、或写者不比当前新却出现陌生类型 → 那一行本来就有问题（类型只增不减，旧版本写不出当前版本不认识的类型），才走 `rejected/`。
+- **类型化错误而不是字符串匹配**：`core/events.mjs` 新增 `UnknownKindError { kind, writer }`，`validateEvent` 与 `core/fold.mjs` 的 default 分支都抛它；`cli/deed.mjs` 的 `guard`（state／verify／gate／serve 入口）与 `doctor` 各自决定话术，`cli/version.mjs` 的 `unknownKindNotice` 出文案。
+- **面板同一判断**（`board/serve.mjs`）：500 页标题在"账本比 deed 新"与"账本里有读不动的行"之间切，`/state` 的 `{broken}` 与 SSE 的 `event: broken` 带同一句 headline+advice。
+- **版本 0.2.0**（事件形状加了可选字段）；旧账本没有 `w`，只能说"没有写者版本"——写进 DESIGN §10 的代价清单。
+- **回归**：`npm test` **88/88**（fold 17 · rules 9 · cli 46 · board 9 · docs 2 · heartbeat 2 · version 3）。新六条用例：`compareVersions` 三段数字与预发布标记不猜；新账本的账本新话术不含 `rejected`；手写的陌生类型仍是坏账；端到端 `doctor`／`state` 两条；每行都盖了 `w`。
+- **演示账本重放**：`node examples/rebuild.mjs` → 37 条事件，全部 `w: "0.2.0"`，`verify`「证据有效」、`doctor`「账本干净」。
+- **文档**：DESIGN §8 加 `w` 与「读不懂的两条路，方向相反」，§10 加两条代价（类型只增不减、旧账本没有 `w`）；README 的 doctor 段补一段；AGENTS 全量改 88。
+
 ## 第六轮：任务书指纹、架构图（用户指出的两处，已改）
 
 - **结论与任务书没有绑定**：账本只记任务书路径，`briefDigest` 可选，`verify`／`doctor` 都不读——任务书被改、被删，结论照样算数。

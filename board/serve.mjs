@@ -5,9 +5,11 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { UnknownKindError } from "../core/events.mjs";
 import { fold } from "../core/fold.mjs";
 import { pressure, reading, countIn, currentSession, openSegment, nextAction, pendingAsks, signBlockers } from "../core/rules.mjs";
 import { readEvents } from "../cli/store.mjs";
+import { currentVersion, unknownKindNotice } from "../cli/version.mjs";
 import { wordsNotice } from "../cli/words.mjs";
 import { renderBoard, when } from "./render.mjs";
 
@@ -19,17 +21,32 @@ function snapshot(root) {
   return { doc, events, config: doc.config };
 }
 
+// 两种读不动的原因走两套话：账本比程序新要升级，这一行坏了要挪走。
+const escape = (text) => String(text ?? "").replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"));
+
+// /state 与 SSE 只带一句：和页面同一个判断，不另说一套。
+const brokenText = (error) => {
+  const notice = error instanceof UnknownKindError ? unknownKindNotice(error.kind, error.writer, currentVersion()) : null;
+  return notice ? notice.headline + " · " + notice.advice : String(error && error.message ? error.message : error);
+};
+
 function brokenPage(error) {
+  const notice = error instanceof UnknownKindError ? unknownKindNotice(error.kind, error.writer, currentVersion()) : null;
+  const title = notice?.newer ? "账本比 deed 新" : "账本里有读不动的行";
+  const lead = notice?.newer
+    ? "页面照旧只读：这本账是更新的 deed 写的，升级之后这一行就能读，别删也别挪。"
+    : "页面照旧只读，事实停留在最后一次能读通的位置。修法是先定位、再决定：";
   return (
     "<!doctype html>\n<html lang=\"zh-CN\"><head><meta charset=\"utf-8\">" +
-    "<title>deed · 账本坏了</title></head>" +
+    "<title>deed · " + title + "</title></head>" +
     "<body style=\"font:15px/1.7 system-ui;margin:4vh auto;max-width:44rem;padding:0 1.5rem;background:#fbf9f5;color:#1c1a17\">" +
-    "<h1 style=\"font-size:1.2rem\">账本里有读不动的行</h1>" +
-    "<p>页面照旧只读，事实停留在最后一次能读通的位置。修法是先定位、再决定：</p>" +
+    "<h1 style=\"font-size:1.2rem\">" + title + "</h1>" +
+    "<p>" + lead + "</p>" +
     "<pre style=\"background:#f1ece3;padding:.8rem 1rem;overflow:auto\">deed doctor</pre>" +
     "<p style=\"color:#6b6255\">" +
-    String(error && error.message ? error.message : error).replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;")) +
-    "</p></body></html>\n"
+    escape(notice ? notice.headline : (error && error.message ? error.message : error)) +
+    "</p>" + (notice ? "<p style=\"color:#6b6255\">" + escape(notice.advice) + "</p>" : "") +
+    "</body></html>\n"
   );
 }
 
@@ -67,7 +84,7 @@ export function handler(root) {
         taken = snapshot(root);
       } catch (error) {
         res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-        res.end(req.method === "HEAD" ? "" : JSON.stringify({ broken: String(error && error.message ? error.message : error) }, null, 2));
+        res.end(req.method === "HEAD" ? "" : JSON.stringify({ broken: brokenText(error) }, null, 2));
         return;
       }
       const { doc, events, config } = taken;
@@ -119,7 +136,7 @@ export function handler(root) {
               } catch (error) {
                 // Do not close the stream on a malformed append: the client shows
                 // the reason and stays connected for the next good write.
-                res.write(`event: broken\ndata: ${String(error && error.message ? error.message : error).replace(/\n/g, " ")}\n\n`);
+                res.write(`event: broken\ndata: ${brokenText(error).replace(/\n/g, " ")}\n\n`);
                 return;
               }
               res.write(`event: change\ndata: ${count}\n\n`);

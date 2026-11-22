@@ -21,6 +21,18 @@ export const EVENT_KINDS = [
 
 export const WHO = ["user", "agent"];
 
+// 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
+// core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名与
+// 写者版本，由 CLI 层去比大小、去说人话。
+export class UnknownKindError extends Error {
+  constructor(kind, writer) {
+    super(`未知事件：${kind}`);
+    this.name = "UnknownKindError";
+    this.kind = kind;
+    this.writer = writer ?? null;
+  }
+}
+
 const need = (ev, field) => {
   const value = ev[field];
   if (value === undefined || value === null || String(value).trim() === "")
@@ -32,7 +44,7 @@ const need = (ev, field) => {
 // ones. Rules (can this segment be judged?) live in rules.mjs, never here.
 export function validateEvent(ev, at) {
   need(ev, "k");
-  if (!EVENT_KINDS.includes(ev.k)) throw new Error(`未知事件：${ev.k}`);
+  if (!EVENT_KINDS.includes(ev.k)) throw new UnknownKindError(ev.k, ev.w);
   if (ev.at && !/^\d{4}-\d{2}-\d{2}T/.test(String(ev.at)))
     throw new Error(`时间不是 ISO 时刻：${ev.at}`);
   const stamped = { v: 1, at: ev.at ?? at, ...ev };

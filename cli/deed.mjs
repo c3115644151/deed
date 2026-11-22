@@ -12,7 +12,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fold } from "../core/fold.mjs";
-import { validateEvent } from "../core/events.mjs";
+import { UnknownKindError, validateEvent } from "../core/events.mjs";
+import { currentVersion, unknownKindNotice } from "./version.mjs";
 import {
   countIn,
   currentSession,
@@ -103,6 +104,9 @@ function transact(flags, build, commit) {
     const events = readEvents(ROOT);
     const doc = fold(events);
     const stamped = validateEvent(build(doc, flags), stamp());
+    // w 记的是写这一行的程序版本，不是事件含义的版本（那是 v）。它让"读到不认得的
+    // 类型"以后能有一个可查的答案：账本比程序新，还是这一行本来就有问题。
+    stamped.w = currentVersion() || undefined;
     const after = fold([...events, stamped]);
     append(ROOT, stamped);
     if (commit) commit(stamped);
@@ -159,7 +163,16 @@ const guard = (fn) => {
   try {
     return fn();
   } catch (err) {
-    if (!err?.refused) reject(err?.message ?? String(err));
+    if (err?.refused) return undefined;
+    if (err instanceof UnknownKindError) {
+      // 账本比程序新时，拒绝是对的（折不动就是折不动），但话要指对路：
+      // 这不是坏账，升级 deed 就能读。
+      const notice = unknownKindNotice(err.kind, err.writer);
+      reject(notice.headline);
+      console.error("  " + notice.advice);
+      return undefined;
+    }
+    reject(err?.message ?? String(err));
     return undefined;
   }
 };
@@ -851,7 +864,14 @@ const commands = {
             validateEvent(ev, ev.at);
             fold([...events, ev]);
           } catch (err) {
-            bad = { file: name, line: i + 1, why: err.message };
+            const notice = err instanceof UnknownKindError ? unknownKindNotice(err.kind, err.writer) : null;
+            bad = {
+              file: name,
+              line: i + 1,
+              why: notice ? notice.headline : err.message,
+              advice: notice?.advice ?? null,
+              newer: notice?.newer ?? false,
+            };
             break;
           }
           events.push(ev);
@@ -878,9 +898,22 @@ const commands = {
           );
         return;
       }
+      // 账本比程序新不是坏账：这一行是别人写下的真事，只是这本程序读不懂。
+      // 两种情形的动作相反（升级 vs 挪走），所以不能共用一套话。
+      if (bad.newer) {
+        console.log("账本比 deed 新 · " + bad.file + " 第 " + bad.line + " 行");
+        console.log("  " + bad.why);
+        console.log("  " + bad.advice);
+        fail("先升级 deed 再读这本账：当前版本读不动的类型只在更新的账本里才有");
+        return;
+      }
       console.log("账本坏了 · " + bad.file + " 第 " + bad.line + " 行 · " + bad.why);
-      console.log("  账本只追加，唯一允许的人工修法是把这一行整行移到 .deed/log/rejected/ 下并记下为什么；");
-      console.log("  不要改动其它行，也不要手写补账：缺的那件事，用正常命令重新做一次。");
+      if (bad.advice) {
+        console.log("  " + bad.advice);
+      } else {
+        console.log("  账本只追加，唯一允许的人工修法是把这一行整行移到 .deed/log/rejected/ 下并记下为什么；");
+        console.log("  不要改动其它行，也不要手写补账：缺的那件事，用正常命令重新做一次。");
+      }
       fail("坏账需要人处理：" + bad.file + " 第 " + bad.line + " 行");
     });
   },
