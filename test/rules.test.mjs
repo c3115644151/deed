@@ -363,6 +363,7 @@ test("a segment a reviewer read counts for the whole review, whatever its delive
 test("a delivery that points at nothing is told apart from one that points at a path it removed", () => {
   assert.equal(pointsAtNothing({ files: [], changed: [] }), true, "什么都没指");
   assert.equal(pointsAtNothing({}), true, "老形状里什么都没有");
+  assert.equal(pointsAtNothing(null), true, "还没有交付：调用点不必先记得判空");
   assert.equal(pointsAtNothing({ changed: ["docs/gone.md"] }), false, "删掉一条路径也算指着它");
   assert.equal(pointsAtNothing({ digest: "a".repeat(64), path: "docs/a.md" }), false, "钉了内容");
   assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md", digest: "b".repeat(64) }] }), false, "钉了一组内容");

@@ -153,4 +153,9 @@
   标准：test/rules.test.mjs 里有用例直接断言 pointsAtNothing 对五种形状的回答（什么都没指、老形状、只删了一条路径、钉了内容、钉了一组内容）；把那半守卫改回只看 files/digest 会红。
   交付：test/rules.test.mjs 新增一条用例，直接断言 pointsAtNothing 对五种形状的回答（{}、files/changed 都空、只有 changed、有 digest+path、有一组 files），把那半守卫改回只看 files/digest 时它变红（跑过：rules 22 条里 1 条红，还原后 22/22）。跑的是这一份字节：node --test 167/167。
 
+## 段 S02.14
+- [x] T63 空交付的形状在文档里写全，空输入也有回答
+  标准：docs/DESIGN.md 的空交付那句写清「钉了内容就不算空」；pointsAtNothing(null) 返回 true 且有用例断言；改回去要红。
+  交付：docs/DESIGN.md 的空交付那句补上「钉了内容就不算空」（哪怕那条路径后来没了）；pointsAtNothing 收下空输入（还没交付时也算什么都没指），test/rules.test.mjs 加一条断言；去掉空输入那一半时 rules 22 条红 1 条（还原后 22/22）。跑的是这一份字节：node --test 167/167。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

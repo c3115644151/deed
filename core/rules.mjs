@@ -277,9 +277,10 @@ export function reviewState(config, session, segment) {
 // 删掉一个文件也算动了——路径走了，没有字节可钉，那不是"没指着"，是它指的那条路径本来就没有字节。
 // 这个判断只在这里写一遍：签收、下一步、verify 报的空交付都从它出。
 export const pointsAtNothing = (proof) =>
-  (proof.files ?? []).length === 0 &&
+  !proof ||
+  ((proof.files ?? []).length === 0 &&
   !(proof.digest && proof.path) &&
-  (proof.changed ?? []).length === 0;
+  (proof.changed ?? []).length === 0);
 
 // 复核得靠内容：要审的段里，每条现行交付都得指着点什么。
 export const unpinned = (session, segment) =>
