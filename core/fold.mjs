@@ -81,6 +81,8 @@ function segmentOf(session, at) {
     judgedAt: null,
     reviewAt: null,
     reviewBy: null,
+    sealedBy: null,
+    sealedWhy: null,
   };
   session.segments.push(segment);
   return segment;
@@ -105,7 +107,7 @@ const sealed = (segment) => segment.closedAt !== null;
 function editable(session, task) {
   const segment = segmentById(session, task.segment);
   if (sealed(segment))
-    noway(`任务 ${task.id} 在已封存的段 ${segment.id} 里：要用 judge --rework 打回才能再改`);
+    noway(`任务 ${task.id} 在已封存的段 ${segment.id} 里：审查者点名退回（--verdict fail --rework）或者人推翻那份结论，才能再改`);
   return segment;
 }
 
@@ -364,6 +366,26 @@ export function fold(events) {
           segment.judgedAt = null;
           segment.closedAt = null;
         }
+        break;
+      }
+      // 免审段的结局。它不是审查结论：没人审过，所以只留下谁封的、凭什么说不用审，
+      // 签收时这一段会被列出来——"没经过审查"是账本上能看见的事实，不是默认的沉默。
+      case "segment.seal": {
+        const session = sessionOf(doc, ev);
+        const segment = segmentById(session, ev.segment);
+        if (sealed(segment)) noway(`段 ${segment.id} 已经封存`);
+        const todo = session.tasks.filter((one) => one.segment === segment.id && one.status === "todo");
+        if (todo.length > 0)
+          noway(`段 ${segment.id} 还有没交付的：${todo.map((one) => one.id).join("、")}`);
+        const ever = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
+        if (ever.length > 0) noway(`段 ${segment.id} 已经有审查结论：结局由那份结论落，封存只给免审段`);
+        for (const task of session.tasks)
+          if (task.segment === segment.id && task.status === "done") task.status = "accepted";
+        segment.verdict = "exempt";
+        segment.judgedAt = ev.at;
+        segment.closedAt = ev.at;
+        segment.sealedBy = ev.by;
+        segment.sealedWhy = ev.why;
         break;
       }
       case "judge.pass": {

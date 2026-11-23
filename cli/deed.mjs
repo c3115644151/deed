@@ -31,6 +31,8 @@ import {
   reviewOf,
   configDrift,
   reviewState,
+  exemptSegments,
+  sealBlockers,
   sessionById,
   signBlockers,
   tasksIn,
@@ -345,6 +347,23 @@ function optionalBlock(config) {
   ];
 }
 
+// 记下的内容变了，那一条交付回答的就不是现在的工作区：封段、落结论都不能装作
+// 没发生过。这里只问账本与磁盘的差，不看谁的判断。
+const auditSegment = (doc, session, seg) => {
+  const inSegment = new Set(tasksIn(session, seg).map((task) => task.id));
+  const audit = auditEvidence(ROOT, doc, session.id);
+  const outside = audit.outside.filter((spot) => inSegment.has(spot.id));
+  if (outside.length > 0)
+    fail(
+      "这一段有交付记录指到工作区外面（" + outside.map((spot) => spot.id + " → " + spot.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付",
+    );
+  const stale = audit.stale.filter((spot) => inSegment.has(spot.id));
+  if (stale.length > 0)
+    fail(
+      "这一段有交付记录过期（" + stale.map((spot) => spot.id + " 记下 " + spot.path).join("、") + "），记下的内容已经变了：重新交付再封段",
+    );
+};
+
 const commands = {
   init(argv) {
     const { flags, words } = parse(argv);
@@ -621,6 +640,7 @@ const commands = {
         return;
       }
       if (!flags.by) fail("review 要给结论就要写清谁审的：--by \"…\"");
+      auditSegment(doc, one, seg);
       const waiting = tasksIn(one, seg).filter((task) => task.status === "todo");
       if (waiting.length > 0)
         fail("段 " + seg.id + " 还有没交付的（" + waiting.map((task) => task.id).join("、") + "）：结论只能落在交付之后");
@@ -685,87 +705,83 @@ const commands = {
     const { flags, words } = parse(argv);
     guard(() => {
       const { doc } = load();
-      // 推翻一条结论是例外，不是步骤：段由审查者的 pass 自己封，人不签字；
-      // 人只在"这一份结论错了"的时候出手，而且要写明为什么。它会点名一条结论，
-      // 所以按结论找会话，而不是按"现在开着哪一期"找。
-      const overturned = flags.overturn
-        ? doc.sessions.flatMap((one2) => one2.reviews.map((rv) => ({ session: one2, review: rv }))).find((pair) => pair.review.id === flags.overturn)
-        : null;
-      if (flags.overturn && !overturned) {
+      // 一段的结局由审查者的结论定：pass 当场封段，fail 点名退回。judge 只剩
+      // "推翻一份结论"这一个动作——人替审查者放行，会让"谁判的"变成两处。
+      if (flags.pass || flags.rework)
+        fail(
+          (flags.pass
+            ? 'judge --pass 已经没有了：审查者的结论就是一段的结局（deed review --segment S01.1 --by "谁" --verdict pass）'
+            : 'judge --rework 已经没有了：判不合格要由审查者点名（deed review --verdict fail --rework T1,T2 --why "为什么"）') +
+            '；人只在结论本身错了时推翻它：deed judge --overturn R1 --why "为什么"',
+        );
+      if (!flags.overturn)
+        fail('judge 只认 --overturn <R1> --why "…"（推翻一条结论）；一段的结局由审查者的结论落，人不再签字');
+      // 推翻一条结论是例外，不是步骤：它点名一条在案的结论，所以按结论找会话，
+      // 而不是按"现在开着哪一期"找——签收之后就没有开着的一期了。
+      const overturned = doc.sessions
+        .flatMap((one2) => one2.reviews.map((rv) => ({ session: one2, review: rv })))
+        .find((pair) => pair.review.id === flags.overturn);
+      if (!overturned) {
         const known = doc.sessions.flatMap((one2) => one2.reviews.map((rv) => one2.id + "/" + rv.id + "（" + rv.verdict + "）"));
         fail("账本里没有结论 " + flags.overturn + "：账本里的结论是 " + (known.join("、") || "（一条都没有）"));
       }
-      const one = overturned ? overturned.session : targetSession(doc, flags);
-      if (flags.overturn) {
-        const review = overturned.review;
-        if (review.voidedAt) fail("结论 " + review.id + " 已经作废过（" + review.voidedBy + "）：再推翻它没有意义");
-        if (!flags.why) fail("推翻一条结论要说清为什么：--why \"…\"");
-        if (one.closeKind)
-          fail(
-            "这一期已经" + (one.closeKind === "signed" ? "签收" : "搁下") + "（" + one.words + "）：账本不往回改，" +
-              "错在哪就开新一期把要补的记进去；要推翻结论得在签收之前",
-          );
-        const after = transact(flags, () => ({
-          k: "review.overturn",
-          s: one.id,
-          review: review.id,
-          why: flags.why,
-          by: signer(flags, "推翻结论"),
-        })).doc;
-        console.log("推翻 · 段 " + review.segment + " · " + review.id + " · " + flags.by + " · " + flags.why);
-        console.log("  这一段回到没判过的样子：重新出清单、重新审");
-        const step = nextAction(after, after.config);
-        console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
-        console.log("  " + step.command);
-        return;
-      }
-      // A pass judges the segment still open; a rework may reach back into the
-      // one a verdict just closed, because that is how settled work reopens.
-      const newest = one.segments[one.segments.length - 1];
+      const one = overturned.session;
+      const review = overturned.review;
+      if (review.voidedAt) fail("结论 " + review.id + " 已经作废过（" + review.voidedBy + "）：再推翻它没有意义");
+      if (!flags.why) fail('推翻一条结论要说清为什么：--why "…"');
+      if (one.closeKind)
+        fail(
+          "这一期已经" + (one.closeKind === "signed" ? "签收" : "搁下") + "（" + one.words + "）：账本不往回改，" +
+            "错在哪就开新一期把要补的记进去；要推翻结论得在签收之前",
+        );
+      const after = transact(flags, () => ({
+        k: "review.overturn",
+        s: one.id,
+        review: review.id,
+        why: flags.why,
+        by: signer(flags, "推翻结论"),
+      })).doc;
+      console.log("推翻 · 段 " + review.segment + " · " + review.id + " · " + flags.by + " · " + flags.why);
+      console.log("  这一段回到没判过的样子：重新出清单、重新审");
+      const step = nextAction(after, after.config);
+      console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
+      console.log("  " + step.command);
+    });
+  },
+
+  // 免审段的结局。门槛说这一段不用审，于是没有审查结论可落——但段仍然要封，
+  // 不然它永远开在 state 里，谁也签不了收。封存要写清凭什么不用审，因为
+  // "没人看过"必须留在账本上，不能变成默认的沉默。
+  seal(argv) {
+    const { flags } = parse(argv);
+    guard(() => {
+      const { doc } = load();
+      const one = targetSession(doc, flags);
       const seg = flags.segment
         ? one.segments.find((s) => s.id === flags.segment)
-        : flags.rework
-          ? (openSegment(one) ?? newest)
-          : openSegment(one);
+        : openSegment(one);
       if (!seg)
         fail(
-          (flags.segment ? "会话 " + one.id + " 里没有段 " + flags.segment : "现在没有待判的段") +
+          (flags.segment ? "会话 " + one.id + " 里没有段 " + flags.segment : "现在没有开着的段") +
             "：账本里的段是 " +
-            (one.segments.map((s) => s.id + (s.closedAt ? "（判过）" : "")).join("、") || "（一个都没有）") +
-            (openSegment(one) ? "；开着的段是 " + openSegment(one).id : "；没有开着的段"),
+            (one.segments.map((s) => s.id + (s.closedAt ? "（已封存）" : "")).join("、") || "（一个都没有）"),
         );
-      if (flags.pass) {
-        const inSegment = new Set(tasksIn(one, seg).map((t) => t.id));
-        const audit = auditEvidence(ROOT, doc, one.id);
-        const stale = audit.stale.filter((s) => inSegment.has(s.id));
-        const outside = audit.outside.filter((s) => inSegment.has(s.id));
-        if (outside.length > 0)
-          fail("这一段有交付记录指到工作区外面（" + outside.map((s) => s.id + " → " + s.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付");
-        if (stale.length > 0)
-          fail("这一段有交付记录过期（" + stale.map((s) => s.id + " 记下 " + s.path).join("、") + "），记下的内容已经变了：重新交付再判");
-        const blockers = judgeBlockers(doc.config, one, seg);
-        if (blockers.length > 0) fail("这一段还不能判：" + blockers.join("；"));
-        const after = transact(flags, () => ({ k: "judge.pass", s: one.id, segment: seg.id, by: signer(flags, "判决") })).doc;
-        console.log("判决通过 · " + seg.id + " · 段已封存");
-        const step = nextAction(after, after.config);
-        console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
-        console.log("  " + step.command);
-        return;
-      }
-      if (flags.rework) {
-        // Both spellings name tasks; ignoring the positional one silently
-        // reworked a subset of what the reviewer asked for.
-        const named2 = [...split(flags.rework), ...words].filter(Boolean);
-        if (named2.length === 0) fail("judge --rework 要点名要重做的任务");
-        if (!flags.why) fail("judge --rework 要说清为什么：--why \"…\"");
-        // 撤一条审查结论和发一份清单一样要署名：否则账本只记得谁判过，不记得谁推翻的。
-        if (!flags.by) fail("judge --rework 要写清谁打回的：--by \"…\"");
-        transact(flags, () => ({ k: "judge.rework", s: one.id, segment: seg.id, tasks: named2, why: flags.why, by: flags.by }));
-        console.log("打回 · " + seg.id + " · " + named2.join("、") + " · " + flags.by + " · " + flags.why);
-        console.log("  段没封，补完再判；上一份审查结论已经作废");
-        return;
-      }
-      fail("judge 只认 --overturn <R1> --why \"…\"（推翻一条结论）；审查者放行就是封段，不再需要人签字");
+      auditSegment(doc, one, seg);
+      const blockers = sealBlockers(doc.config, one, seg);
+      if (blockers.length > 0) fail("这一段不能封存：" + blockers.join("；"));
+      if (!flags.why) fail('封存要写清凭什么不用审：--why "…"');
+      const after = transact(flags, () => ({
+        k: "segment.seal",
+        s: one.id,
+        segment: seg.id,
+        why: flags.why,
+        by: signer(flags, "封存"),
+      })).doc;
+      console.log("封存 · " + seg.id + " · 免审 · " + flags.by + " · " + flags.why);
+      console.log("  没人审过这一段：签收时它会列出来");
+      const step = nextAction(after, after.config);
+      console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
+      console.log("  " + step.command);
     });
   },
 
@@ -780,6 +796,10 @@ const commands = {
       const title = flags.title ?? period(doc);
       transact(flags, () => ({ k: "sign", s: one.id, words: flags.words, title, by: signer(flags, "签收") }));
       console.log("签收 · " + one.id + " · " + title + " · 「" + flags.words + "」");
+      // 没人审过的段不能被静默放过：签收这一刻把它们摆出来。
+      const unread = exemptSegments(one);
+      if (unread.length > 0)
+        console.log("  没经过审查 · " + unread.map((s) => s.id + "（" + s.sealedWhy + "）").join("、"));
       const owed = debt(one);
       if (owed.deferred.length + owed.dropped.length > 0)
         console.log("  带着走的欠账 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
@@ -997,6 +1017,7 @@ const HELP = [
   "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
   "deed review --segment S01.1 --by \"谁\" --verdict pass [--finding \"…\"]   pass 直接封段",
   "deed review --segment S01.1 --by \"谁\" --verdict fail --rework T1,T2 --why \"…\" [--finding \"…\"]",
+  "deed seal [--segment S01.1] --why \"…\"  封一个免审段（门槛说不用审，没人审过）",
   "deed judge --overturn R1 --why \"…\"    推翻一条在案的结论（例外，不是步骤）",
   "deed sign --words \"<用户原话>\" [--title \"<这一期的名字>\"]",
   "deed shelve --why \"…\"",

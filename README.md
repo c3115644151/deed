@@ -27,7 +27,7 @@ Node ≥ 22，纯 ESM，零依赖，还没有 npm 包（名字没定）。
 git clone <this> deed && cd deed
 node cli/deed.mjs help      # 就地可用
 npm link                    # 之后在任意目录敲 deed
-npm test                    # 107 条，一分钟以内（每条都起真进程）
+npm test                    # 113 条，一分钟多一点（每条都起真进程）
 ```
 
 vendor、本地 tarball、升级与卸载见 [`docs/INSTALL.md`](docs/INSTALL.md)。
@@ -65,6 +65,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 结论记的是发出去那一刻两份的 sha256（`briefDigest`+`guideDigest`），不是落结论时现写的一份；`deed verify` 会重算核对。
 - 审查者放行就是这一段的结局：`deed review --segment S0x.N --by 「谁」 --verdict pass` 直接封段，不需要第二个人签字。判不合格要 `--verdict fail --rework T1,T2 --why 「为什么」`：被点名的条目回到未做，其余保持交付，段不封。
 - 人只在一份结论错了时出手：`deed judge --overturn R1 --why 「为什么」` 把这条结论作废、这一段重新打开。签收 `deed sign --words 「用户原话」 --by 「谁」`：人在终端里敲可以省 `--by`（账本记 user），从管道里跑必须写清谁按的。
+- 门槛说这一段不用审（改动只落在免审路径）：`deed seal --why 「凭什么不审」` 封段。它不是结论，签收时这一段会被列成「没经过审查」。`judge --pass`／`judge --rework` 已经没有了：一段的结局由审查者的结论落。
 - 身份是约定不是鉴权：`--by`、`who` 记的是自述，账本保证「谁说过什么」可回溯，不保证「说的人是谁」；它能做的只有一件事——不替任何动作填名字。
 - 每条交付记录都带 `--digest <工作区里的文件>`（几份就写几遍）：说得清做了什么，也记下了当时的内容；没记文件的仍在账本里，但会挡住要审段的放行。
 - 查：`deed verify`（交付记录与 sha256）、`deed doctor`（账本能否重放）、`deed serve`（本机只读面板）。

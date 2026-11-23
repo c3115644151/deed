@@ -14,6 +14,9 @@ export const EVENT_KINDS = [
   "review.brief",
   "review.log",
   "review.overturn",
+  "segment.seal",
+  // 只读：旧账本里还有这两种结局，命令面已经不再产生它们（一段的结局由审查者的
+  // 结论定，人只能推翻结论）。
   "judge.pass",
   "judge.rework",
   "sign",
@@ -27,7 +30,7 @@ export const WHO = ["user", "agent"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 3;
+export const EVENT_VERSION = 4;
 
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
 // core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、
@@ -149,6 +152,13 @@ export function validateEvent(ev, at) {
       break;
     case "review.overturn":
       need(ev, "review");
+      need(ev, "why");
+      need(ev, "by");
+      break;
+    // 免审段的结局：门槛说这一段不用审，但段仍然要有人封，不然它永远开在
+    // state 里、谁也签不了收。它不是审查结论，所以不写 review.log。
+    case "segment.seal":
+      need(ev, "segment");
       need(ev, "why");
       need(ev, "by");
       break;

@@ -343,10 +343,35 @@ export function nextAction(doc, config) {
       command: `deed review --segment ${segment.id} --by "你是谁" --verdict fail --rework T1,T2 --why "…"`,
     };
   }
+  // 走到这里只剩一种：门槛说这一段不用审，而它还没封。免审就是不用审，所以不再
+  // 叫一个人去签发假结论——由交付的人写清凭什么不审，签收时这一段会被列出来。
   return {
-    who: "user",
-    what: "判决",
-    text: `${segment.id} · ${count.total} 条已交付，${state === "pass" ? "审查通过" : "免审"}`,
-    command: `deed judge --pass --segment ${segment.id}`,
+    who: "agent",
+    what: "封存",
+    text: `${segment.id} · ${count.total} 条都交付了，门槛说这一段不用审（改动都在免审路径、规模也不大）`,
+    command: `deed seal --segment ${segment.id} --why "门槛说这一段不用审：改动只落在免审路径"`,
   };
+}
+
+// 免审段要人封一次，理由写在账本里；但它不能顶替审查结论：要审的段封不了。
+export function sealBlockers(config, session, segment = openSegment(session)) {
+  if (!session) return ["现在没有在推进的会话"];
+  if (!segment) return ["现在没有待封的段"];
+  const blockers = [];
+  if (segment.closedAt !== null) blockers.push(`段 ${segment.id} 已经封存`);
+  const count = countIn(session, segment);
+  if (count.todo > 0)
+    blockers.push(`还有 ${count.todo} 条没交付（${session.tasks.filter((one) => one.segment === segment.id && one.status === "todo").map((one) => one.id).join("、")}）`);
+  const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
+  if (live.length > 0)
+    blockers.push("这一段已经有审查结论：结局由那份结论定（deed judge --overturn 只用来推翻它）");
+  if (needsReview(config, session, segment))
+    blockers.push(`这一段按门槛要审：结局得由审查者的结论落（deed review --segment ${segment.id}）`);
+  return blockers;
+}
+
+// 没经过审查就收口的段：签收时要把它们摆出来，别让"免审"变成没人知道。
+export function exemptSegments(session) {
+  if (!session) return [];
+  return session.segments.filter((one) => one.verdict === "exempt");
 }

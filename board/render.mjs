@@ -6,7 +6,6 @@
 import {
   countIn,
   currentSession,
-  judgeBlockers,
   needsReview,
   nextAction,
   openSegment,
@@ -94,26 +93,24 @@ function gatesOf(doc, session, config, segment) {
     },
     {
       key: "verdict",
-      name: "判决",
-      // The verdict gate is the judge's, not the reviewer's: a pass written by
-      // the reviewer still leaves the segment undecided until someone judges it.
-      done: segment ? segment.verdict === "pass" || state === "exempt" : true,
+      name: state === "exempt" && segment && segment.closedAt === null ? "封存" : "判决",
+      // 一段的结局只有两种：审查者的结论（pass 当场封段），或者门槛说不用审时
+      // 有人写清凭什么不审。后者没人看过，所以这一格叫"封存"，不叫"判过"。
+      done: segment ? segment.closedAt !== null : true,
       why:
         state === "stale"
           ? "结论早于最后一次交付：审的是旧内容，要重审一次"
-          : segment && segment.verdict === "rework"
-            ? "判过不合格：补完再判"
+          : state === "exempt"
+            ? "门槛说这一段不用审：还没有人封存"
             : state === "pass"
-              ? "审查通过，等判决" + (judgeBlockers(config, session, segment)[0] ? "（" + judgeBlockers(config, session, segment)[0] + "）" : "")
-              : segment
-                ? "这一段要审，结论还没落盘"
-                : "还没有段",
+              ? "审查通过"
+              : "这一段要审，结论还没落盘",
       command:
-        segment && (state === "pass" || segment.verdict === "rework")
-          ? "deed judge --pass --segment " + segment.id
-          : segment
+        state === "exempt" && segment && segment.closedAt === null
+          ? "deed seal --segment " + segment.id + ' --why "…"'
+          : segment && segment.closedAt === null
             ? "deed review --segment " + segment.id
-            : "deed task add \"" + "…" + "\" --criteria \"" + "…" + "\"",
+            : 'deed task add "…" --criteria "…"',
     },
     {
       key: "sign",

@@ -241,8 +241,8 @@ test("signing needs a judgement and the user own words", () => {
   assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 1, "什么都没交付不能签收");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 1, "段还没判");
-  deed(cwd, "judge", "--pass", "--by", "user");
+  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 1, "段还没封");
+  deed(cwd, "seal", "--why", "只改了文档，门槛说不用审", "--by", "agent");
   assert.equal(deed(cwd, "sign", "--by", "user").status, 1, "签收要留原话");
   assert.equal(deed(cwd, "sign", "--words", "可以，就这样", "--title", "上手", "--by", "user").status, 0);
   const signed = readEvents(cwd).find((one) => one.k === "sign");
@@ -252,15 +252,15 @@ test("signing needs a judgement and the user own words", () => {
 
 // 账本替人签过名：judge --pass 与 sign 以前默认写 by: "user"，于是 agent 交付、
 // 判决、签收一条龙之后，记录上写着是用户按的。名字现在必须由写者给。
-test("a piped judgement or signing names the hand that typed it", () => {
+test("a piped seal or signing names the hand that typed it", () => {
   const cwd = workspace("name-it");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  const unnamed = deed(cwd, "judge", "--pass");
-  assert.equal(unnamed.status, 1, "管道里跑的判决不能自动记成用户按的");
+  const unnamed = deed(cwd, "seal", "--why", "只改了文档");
+  assert.equal(unnamed.status, 1, "管道里跑的封存不能自动记成用户按的");
   assert.match(unnamed.stderr, /--by/);
-  assert.equal(deed(cwd, "judge", "--pass", "--by", "agent:claude").status, 0);
+  assert.equal(deed(cwd, "seal", "--why", "只改了文档", "--by", "agent:claude").status, 0);
   const typed = deed(cwd, "sign", "--words", "可以");
   assert.equal(typed.status, 1, "签收同理");
   assert.match(typed.stderr, /--by/);
@@ -301,11 +301,11 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.equal(unknown.status, 1, "点名不存在的任务要被拒");
   assert.match(unknown.stderr, /没有任务|不在/);
   assert.equal(readEvents(cwd).length, before, "被拒的动作一个字节也没写进去");
-  deed(cwd, "judge", "--pass", "--by", "user");
-  const sealed = deed(cwd, "task", "done", "T1", "--evidence", "判过之后又改");
+  deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
+  const sealed = deed(cwd, "task", "done", "T1", "--evidence", "封过之后又改");
   assert.equal(sealed.status, 1, "判过的段不能再往任务上写");
   assert.match(sealed.stderr, /已封存/);
-  assert.equal(readEvents(cwd).length, before + 1, "只多了那一条判决");
+  assert.equal(readEvents(cwd).length, before + 1, "只多了那一条封存");
   assert.equal(deed(cwd, "state").status, 0, "工作区没被写坏");
   assert.equal(deed(cwd, "verify").status, 0);
   assert.equal(deed(cwd, "doctor").status, 0);
@@ -316,7 +316,7 @@ test("a closed period cannot be written into, and no verb invents a new one", ()
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "judge", "--pass", "--by", "user");
+  deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
   deed(cwd, "sign", "--words", "可以", "--by", "user");
   const after = readEvents(cwd).length;
   const stray = deed(cwd, "task", "add", "又一件", "--criteria", "x");
@@ -354,22 +354,27 @@ test("verify reports evidence pinned to content that has since changed, and hold
   const stale = deed(cwd, "verify");
   assert.equal(stale.status, 1);
   assert.match(stale.stdout, /交付记录过期/);
-  const judge = deed(cwd, "judge", "--pass", "--by", "user");
+  const judge = deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
   assert.equal(judge.status, 1, "记下的内容变了,这一条不能再算数");
   assert.match(judge.stderr, /过期/);
 });
 
-test("a rework after a verdict reopens the newest segment instead of starting over", () => {
+test("a pass seals the segment, and a fail after overturning it reopens that same one", () => {
   const cwd = workspace("rework");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "judge", "--pass", "--by", "user");
-  assert.equal(deed(cwd, "judge", "--rework", "T1", "--why", "少了一节", "--by", "qa").status, 0);
+  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "封过之后又改").status, 1, "封过的段不能再往任务上写");
+  assert.equal(deed(cwd, "judge", "--overturn", "R1", "--why", "这份结论看错了一处", "--by", "user").status, 0);
+  const back = deed(cwd, "review", "--segment", "S01.1", "--by", "qa2", "--verdict", "fail", "--rework", "T1", "--why", "少了一节");
+  assert.equal(back.status, 0, back.stdout + back.stderr);
   const doc = readEvents(cwd);
-  assert.equal(doc.filter((one) => one.k === "judge.rework").length, 1);
-  assert.equal(doc.filter((one) => one.s === "S01" && one.k === "task.add").length, 1, "打回不开新段");
-  assert.equal(deed(cwd, "state").stdout.includes("段 S01.1"), true);
+  assert.equal(doc.filter((one) => one.k === "review.overturn").length, 1);
+  assert.equal(doc.filter((one) => one.s === "S01" && one.k === "task.add").length, 1, "退回不开新段");
+  assert.match(deed(cwd, "state").stdout, /● T1|○ T1/);
+  assert.match(deed(cwd, "state").stdout, /段 S01\.1/);
 });
 
 test("doctor names the line that broke the ledger and the only repair it allows", () => {
@@ -425,7 +430,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
-  const blocked = deed(cwd, "judge", "--pass", "--by", "user");
+  const blocked = deed(cwd, "seal", "--why", "全部免审", "--by", "user");
   assert.equal(blocked.status, 1, "改文件不改变规则");
   assert.match(blocked.stderr, /要审|审查/);
   const drift = deed(cwd, "verify");
@@ -439,7 +444,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   assert.equal(last.why, "全部免审，只留文档");
   assert.deepEqual(last.to.required, [], "账本记的是改成什么样");
   assert.deepEqual(last.to.exempt, ["**"]);
-  assert.equal(deed(cwd, "judge", "--pass", "--by", "user").status, 0, "账本放开了才算放开");
+  assert.equal(deed(cwd, "seal", "--why", "全部免审", "--by", "user").status, 0, "账本放开了才算放开");
 });
 
 test("a config.json saved with a BOM reads the same as one without", () => {
@@ -603,27 +608,35 @@ test("a pass seals the segment, so later work opens a new one instead of making 
   assert.match(sign.stderr, /S01\.2/);
 });
 
-test("a rework leaves no standing verdict behind", () => {
+test("an overturned conclusion stays in the ledger but stops counting", () => {
   const cwd = workspace("rework-void");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
   deed(cwd, "review", "--segment", "S01.1");
-  deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass");
-  deed(cwd, "judge", "--rework", "T1", "--why", "记录不够", "--by", "qa");
-  const skipped = deed(cwd, "judge", "--pass", "--by", "user");
-  assert.equal(skipped.status, 1, "打回之后没人再审，不能直接封段");
-  assert.match(skipped.stderr, /作废|重新审/);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+  assert.match(deed(cwd, "state").stdout, /签收/, "pass 封段之后只剩签收");
+  const overturned = deed(cwd, "judge", "--overturn", "R1", "--why", "结论没看交付记录", "--by", "user");
+  assert.equal(overturned.status, 0, overturned.stdout + overturned.stderr);
+  const review = fold(readEvents(cwd)).sessions[0].reviews[0];
+  assert.equal(review.voidedBy, "user");
+  assert.notEqual(review.voidedAt, null, "作废的那条留着，只是不再算");
+  assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1$|deed review --segment S01\.1/, "这一段回到要审");
+  const blocked = deed(cwd, "sign", "--words", "可以", "--by", "user");
+  assert.equal(blocked.status, 1, "没有在案的结论不能签收");
+  assert.match(blocked.stderr, /S01\.1/);
 });
 
-test("a rework names every task it was given, in either spelling", () => {
+test("a fail names every task it sends back", () => {
   const cwd = workspace("rework-many");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "一", "--criteria", "c", "--files", "docs/a.md");
-  deed(cwd, "task", "add", "二", "--criteria", "c", "--files", "docs/b.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
-  deed(cwd, "judge", "--rework", "T1", "T2", "--why", "两处都要补", "--by", "qa");
+  deed(cwd, "task", "add", "一", "--criteria", "c", "--files", "core/a.mjs");
+  deed(cwd, "task", "add", "二", "--criteria", "c", "--files", "core/b.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "写完了", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T2", "--evidence", "写完了", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.1");
+  const back = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1,T2", "--why", "两处都要补");
+  assert.equal(back.status, 0, back.stdout + back.stderr);
   const state = deed(cwd, "state");
   assert.match(state.stdout, /○ T1/);
   assert.match(state.stdout, /○ T2/);
@@ -688,7 +701,7 @@ test("--session that names no period is refused by every verb that takes one", (
   for (const args of [
     ["task", "done", "T1", "--evidence", "写完了", "--session", "S99"],
     ["review", "--segment", "S01.1", "--session", "S99"],
-    ["judge", "--pass", "--by", "user", "--session", "S99"],
+    ["seal", "--why", "免审", "--by", "user", "--session", "S99"],
     ["sign", "--words", "可以", "--by", "user", "--session", "S99"],
   ]) {
     const refused = deed(cwd, ...args);

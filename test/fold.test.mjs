@@ -15,7 +15,7 @@ const rework = (n, segment, tasks, why = "不够", by = "qa") => ({ v: 1, at: T(
 const sign = (n, words = "可以", title = "第一期") => ({ v: 1, at: T(n), k: "sign", s: null, words, title, by: "user" });
 
 test("the first recorded turn opens a session by itself", () => {
-  const doc = fold([turn(1, "我要一个机制")]);
+  const doc = fold([turn(1, "先把这一段跑完")]);
   assert.equal(doc.sessions.length, 1);
   assert.equal(doc.sessions[0].id, "S01");
   assert.equal(doc.sessions[0].turns.length, 1);
