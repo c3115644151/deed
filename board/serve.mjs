@@ -12,6 +12,7 @@ import { readEvents } from "../lib/store.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { wordsNotice } from "../lib/words.mjs";
 import { renderBoard, when } from "./render.mjs";
+import { clearPanel, recordPanel } from "../lib/panel.mjs";
 
 function snapshot(root) {
   // A panel that vanishes because one ledger line is malformed is worse than a
@@ -54,8 +55,9 @@ function zoneOfMachine() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-export function handler(root) {
+export function handler(root, onRequest = () => {}) {
   return (req, res) => {
+    onRequest();
     const url = new URL(req.url, "http://localhost");
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405, { allow: "GET, HEAD", "content-type": "text/plain; charset=utf-8" });
@@ -169,7 +171,8 @@ export function handler(root) {
 }
 
 export function start(root, port) {
-  const server = http.createServer(handler(root));
+  let lastRequest = Date.now();
+  const server = http.createServer(handler(root, () => { lastRequest = Date.now(); }));
   server.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
       console.error(`deed: 端口 ${port} 被占用；换一个：deed serve --port ${port + 1}`);
@@ -177,8 +180,23 @@ export function start(root, port) {
     }
     throw error;
   });
+  // 面板闲着自己退：它跟着命令被拉起来，就没有理由在没人看的时候一直占着一格端口。
+  // 有人连着（SSE）不算闲，所以按"最后一次请求"算，不按"最后一个页面"算。
+  const idle = Number(process.env.DEED_PANEL_IDLE_MIN ?? 30) * 60 * 1000;
+  const clock = setInterval(() => {
+    if (Date.now() - lastRequest < idle) return;
+    clearInterval(clock);
+    server.close(() => process.exit(0));
+  }, 60 * 1000);
+  server.on("close", () => {
+    clearInterval(clock);
+    clearPanel(root, process.pid);
+  });
   server.listen(port, "127.0.0.1", () => {
     const actual = server.address().port;
+    // 记号写给下一條命令读：它要凭这个知道页面已经在，不再拉第二个。
+    recordPanel(root, { pid: process.pid, port: actual });
+    lastRequest = Date.now();
     console.log(`契约页 http://127.0.0.1:${actual}`);
     console.log("  只读：命令由人执行，页面只呈现当前事实");
   });

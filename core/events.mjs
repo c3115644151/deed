@@ -31,7 +31,7 @@ export const WHO = ["user", "agent"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 7;
+export const EVENT_VERSION = 8;
 
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
 // core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、

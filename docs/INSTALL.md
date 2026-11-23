@@ -46,8 +46,8 @@ node tools/deed/cli/deed.mjs help        # 用相对路径调用，不占全局
 ### 打一个包带走
 
 ```bash
-npm pack                     # 产出 deed-0.6.0.tgz（private 只挡发布，不挡打包）
-npm i -g ./deed-0.6.0.tgz    # 装到这台机器上
+npm pack                     # 产出 deed-0.7.0.tgz（private 只挡发布，不挡打包）
+npm i -g ./deed-0.7.0.tgz    # 装到这台机器上
 ```
 
 ## 接进一个工作区
@@ -77,7 +77,7 @@ deed init --review "src/**,apps/**" --exempt "docs/**,*.md"
 | `--said "…"` | 你开局那句话，作为第一轮的事实落进账本 |
 | `--review "src/**,…"` | 要审的路径；默认为空，表示「没声明就等于要审」 |
 | `--exempt "docs/**,…"` | 免审的路径 |
-| `--port 7317` | `deed serve` 的端口 |
+| `--port 7317` | `deed serve` 的端口（面板自己起来时用系统给的空端口） |
 | `--print-agents` | 只打印一段可粘贴的规则，不改工作区 |
 
 ### 已经接过一次之后
@@ -130,7 +130,7 @@ npm unlink -g deed        # 或删掉 vendor 的那份目录
 ```
 
 `.deed/` 可以留着：它是这个工作区的历史。真要清掉，先 `deed verify` 确认没有未签收的任务，再整目录删。
-deed 没有后台进程、没有守护、没有全局状态，`deed serve` 是前台只读服务，`Ctrl+C` 就停。
+deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来：每条命令执行前探测一次，不在就用后台进程拉起，URL 打在那一行输出里；30 分钟没人连就自己退，`deed panel --stop` 立即停，`DEED_NO_PANEL=1` 一条都不起。它不写账本，也不占终端。要端口固定、前台看日志，仍可 `deed serve --port 7317`。
 
 ## 常见故障
 

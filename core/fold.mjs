@@ -233,7 +233,17 @@ export function fold(events) {
         if (!last) noway("任务 " + task.id + " 没有可撤回的交付");
         task.evidence.pop();
         // 撤回的那条还带着它的批号：剩下同批的那条，数目不能因为撤回而变小。
-        task.undone.push({ claim: last.claim, why: ev.why, by: ev.by ?? "agent", at: ev.at, batch: last.batch ?? null });
+        // 也带着它记下的内容：撤回之后账本里再没有那句话，而"它当时指着哪份字节"
+        // 是别人复核这条撤回的唯一依据——不留，撤回就成了没法核对的一句话。
+        task.undone.push({
+          claim: last.claim,
+          why: ev.why,
+          by: ev.by ?? "agent",
+          at: ev.at,
+          batch: last.batch ?? null,
+          undoes: last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []),
+          changed: last.changed ?? [],
+        });
         // 撤回的交付不再替这些字节说话：这一段碰过的路径与大小重新由还在的交付算。
         rederive(task);
         task.status = task.evidence.length > 0 ? "done" : "todo";

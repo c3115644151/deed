@@ -124,7 +124,19 @@ function taskBlock(task, batches = new Map()) {
         (proof.batch ? batchLine(batches.get(proof.batch.at)) : "")
       );
     }),
-    ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计入"),
+    ...(task.undone ?? []).map(
+      (one) =>
+        "- 撤回的交付：" +
+        one.why +
+        "（" +
+        one.by +
+        " · " +
+        stamp0(one.at) +
+        "）· 那条不计入" +
+        ((one.undoes ?? []).length > 0
+          ? "；它当时记下的是 " + one.undoes.map((file) => file.path + " " + file.digest.slice(0, 12)).join("、")
+          : "；它当时没有记下任何内容"),
+    ),
     "",
   ];
 }

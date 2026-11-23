@@ -54,7 +54,8 @@ import {
   writeSnapshot,
 } from "../lib/store.mjs";
 import { start } from "../board/serve.mjs";
-import { auditBriefs, auditEvidence, bareEvidence, briefTrouble, staleEvidence } from "./audit.mjs";
+import { ensurePanel, panelNow, panelOff, startPanel, stopPanel } from "./panel.mjs";
+import { auditBriefs, auditEvidence, bareEvidence, bareHistory, briefTrouble, staleEvidence } from "./audit.mjs";
 import { planBrief, planWhole, writeBrief } from "./brief.mjs";
 import { FORMAT as PLAN_FORMAT, draft as planDraft, parse as parsePlan } from "./plan.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
@@ -1061,9 +1062,9 @@ const commands = {
               if (task.status === "done" || task.status === "accepted") continue;
               if (task.status === "dropped") fail(item.id + " 已经放弃过：要接着做就新开一条");
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
-              // 一条交付总要指着点什么：工作区没量到改动、也没有文件可指时，写下去就是一条
-              // 谁也核不了的空话——它自己消失得比谁都干净（后面的交付一钉就把这条盖住）。
-              if (pins.length === 0)
+              // 一条交付总要指着点什么：既没量到改动、也没有文件可指时，写下去就是一条谁也核不了的空话。
+              // 只删不改也算动了——那时 pins 是空的，但 changed 里有那条走了的路径，得放行。
+              if (pins.length === 0 && scanned.changed.length === 0)
                 fail(
                   item.id +
                     " 勾上了，但这一批没有量到任何改动、也没有文件可指：先真的动过再勾，或者用 deed task done " +
@@ -1263,6 +1264,7 @@ const commands = {
       if (covered.length > 0)
         console.log("早先的交付 " + covered.length + " 条 · 已被后来的交付覆盖（" + covered.map((one) => one.id).join("、") + "；钉过的内容现在是什么不再核对）");
       const bare = bareEvidence(doc);
+      const past = bareHistory(doc);
       const briefs = auditBriefs(ROOT, doc);
       const looseBriefs = briefTrouble(briefs);
       for (const one of bare) console.log("没钉内容 · " + one.id + "（--evidence 里没有 --digest：说得出做了什么，查不了）");
@@ -1280,6 +1282,17 @@ const commands = {
       for (const one of drift)
         console.log("门槛对不上 · " + one.key + " · 账本里是 " + JSON.stringify(one.ledger) + "，磁盘上写的是 " + JSON.stringify(one.disk));
       const wrong = stale.length + outside.length;
+      // 历史上写过、后来被重交盖住的空交付：不挡门，但账本里那句话确实存在过。
+      for (const one of past)
+        console.log(
+          "空交付 · " +
+            one.id +
+            " · " +
+            stamp0(one.at) +
+            "（" +
+            (one.withdrawn ? "撤回时没记下内容" : "那时没记下文件") +
+            "：后来重交过，不挡放行）",
+        );
       if (wrong === 0 && looseBriefs === 0 && drift.length === 0) {
         if (bare.length === 0) console.log("交付记录有效：每一条都说得出做了什么，也都记下了一份内容的 sha256");
         else console.log("交付记录有效：记下内容的都还在，另有 " + bare.length + " 条没记文件（要审的段判决前会被挡）");
@@ -1419,6 +1432,31 @@ const commands = {
     });
   },
 
+  panel(argv) {
+    const { flags } = parse(argv);
+    guard(() => {
+      if (flags.stop) {
+        const one = stopPanel(ROOT);
+        if (one.stopped) console.log("面板已停 · 端口 " + one.port);
+        else console.log("面板本来就没在跑");
+        return;
+      }
+      panelNow(ROOT)
+        .then((now) => {
+          if (now.running) {
+            console.log("面板 · http://127.0.0.1:" + now.port + " · pid " + now.pid);
+            return null;
+          }
+          return startPanel(ROOT).then((one) => {
+            if (!one.running) fail("面板起不来：直接跑 deed serve --port 7317 看它报什么");
+            console.log("面板 · http://127.0.0.1:" + one.port);
+            return null;
+          });
+        })
+        .catch((err) => reject(err?.message ?? String(err)));
+    });
+  },
+
   serve(argv) {
     const { flags } = parse(argv);
     guard(() => {
@@ -1462,6 +1500,7 @@ const HELP = [
   "deed doctor",
   "deed gate [名字…]              按账本里的 gates 顺序跑门，失败即退出",
   "deed serve [--port 7317]",
+  "deed panel [--stop]              看面板在不在（没在跑就拉起来，打印 URL）",
   "",
   "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
@@ -1487,6 +1526,16 @@ if (!verb || verb === "help" || verb === "--help") {
 if (verb === "--version" || verb === "-v" || verb === "version") {
   console.log(currentVersion());
   process.exit(0);
+}
+// 面板跟着命令走，不跟着开机走：你要用它的那一下，页面应该在；没人用它的时候
+// 它没有理由占着一格端口。serve 与 panel 自己不算（它们就是在做这件事）。
+if (!panelOff() && verb !== "serve" && verb !== "panel" && verb !== "init") {
+  try {
+    const one = await ensurePanel(ROOT);
+    if (one && one.started) console.log("面板 · http://127.0.0.1:" + one.port);
+  } catch {
+    // 面板起不来不该让命令失败：账本的事比页面重要。
+  }
 }
 // An unknown verb is refused, not thrown: fail() raises, and the raise would
 // reach the terminal as a stack trace with nobody left to swallow it.

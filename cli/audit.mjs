@@ -56,14 +56,38 @@ export function auditEvidence(root, doc, sessionId) {
 
 export const staleEvidence = (root, doc, sessionId) => auditEvidence(root, doc, sessionId).stale;
 
+// 一条交付「什么也没指着」有两种样子：没记下任何文件（--evidence 里没有 --digest），
+// 或者记下的路径这一批根本不存在（删文件也是改动，但没有字节可钉）。
+// 后者说得通：路径走了，改动的痕迹留在 changed 上。
+const pointsAtNothing = (proof) => filesOf(proof).length === 0 && (proof.changed ?? []).length === 0;
+
+// 现行的那一条要挡门：它现在就是这条任务对外的说法。
 export function bareEvidence(doc) {
   const bare = [];
   for (const one of doc.sessions)
     for (const task of one.tasks) {
       const claim = task.evidence[task.evidence.length - 1];
-      if (claim && filesOf(claim).length === 0) bare.push({ id: task.id });
+      if (claim && pointsAtNothing(claim)) bare.push({ id: task.id });
     }
   return bare;
+}
+
+// 历史上写过、后来被重交盖住的空交付：它挡不了门（现行那条已经不是它），
+// 但也不能当没发生过——只看每条任务的最后一笔，这种记录会永远藏在账本里。
+export function bareHistory(doc) {
+  const past = [];
+  for (const one of doc.sessions)
+    for (const task of one.tasks) {
+      const claim = task.evidence[task.evidence.length - 1];
+      for (const proof of task.evidence) {
+        if (proof === claim) continue;
+        if (!pointsAtNothing(proof)) continue;
+        past.push({ id: task.id, at: proof.at, by: proof.by });
+      }
+      for (const gone of task.undone ?? [])
+        if ((gone.undoes ?? []).length === 0) past.push({ id: task.id, at: gone.at, by: gone.by, withdrawn: true });
+    }
+  return past;
 }
 
 // The brief is outside the ledger, so the ledger keeps its path and sha256.
