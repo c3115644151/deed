@@ -5,6 +5,7 @@ export const EVENT_KINDS = [
   "turn",
   "task.add",
   "task.done",
+  "task.undo",
   "task.defer",
   "task.drop",
   "ask.raise",
@@ -70,6 +71,10 @@ export function validateEvent(ev, at) {
       need(ev, "by");
       if (ev.changed !== undefined && !Array.isArray(ev.changed))
         throw new Error("task.done 的 changed 要是路径数组");
+      break;
+    case "task.undo":
+      need(ev, "id");
+      need(ev, "why");
       break;
     case "task.defer":
     case "task.drop":

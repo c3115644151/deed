@@ -105,7 +105,10 @@ export function needsReview(config, session, segment) {
 // earlier version of the work, so it stops counting as a conclusion.
 export const lastDelivery = (session, segment) => {
   const times = tasksIn(session, segment)
-    .flatMap((one) => one.evidence.map((proof) => proof.at))
+    .flatMap((one) => [
+      ...one.evidence.map((proof) => proof.at),
+      ...(one.undone ?? []).map((gone) => gone.at),
+    ])
     .sort();
   return times[times.length - 1] ?? null;
 };

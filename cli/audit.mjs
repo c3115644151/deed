@@ -6,18 +6,25 @@ import { paths, rel } from "../lib/store.mjs";
 // 核对"账本说的"与"工作区现在的"：这是唯一一条从账本往磁盘看的通道。
 // 工作区当参数传进来，模块自己不认 cwd——同一段判断在哪跑都读同一份。
 
-// Three things can be wrong with evidence, and they are not the same problem:
-// the file changed (stale), the path leaves the workspace (a ledger that only
-// makes sense on one machine), or nothing was pinned at all (nothing to check).
+// 一条任务只有一份现行交付：它最后说的那句话。更早的交付是账本历史（谁在哪天说过什么），
+// 不是现在的承诺——它们钉住的内容当然会跟着工作区变，那不是错，只是过去了。
+// 所以三条判断只对现行那份做：内容变了（过期）、路径出了工作区、什么都没钉（没得查）。
+// 早先那些钉过的交付单独列出来，报个条数，不算坏账、不挡判决。
 export function auditEvidence(root, doc, sessionId) {
   const stale = [];
   const outside = [];
+  const covered = [];
   for (const one of doc.sessions) {
     if (sessionId && one.id !== sessionId) continue;
-    for (const task of one.tasks)
+    for (const task of one.tasks) {
+      const claim = task.evidence[task.evidence.length - 1];
       for (const proof of task.evidence) {
         if (!proof.digest || !proof.path) continue;
         const file = path.resolve(root, proof.path);
+        if (proof !== claim) {
+          covered.push({ id: task.id, path: proof.path, digest: proof.digest });
+          continue;
+        }
         const inside = path.relative(root, file);
         if (inside.startsWith("..") || path.isAbsolute(inside)) {
           outside.push({ id: task.id, path: proof.path });
@@ -26,8 +33,9 @@ export function auditEvidence(root, doc, sessionId) {
         const actual = fs.existsSync(file) ? digest(fs.readFileSync(file)) : null;
         if (actual !== proof.digest) stale.push({ id: task.id, path: proof.path, digest: proof.digest });
       }
+    }
   }
-  return { stale, outside };
+  return { stale, outside, covered };
 }
 
 export const staleEvidence = (root, doc, sessionId) => auditEvidence(root, doc, sessionId).stale;
@@ -35,8 +43,10 @@ export const staleEvidence = (root, doc, sessionId) => auditEvidence(root, doc, 
 export function bareEvidence(doc) {
   const bare = [];
   for (const one of doc.sessions)
-    for (const task of one.tasks)
-      if (task.evidence.length > 0 && !task.evidence.some((proof) => proof.digest && proof.path)) bare.push({ id: task.id });
+    for (const task of one.tasks) {
+      const claim = task.evidence[task.evidence.length - 1];
+      if (claim && !(claim.digest && claim.path)) bare.push({ id: task.id });
+    }
   return bare;
 }
 

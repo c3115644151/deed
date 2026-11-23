@@ -26,6 +26,7 @@ export function planBrief(root, open, segment, at) {
       "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
       "- 状态：" + task.status,
       ...task.evidence.map((proof) => "- 证据：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）"),
+      ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计证据"),
       "",
     ]),
     "## 怎么审",

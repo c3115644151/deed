@@ -54,6 +54,7 @@
 ## 治理
 - 每轮对话先 `deed tick --who user|agent --said "…" --did "…"`；会话跟着轮次自己开合，不用手动建。
 - 要做事先 `deed task add "承诺" --criteria "做完的标准" --files core/a.mjs,cli/b.mjs`（逗号分隔、正斜杠）；做完 `deed task done <T> --evidence "命令与结果" --digest <工作区里的文件>`。
+- 交付说错了话用 `deed task undo <T> --why "为什么收回"`：最后那条退回未做，撤回的理由留在任务上，账本里两条事实都在——不要改写成对的。
 - 拿不准就问 `deed ask "…" --reading "我理解成…" --why "为什么得你定"`，只有用户能 `ask resolve`。
 - `deed state` 只说下一步是谁；照着做，不要自己另排优先级。
 - 要审的段：`deed review --segment S0x.N` 出任务书（记一条 `review.brief`，不写结论），审查者照它落 `--by "谁" --verdict pass|fail`；结论要求这一段已经全部交付（还有未做的会被拒），并且是这一段的最后一份结论。

@@ -180,7 +180,9 @@ function taskCard(task, zone) {
     '<span class="cid">' + esc(task.id) + "</span>" +
     '<span class="ctitle">' + esc(task.title) + "</span>" +
     '<span class="cmeta"><span class="tstate">' + (STATUS_WORD[task.status] ?? "") + "</span>" +
-    '<span class="cnail">' + task.evidence.length + " 钉</span></span>" +
+    '<span class="cnail">' + task.evidence.length + " 钉</span>" +
+    ((task.undone && task.undone.length > 0) ? '<span class="cundone">撤 ' + task.undone.length + "</span>" : "") +
+    "</span>" +
     '<span class="cfiles">' + esc(files) + "</span>" +
     "</summary>" +
     '<div class="cdetail">' +
@@ -463,6 +465,7 @@ body { border-top: 9px solid var(--ink); }
 .cmeta { display: flex; gap: 8px; align-items: baseline; justify-content: flex-end; white-space: nowrap; }
 .tstate { font-size: 9.5px; letter-spacing: .18em; color: var(--soft); }
 .cnail { font-family: var(--mono); font-size: 10px; color: var(--soft); border: 1px solid var(--rule); padding: 0 5px; }
+.cundone { font-family: var(--mono); font-size: 10px; color: var(--red); border: 1px dashed currentColor; padding: 0 5px; margin-left: 6px; }
 .cfiles { grid-column: 3; font-family: var(--mono); font-size: 10px; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmeta { grid-column: 2 / -1; grid-row: 3; justify-content: flex-start; gap: 10px; margin-top: 2px; }
 .cdetail { padding: 0 12px 12px; border-top: 1px dotted var(--rule); margin-top: 4px; padding-top: 10px; }

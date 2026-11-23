@@ -148,6 +148,7 @@ export function fold(events) {
           createdAt: ev.at,
           status: "todo",
           evidence: [],
+          undone: [],
           changed: [],
           deferredWhy: null,
         });
@@ -166,11 +167,29 @@ export function fold(events) {
           at: ev.at,
           digest: ev.digest ?? null,
           path: ev.digestPath ?? null,
+          changed: ev.changed ?? [],
         });
         // What the delivery actually moved in the workspace, computed before the
         // event landed. The review threshold reads this, not the task's own story
         // about which paths it touched.
         task.changed.push(...(ev.changed ?? []));
+        break;
+      }
+      // 交付说错了话，只能收回，不能改写：撤回是一条新事实，最后那条交付
+      // 退回未做，理由留在任务上——审查任务书要能说清哪一条不算数。
+      case "task.undo": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        editable(session, task);
+        const last = task.evidence[task.evidence.length - 1];
+        if (!last) noway("任务 " + task.id + " 没有可撤回的交付");
+        task.evidence.pop();
+        task.undone.push({ claim: last.claim, why: ev.why, by: ev.by ?? "agent", at: ev.at });
+        for (const one of last.changed ?? []) {
+          const spot = task.changed.indexOf(one);
+          if (spot >= 0) task.changed.splice(spot, 1);
+        }
+        task.status = task.evidence.length > 0 ? "done" : "todo";
         break;
       }
       case "task.defer":

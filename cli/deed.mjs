@@ -21,6 +21,7 @@ import {
   debt,
   judgeBlockers,
   lastBrief,
+  lastDelivery,
   nextAction,
   openSegment,
   pendingAsks,
@@ -469,6 +470,15 @@ const commands = {
         if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（门槛按它判，不只按声明的 --files）");
         return;
       }
+      // A delivery that said the wrong thing is taken back, not rewritten: the
+      // ledger keeps both facts, and the brief stops counting it as proof.
+      if (verb === "undo") {
+        if (!id) fail("task undo 要点名任务");
+        if (!flags.why) fail("task undo 要说清为什么收回：--why \"…\"");
+        transact(flags, () => ({ k: "task.undo", s: flags.session ?? null, id, why: flags.why, by: flags.by ?? "agent" }));
+        console.log("撤回交付 · " + id + " · " + flags.why);
+        return;
+      }
       if (verb === "defer" || verb === "drop") {
         if (!id) fail("task " + verb + " 要点名任务");
         if (!flags.why) fail("task " + verb + " 要说清为什么：--why \"…\"");
@@ -476,7 +486,7 @@ const commands = {
         console.log((verb === "defer" ? "延后" : "放弃") + " · " + id + " · " + flags.why);
         return;
       }
-      fail("task 只认 add / done / defer / drop");
+      fail("task 只认 add / done / undo / defer / drop");
     });
   },
 
@@ -539,12 +549,16 @@ const commands = {
           // 手上那份已经不是账本里记的那一份，谁读它都不算数。
           const file = path.resolve(ROOT, handed.brief);
           const intact = fs.existsSync(file) && digest(fs.readFileSync(file)) === handed.briefDigest;
-          if (intact) {
+          // 任务书写的是它出纸那一刻的证据。之后账本又动了（交付、收回），
+          // 这份纸就不再说这一段现在的事——换一份，别让人审旧内容。
+          const moved = lastDelivery(one, seg);
+          const stale = moved !== null && moved > handed.at;
+          if (intact && stale) console.log("上一份任务书(" + handed.brief + ")出在最后一次交付之前：另出一份");
+          else if (intact) {
             console.log("审查任务书 · " + handed.brief + "（这一段已经出过，等结论落盘）");
             console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
             return;
-          }
-          console.log("上一份任务书(" + handed.brief + ")改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
+          } else console.log("上一份任务书(" + handed.brief + ")改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
         }
         const plan = planBrief(ROOT, one, seg, stamp());
         const brief = rel(ROOT, plan.file);
@@ -680,7 +694,9 @@ const commands = {
         process.exitCode = 1;
         return;
       }
-      const { stale, outside } = auditEvidence(ROOT, doc);
+      const { stale, outside, covered } = auditEvidence(ROOT, doc);
+      if (covered.length > 0)
+        console.log("早先的交付 " + covered.length + " 条 · 已被后来的交付覆盖（" + covered.map((one) => one.id).join("、") + "；钉过的内容现在是什么不再核对）");
       const bare = bareEvidence(doc);
       const briefs = auditBriefs(ROOT, doc);
       const looseBriefs = briefTrouble(briefs);
@@ -856,6 +872,7 @@ const HELP = [
   "deed tick --who user|agent --said \"…\" [--did \"…\"] [--session S01]",
   "deed task add \"<承诺>\" --criteria \"<做完的标准>\" [--files \"src/a.mjs,docs/b.md\"]",
   "deed task done <T1> --evidence \"<命令与结果>\" [--digest <路径>] [--session S01]",
+  "deed task undo <T1> --why \"…\"         收回最后那条交付（说错了话用它，别改写成对的）",
   "deed task defer|drop <T1> --why \"…\"",
   "deed ask \"<问题>\" --reading \"我理解成…\" --why \"…\"",
   "deed ask resolve|withdraw <A1> [--decision \"…\"] [--why \"…\"]",
@@ -875,6 +892,14 @@ const HELP = [
 ].join("\n");
 
 const [verb, ...rest] = process.argv.slice(2);
+const usageOf = (one) => HELP.split("\n").filter((line) => line.startsWith("deed " + one + " "));
+// `deed review --help` used to hand out a brief: asking what a verb takes is
+// not asking it to do the thing.
+if (rest.some((one) => one === "--help" || one === "-h")) {
+  const lines = usageOf(verb);
+  console.log(lines.length > 0 ? [lines[0], ...lines.slice(1)].join("\n") : HELP);
+  process.exit(0);
+}
 if (!verb || verb === "help" || verb === "--help") {
   console.log(HELP);
   process.exit(0);

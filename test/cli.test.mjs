@@ -809,3 +809,107 @@ test("a directory with no ledger cannot be written into, or read as if it were f
   assert.equal(verify.status, 1);
   assert.equal(verify.stdout.trim(), "这个目录还没接 deed：deed init 之后才有账本和证据可查");
 });
+
+test("a delivery that said the wrong thing is taken back, not rewritten", () => {
+  const cwd = workspace("undo");
+  deed(cwd, "init", "--said", "开始");
+  const said = deed(cwd, "task", "add", "先说一句承诺", "--criteria", "做完了", "--files", "proof.txt");
+  assert.equal(said.status, 0);
+  const pinned = proof(cwd);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "说要被撤回的那条", "--digest", pinned).status, 0);
+  const undo = deed(cwd, "task", "undo", "T1", "--why", "这条证据是我手滑打进去的乱码");
+  assert.equal(undo.status, 0);
+  assert.match(undo.stdout, /撤回交付 · T1/);
+
+  const after = deed(cwd, "state");
+  assert.match(after.stdout, /（未做 1 · 已交付 0）/, "收回之后这条又回到未做");
+  assert.match(after.stdout, /deed task done T1/, "下一步重新是交付它");
+
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "这次说的是真的", "--digest", pinned).status, 0);
+  assert.deepEqual(kinds(cwd).filter((one) => one.startsWith("task.")), ["task.add", "task.done", "task.undo", "task.done"]);
+
+  assert.equal(deed(cwd, "review").status, 0);
+  const handed = briefs(cwd).map((one) => path.join(cwd, ".deed", "review", one)).sort().pop();
+  const text = fs.readFileSync(handed, "utf8");
+  assert.equal(text.includes("说要被撤回的那条"), false, "撤回的那条不算证据");
+  assert.match(text, /- 撤回的交付：这条证据是我手滑打进去的乱码/, "任务书要说清哪一条不算数");
+  assert.match(text, /- 证据：这次说的是真的/);
+});
+
+test("taking back a delivery that never landed is refused, and nothing is written", () => {
+  const cwd = workspace("undo-empty");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "一条还没交的承诺", "--criteria", "做完了");
+  const run = deed(cwd, "task", "undo", "T1", "--why", "手滑");
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /没有可撤回的交付/);
+  assert.equal(kinds(cwd).includes("task.undo"), false);
+});
+
+test("asking what a verb takes does not run it", () => {
+  const cwd = workspace("verb-help");
+  deed(cwd, "init", "--said", "开始");
+  const before = briefs(cwd).length;
+  const asked = deed(cwd, "review", "--help");
+  assert.equal(asked.status, 0);
+  assert.match(asked.stdout, /deed review --segment S01\.1 --by/);
+  assert.equal(briefs(cwd).length, before, "问一句用法不该发一份任务书");
+  assert.equal(kinds(cwd).includes("review.brief"), false);
+
+  const task = deed(cwd, "task", "--help");
+  assert.equal(task.status, 0);
+  assert.match(task.stdout, /deed task undo/);
+});
+
+test("a brief handed out before the ledger moved is replaced, not answered", () => {
+  const cwd = workspace("brief-moved");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "先说一句承诺", "--criteria", "做完了", "--files", "proof.txt");
+  const pinned = proof(cwd);
+  deed(cwd, "task", "done", "T1", "--evidence", "第一次交付", "--digest", pinned);
+
+  const first = deed(cwd, "review");
+  assert.equal(first.status, 0);
+  const seen = new Set(briefs(cwd));
+  const again = deed(cwd, "review");
+  assert.match(again.stdout, /已经出过，等结论落盘/, "账本没动时，同一份纸就继续等结论");
+
+  deed(cwd, "task", "undo", "T1", "--why", "那条证据说错了话");
+  deed(cwd, "task", "done", "T1", "--evidence", "第二次交付", "--digest", pinned);
+  const third = deed(cwd, "review");
+  assert.match(third.stdout, /出在最后一次交付之前：另出一份/, "账本动了，旧纸就不再是这一段现在的事");
+  const fresh = briefs(cwd).filter((one) => !seen.has(one));
+  assert.equal(fresh.length, 1, "只该多出一份");
+  const text = fs.readFileSync(path.join(cwd, ".deed", "review", fresh[0]), "utf8");
+  assert.match(text, /第二次交付/);
+  assert.match(text, /撤回的交付：那条证据说错了话/);
+});
+
+test("an older delivery is history, not a claim that keeps going stale", () => {
+  const cwd = workspace("covered");
+  fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "钉住内容", "--criteria", "文件不变", "--files", "docs/a.md");
+  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "thing.txt");
+  fs.writeFileSync(path.join(cwd, "thing.txt"), "v2");
+  deed(cwd, "task", "done", "T1", "--evidence", "第二版：跟着改了", "--digest", "thing.txt");
+  const ok = deed(cwd, "verify");
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /早先的交付 1 条/, "覆盖掉的交付要说是历史，不能假装它还在核对");
+  const judge = deed(cwd, "judge", "--pass", "--by", "qa");
+  assert.doesNotMatch(judge.stdout + judge.stderr, /过期/, "现行那份是新的，判决不该再被过期证据挡住");
+  fs.writeFileSync(path.join(cwd, "thing.txt"), "v3");
+  const stale = deed(cwd, "verify");
+  assert.equal(stale.status, 1, "现行那份跟着变了才算过期");
+  assert.match(stale.stdout, /证据过期 · T1/);
+});
+
+test("the word --help inside evidence is evidence", () => {
+  const cwd = workspace("help-in-words");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  const done = deed(cwd, "task", "done", "T1", "--evidence", "跑过 review --help 与 task --help，都只打用法");
+  assert.equal(done.status, 0, "证据里出现 --help 不该被当成在问用法");
+  assert.match(done.stdout, /交付 · T1/);
+  assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 1);
+});
