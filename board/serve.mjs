@@ -117,7 +117,8 @@ export function handler(root) {
         "cache-control": "no-store",
         connection: "keep-alive",
       });
-      res.write(`event: hello\ndata: ${when(new Date().toISOString())}\n\n`);
+      // Same zone as the page: one moment must not read two ways on one screen.
+      res.write(`event: hello\ndata: ${when(new Date().toISOString(), zoneOfMachine())}\n\n`);
       let timer = null;
       // A workspace that was never initialised has no .deed/log yet: attach when
       // it appears instead of dying with ENOENT on the first request.

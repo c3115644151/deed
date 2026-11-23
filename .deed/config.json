@@ -1,0 +1,25 @@
+{
+  "review": {
+    "required": [
+      "src/**",
+      "apps/**",
+      "cli/**",
+      "core/**",
+      "lib/**",
+      "board/**"
+    ],
+    "exempt": [
+      "docs/**",
+      "*.md",
+      "examples/**",
+      ".github/**"
+    ]
+  },
+  "gates": {
+    "commit": [],
+    "check": []
+  },
+  "board": {
+    "port": 7317
+  }
+}

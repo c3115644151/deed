@@ -5,7 +5,7 @@ import http from "node:http";
 import path from "node:path";
 import { fold } from "../core/fold.mjs";
 import { append } from "../lib/store.mjs";
-import { renderBoard } from "../board/render.mjs";
+import { renderBoard, when } from "../board/render.mjs";
 import { start } from "../board/serve.mjs";
 import { workspace } from "../support/lib.mjs";
 
@@ -115,11 +115,28 @@ test("serving is read-only and says so", async () => {
     });
     assert.equal(posted, 405);
     const stream = await new Promise((resolve) => {
-      http.get({ host: "127.0.0.1", port, path: "/events" }, (res) => resolve(res));
+      http.get({ host: "127.0.0.1", port, path: "/events" }, (res) => {
+        let text = "";
+        res.on("data", (chunk) => {
+          text += chunk;
+          if (text.includes("\n\n")) {
+            resolve({ status: res.statusCode, type: res.headers["content-type"], text });
+            res.destroy();
+          }
+        });
+      });
     });
-    assert.equal(stream.statusCode, 200);
-    assert.match(stream.headers["content-type"], /text\/event-stream/);
-    stream.destroy();
+    assert.equal(stream.status, 200);
+    assert.match(stream.type, /text\/event-stream/);
+    // The hello line is the only clock this stream reads, and it must speak the
+    // zone the page speaks: one moment cannot read two ways on one screen.
+    const said = stream.text.split("\n").find((line) => line.startsWith("data: ")).slice(6);
+    const minutes = (text) => {
+      const parts = text.match(/^(\d\d\/\d\d) (\d\d):(\d\d)$/);
+      return Number(parts[2]) * 60 + Number(parts[3]);
+    };
+    const expected = when(new Date().toISOString(), new Intl.DateTimeFormat().resolvedOptions().timeZone);
+    assert.equal(Math.abs(minutes(said) - minutes(expected)) <= 1, true, "流里的开场时刻 " + said + " 该和页面同一个钟：" + expected);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
