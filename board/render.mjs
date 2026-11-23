@@ -7,14 +7,18 @@
 import {
   countIn,
   currentSession,
+  goalOf,
   needsReview,
+  needsWhole,
   nextAction,
   openSegment,
   pendingAsks,
   reading,
   reviewOf,
   reviewState,
+  sessionReview,
   signBlockers,
+  wholeState,
 } from "../core/rules.mjs";
 
 const esc = (value) =>
@@ -355,12 +359,34 @@ function acceptScreen(doc, session, config, zone, on) {
     })
     .join("");
   const signed = session && session.sign;
+  const goal = session ? goalOf(session) : null;
+  const wholeReview = session ? sessionReview(session) : null;
+  const whole = session ? wholeState(session) : null;
+  const wholeWord = !needsWhole(config, session ?? { segments: [] })
+    ? null
+    : whole === "pass" ? { ok: true, label: "这一期整体审过", why: wholeReview ? wholeReview.by + " · " + when(wholeReview.at, zone) : "" }
+    : whole === "nogoal" ? { ok: false, label: "还没写清这一期要做成什么", why: "deed goal" }
+    : whole === "stale" ? { ok: false, label: "整体审的结论早于最后一次改动", why: "deed review --all" }
+    : { ok: false, label: "这一期还没有整体审", why: "deed review --all" };
+  const wholeCard = wholeReview
+    ? '<article class="vcard" data-kind="' + (wholeReview.verdict === "pass" ? "pass" : "fail") + '">' +
+      '<div class="vhead"><span class="vid">整期</span>' +
+      '<span class="vword">' + (wholeReview.verdict === "pass" ? "放行" : "不合格") + "</span>" +
+      '<span class="vmeta">' + esc(wholeReview.by) + " · " + when(wholeReview.at, zone) + "</span>" +
+      '<span class="vcount">' + tasks.length + " 条 · " + (wholeReview.findings.length ? "点了 " + wholeReview.findings.length + " 条" : "没有发现") + "</span>" +
+      "</div>" +
+      '<p class="vbrief"><span class="k">材料</span>' + esc(String(wholeReview.brief).split(/[\\/]/).pop()) +
+      (wholeReview.rework && wholeReview.rework.length ? '　<span class="k">退回</span>' + esc(wholeReview.rework.join("、")) : "") + "</p>" +
+      (wholeReview.findings.length ? '<div class="fds">' + findingList(wholeReview.findings) + "</div>" : "") +
+      "</article>"
+    : "";
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="accept" id="screen-accept">' +
     screenHead("03", "验收", "判过什么、谁判的、还差谁一句话", sealed.length + " 段判过") +
+    (goal ? '<p class="goal"><span class="k">这一期要做成什么</span>' + esc(goal) + "</p>" : "") +
     '<div class="cols">' +
     '<div class="col">' +
-    '<h3 class="colh">结论</h3>' + (cards || '<p class="quiet">还没有审查结论</p>') +
+    '<h3 class="colh">结论</h3>' + (wholeCard + cards || '<p class="quiet">还没有审查结论</p>') +
     "</div>" +
     '<aside class="col side">' +
     '<h3 class="colh">签收</h3>' +
@@ -368,6 +394,7 @@ function acceptScreen(doc, session, config, zone, on) {
     check(sealed.length === segments.length, "每一段都判过", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没判" : "") +
     check(todo === 0, "没有未做的条目", todo ? "还有 " + todo + " 条" : "") +
     check(asks.length === 0, "没有等裁定的问题", asks.length ? "还有 " + asks.length + " 条待裁（" + asks.map((one) => one.id).join("、") + "）" : "") +
+    (wholeWord ? check(wholeWord.ok, wholeWord.label, wholeWord.why) : "") +
     check(blocks.length === 0 && (!session || !!signed || sealed.length === segments.length), "没有挡路的债", blocks.length ? blocks.length + " 条，见下" : "") +
     "</ul>" +
     (signed
@@ -724,6 +751,8 @@ html[data-theme="light"] body {
 .vcount { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--dim); letter-spacing: .1em; }
 .vbrief { margin: 8px 13px 0; font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
 .vcard .fds { margin: 8px 13px 12px; }
+.goal { margin: 0 0 14px; padding: 10px 13px; border-left: 2px solid var(--signal); background: var(--sunk); font-size: 13px; line-height: 1.55; }
+.goal .k { color: var(--dim); font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; margin-right: 9px; }
 .checks { list-style: none; margin: 0; padding: 0; }
 .chk { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 4px 6px; padding: 5px 0; border-bottom: 1px dotted var(--line); align-items: baseline; }
 .cbox { font-family: var(--mono); font-size: 11px; color: var(--warn); }

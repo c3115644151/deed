@@ -132,6 +132,53 @@ export const lastSegmentChange = (session, segment) => {
 export const lastBrief = (session, segmentId) =>
   session.briefs.filter((one) => one.segment === segmentId).at(-1) ?? null;
 
+// 一期要做成什么：签收和整体审都拿它当尺子。可以改，账本留每一次。
+export const goalOf = (session) => session?.goal?.text ?? null;
+
+// 整期的在案结论（整体审）。段审的结论不算：它回答的是一批任务。
+export const sessionReview = (session) => {
+  if (!session) return null;
+  const live = session.reviews.filter((one) => one.scope === "session" && !one.voidedAt);
+  return live[live.length - 1] ?? null;
+};
+
+// 整期最后一次改动：任何一条任务的交付、撤回、增改，加上那句目的。
+// 整体审的结论早于它，回答的就是旧的一期。
+export const periodChange = (session) => {
+  if (!session) return null;
+  const times = [
+    ...session.tasks.flatMap((one) => [
+      one.touchedAt,
+      ...one.evidence.map((proof) => proof.at),
+      ...(one.undone ?? []).map((gone) => gone.at),
+    ]),
+    session.goal?.at ?? null,
+  ]
+    .filter(Boolean)
+    .sort();
+  return times[times.length - 1] ?? null;
+};
+
+// 整期审的状态：没写目的 / 没审过 / 结论过期 / pass / fail。
+export function wholeState(session) {
+  if (!goalOf(session)) return "nogoal";
+  const changed = periodChange(session);
+  const review = sessionReview(session);
+  if (review) return changed && review.at < changed ? "stale" : review.verdict;
+  // 一段的一期：那一段的结论就是这一期的结论——同一批活不审两遍。
+  if (session && session.segments.length === 1) {
+    const only = reviewOf(session, session.segments[0]);
+    if (!only) return "missing";
+    return changed && only.at < changed ? "stale" : only.verdict;
+  }
+  return "missing";
+}
+
+// 这一期需不需要一次整体审：只要有一段按门槛要审，签收前就得有一份整期结论。
+// 全都免审的期不需要——没人需要看的东西不必再造一份材料。
+export const needsWhole = (config, session) =>
+  config ? session.segments.some((one) => needsReview(config, session, one)) : Boolean(session?.segments.length);
+
 export const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
   const last = lastSegmentChange(session, segment);
@@ -190,6 +237,16 @@ export function signBlockers(doc, session, config = null) {
         : shut.id + " 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
     );
   }
+  // 整期审：签收签的是这一期，最后一句结论该落在它身上。段都封了还没有整体审，
+  // 或者整体审的结论早于最后一次改动，都挡签收。
+  // 一段的一期不另算：那一段的结论就是整期的结论（wholeState 已经这么读），
+  // 同一批活不审两遍，也就不再要一句额外的目的。
+  if (session.segments.length > 1 && needsWhole(config, session)) {
+    const whole = wholeState(session);
+    if (whole === "nogoal") blockers.push("还没有写清这一期要做成什么（deed goal \"…\"）");
+    else if (whole === "missing") blockers.push(`${session.id} 还没有整体审通过（deed review --all）`);
+    else if (whole === "stale") blockers.push(`${session.id} 的整体审结论早于这一期最后一次改动（deed review --all）`);
+  }
   // Work owed outside the open segment is what a segment-level view cannot see;
   // inside it, the segment's own blockers already say it.
   const open = openSegment(session);
@@ -225,6 +282,35 @@ export const pressure = (session) => {
   return { segment: segment.id, tasks: count.total, undecided: count.done };
 };
 
+// 整期审这一步：缺目的先说目的，材料已交出去就落结论，否则发材料。
+function wholeStep(session, whole) {
+  const handed = session.briefs.filter((one) => one.scope === "session").at(-1) ?? null;
+  const waiting = Boolean(handed) && !session.reviews.some((one) => one.scope === "session" && one.brief === handed.brief);
+  if (whole === "nogoal")
+    return {
+      who: "user",
+      what: "写目的",
+      text: `${session.id} 的活都交付了，账本里还没有「这一期要做成什么」：整体审和签收都拿它当尺子`,
+      command: `deed goal "这一期要做成什么" --by "…"`,
+    };
+  if (whole === "missing" && waiting)
+    return {
+      who: "reviewer",
+      what: "落结论",
+      text: `整体审的材料已经交出去了：${handed.brief}（这一期 ${session.tasks.length} 条）`,
+      command: `deed review --all --by "你是谁" --verdict pass`,
+    };
+  return {
+    who: "reviewer",
+    what: whole === "stale" ? "重审整期" : "整体审",
+    text:
+      whole === "stale"
+        ? `${session.id} 的整体审结论早于这一期最后一次改动：它回答的是旧的一期`
+        : `${session.id} 的 ${session.tasks.length} 条都交付了，要一份看整期的结论`,
+    command: `deed review --all`,
+  };
+}
+
 export function nextAction(doc, config) {
   const session = currentSession(doc);
   if (!session) {
@@ -256,6 +342,7 @@ export function nextAction(doc, config) {
   const segment = openSegment(session) ?? session.segments[session.segments.length - 1];
   const count = countIn(session, segment);
   if (segment.closedAt !== null) {
+    if (needsWhole(config, session) && wholeState(session) !== "pass") return wholeStep(session, wholeState(session));
     const blockers = signBlockers(doc, session, config);
     return {
       who: "user",
@@ -337,6 +424,24 @@ export function nextAction(doc, config) {
         command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
       };
     }
+    // 手上那份清单是审查者的活：材料发出去、还没人回答，下一步是落结论，不是再发一份。
+    const handed = lastBrief(session, segment.id);
+    const waiting = Boolean(handed) && !session.reviews.some((one) => one.brief === handed.brief);
+    if (waiting)
+      return {
+        who: "reviewer",
+        what: "落结论",
+        text: `${segment.id} 的不合格（${review.by}）还在案；新的一份材料已经交出去了：${handed.brief}`,
+        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
+      };
+    // 旧账本里有点名之前写下的不合格：没有可结清的条目，只能由人推翻。
+    if (named.length === 0)
+      return {
+        who: "agent",
+        what: "清结论",
+        text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，只能由人推翻那条结论，或者开新一期`,
+        command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
+      };
     return {
       who: "reviewer",
       what: "重审",

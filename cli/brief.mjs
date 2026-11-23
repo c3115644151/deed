@@ -11,12 +11,15 @@ import { fileStamp, stamp0 } from "../lib/format.mjs";
 
 // 角色包：清单说"审什么"，这一份说"怎么审"。它和清单一起交出去，也一起
 // 记下 sha256——换掉其中任何一份，结论就落不下来。
-function guideText(segment) {
+function guideText(subject, target, briefName) {
+  const verdict = target ? "deed review --segment " + target : "deed review --all";
   return [
-    "# 审查者 · 段 " + segment.id,
+    "# 审查者 · " + subject,
     "",
-    "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。",
-    "清单在同目录（" + segment.id + "-<时间>.md）。你判的是清单上那几条，不是整个项目。",
+    target
+      ? "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。"
+      : "你要回答一件事：这一期交付的活，合起来够不够得上它写下的目的。段只是批次，判断落在整期。",
+    "清单在同目录（" + briefName + "）。你判的是清单上那几条，不是整个项目。",
     "",
     "## 先读标准，再读代码",
     "",
@@ -46,13 +49,13 @@ function guideText(segment) {
     "",
     "全部达成：",
     "",
-    "    deed review --segment " + segment.id + " --by \"你是谁\" --verdict pass",
+    "    " + verdict + " --by \"你是谁\" --verdict pass",
     "",
     "pass 直接封段，不需要第二个人签字。",
     "",
     "有没达成的：",
     "",
-    "    deed review --segment " + segment.id + " --by \"你是谁\" --verdict fail --rework T1,T2 \\",
+    "    " + verdict + " --by \"你是谁\" --verdict fail --rework T1,T2 \\",
     "      --why \"一句话总结\" --finding \"…\" --finding \"…\"",
     "",
     "被点名的条目回到未做（交付记录退回），其余保持交付；段不封，补完再交再审。",
@@ -60,12 +63,32 @@ function guideText(segment) {
     "## 你不能",
     "",
     "- 不能改代码：动过这一段的活，你的结论就不再是独立的。",
-    "- 不能判自己交付过的段：deed 会拒这条结论。",
+    "- 不能判自己交付过的活：deed 会拒这条结论。",
     "- 不能把没达成写成达成来结束这件事。",
     "",
     "这份角色包和清单一起记进了账本（review.brief + 两份 sha256）：改其中任何一份，结论都落不下来。",
     "",
   ].join("\n");
+}
+
+// 一条任务在清单上的样子：段审和整体审共用，两种材料说的应该是同一件事。
+function taskBlock(task) {
+  return [
+    "### " + task.id + " · " + task.title,
+    "",
+    "- 做完的标准：" + task.criteria,
+    "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
+    "- 状态：" + task.status,
+    ...task.evidence.map((proof) => {
+      const files = proof.files ?? (proof.digest ? [{ path: proof.path, digest: proof.digest }] : []);
+      return (
+        "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
+        (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、"))
+      );
+    }),
+    ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计入"),
+    "",
+  ];
 }
 
 export function planBrief(root, open, segment, at) {
@@ -78,22 +101,7 @@ export function planBrief(root, open, segment, at) {
     "",
     "## 要审的任务",
     "",
-    ...tasks.flatMap((task) => [
-      "### " + task.id + " · " + task.title,
-      "",
-      "- 做完的标准：" + task.criteria,
-      "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
-      "- 状态：" + task.status,
-      ...task.evidence.map((proof) => {
-        const files = proof.files ?? (proof.digest ? [{ path: proof.path, digest: proof.digest }] : []);
-        return (
-          "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
-          (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、"))
-        );
-      }),
-      ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计入"),
-      "",
-    ]),
+    ...tasks.flatMap(taskBlock),
     "## 怎么审",
     "",
     "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
@@ -111,7 +119,63 @@ export function planBrief(root, open, segment, at) {
     n += 1;
     file = base(n) + ".md";
   }
-  const guide = guideText(segment);
+  const guide = guideText("段 " + segment.id, segment.id, path.basename(file));
+  return {
+    file,
+    text,
+    digest: digest(text),
+    guideFile: base(n) + "-reviewer.md",
+    guideText: guide,
+    guideDigest: digest(guide),
+  };
+}
+
+// 整期审的材料：目的在最上面（签收与这一份比的是它），下面是每一段的活与段审结论。
+// 单段的一期出这一份就够了——段审和整体审本来就看同一批任务。
+export function planWhole(root, session, at) {
+  const p = ensureDirs(root);
+  const verdicts = new Map(
+    session.reviews.filter((one) => one.scope !== "session" && !one.voidedAt).map((one) => [one.segment, one]),
+  );
+  const text = [
+    "# 整体审清单 · " + session.id,
+    "",
+    "会话 " + session.id + " · " + session.segments.length + " 段 · " + session.tasks.length + " 条 · 生成于 " + stamp0(at),
+    "",
+    "## 这一期要做成什么",
+    "",
+    session.goal
+      ? session.goal.text + "（" + session.goal.by + " · " + stamp0(session.goal.at) + "）"
+      : "（账本里还没写这一期要做成什么）",
+    "",
+    ...session.segments.flatMap((segment) => {
+      const review = verdicts.get(segment.id) ?? null;
+      return [
+        "## 段 " + segment.id + " · " +
+          (review
+            ? (review.verdict === "pass" ? "段审通过" : "段审不合格") + "（" + review.by + " · " + stamp0(review.at) + "）"
+            : "没有段审"),
+        "",
+        ...tasksIn(session, segment).flatMap(taskBlock),
+      ];
+    }),
+    "## 怎么审",
+    "",
+    "1. 拿这一期写下的目的当尺子：这些交付合起来，兑现了那句话没有。",
+    "2. 段审看的是单条标准；你要看它们合起来还缺什么——缺的那一块，就是这一期没做成的事。",
+    "3. 结论落盘：deed review --all --by \"<你是谁>\" --verdict pass|fail --finding \"<缺的那一块>\"",
+    "",
+    "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
+    "",
+  ].join("\n");
+  const base = (n) => path.join(p.review, session.id + "-all-" + fileStamp(at) + (n === 1 ? "" : "-" + n));
+  let n = 1;
+  let file = base(n) + ".md";
+  while (fs.existsSync(file) || fs.existsSync(base(n) + "-reviewer.md")) {
+    n += 1;
+    file = base(n) + ".md";
+  }
+  const guide = guideText("这一期 " + session.id, null, path.basename(file));
   return {
     file,
     text,

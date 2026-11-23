@@ -9,6 +9,7 @@ import {
   reviewState,
   sealBlockers,
   signBlockers,
+  wholeState,
 } from "../core/rules.mjs";
 
 const config = { review: { required: ["src/**", "core/**", "apps/**"], exempt: ["docs/**", "*.md"] } };
@@ -21,6 +22,9 @@ const done = (n, id) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence
 const pass = (n, segment = "S01.1") => ({ v: 1, at: T(n), k: "judge.pass", s: null, segment, by: "user" });
 const verdict = (n, v, segment = "S01.1") => ({ v: 1, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: v, brief: "b.md" });
 const ask = (n) => ({ v: 1, at: T(n), k: "ask.raise", s: null, id: "A1", text: "要兼容旧账吗", reading: "不兼容", why: "不确定" });
+const goal = (n, text = "把这一期收干净") => ({ v: 1, at: T(n), k: "goal.set", s: null, text, by: "user" });
+// 现在的结论自己封段（事件含义第 3 版起）；老账本里的结论只算一句判断。
+const sealed = (n, segment = "S01.1") => ({ v: 5, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: "pass", brief: "b.md", findings: [] });
 
 test("an empty period reads as discussing, a delivered batch as executing, a judged one as accepting", () => {
   assert.equal(reading(fold([])), "idle");
@@ -126,6 +130,35 @@ test("signing waits for the judgement and for every open question", () => {
   assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）"]);
   const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
   assert.deepEqual(signBlockers(clean, clean.sessions[0], config), []);
+});
+
+// 多段的一期：段都封了还差一句落在整期上的结论；它要拿目的当尺子，
+// 而一段的一期不必再算一次——那一段的结论就是整期的结论。
+test("a period with more than one segment needs a conclusion on the period itself", () => {
+  const doc = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5),
+    add(6, "T2", ["core/b.mjs"]), done(7, "T2"), sealed(8, "S01.2"),
+  ]);
+  assert.equal(wholeState(doc.sessions[0]), "missing");
+  const step = nextAction(doc, config);
+  assert.equal(step.who, "reviewer");
+  assert.match(step.command, /deed review --all/);
+  const whole = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5),
+    add(6, "T2", ["core/b.mjs"]), done(7, "T2"), sealed(8, "S01.2"),
+    { v: 5, at: T(9), k: "review.log", s: null, scope: "session", by: "qa", verdict: "pass", brief: "all.md", findings: [] },
+  ]);
+  assert.equal(wholeState(whole.sessions[0]), "pass");
+  assert.equal(nextAction(whole, config).what, "签收");
+});
+
+// 一段的一期不审两遍：那一段的结论已经回答了这一期。
+test("one segment's verdict answers for the period, so no second pass is asked for", () => {
+  const doc = fold([turn(1), goal(2), add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5)]);
+  assert.equal(wholeState(doc.sessions[0]), "pass");
+  assert.deepEqual(signBlockers(doc, doc.sessions[0], config), []);
 });
 
 test("the next step names one actor and one action", () => {

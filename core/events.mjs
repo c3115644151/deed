@@ -11,6 +11,7 @@ export const EVENT_KINDS = [
   "ask.raise",
   "ask.resolve",
   "ask.withdraw",
+  "goal.set",
   "review.brief",
   "review.log",
   "review.overturn",
@@ -30,7 +31,7 @@ export const WHO = ["user", "agent"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 4;
+export const EVENT_VERSION = 5;
 
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
 // core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、
@@ -114,10 +115,17 @@ export function validateEvent(ev, at) {
       need(ev, "id");
       need(ev, "why");
       break;
+    // 一期要做成什么：签收签的是它，整体审比的也是它。可以改，改一次一条记录。
+    case "goal.set":
+      need(ev, "text");
+      need(ev, "by");
+      break;
     // Handing the brief out is a fact, not a side effect: without it the
     // ledger cannot say which document a verdict answered.
     case "review.brief":
-      need(ev, "segment");
+      // 整体审的材料覆盖整期，没有"段"这一格；段审的必须有。
+      if (ev.scope === "session") need(ev, "goal");
+      else need(ev, "segment");
       need(ev, "brief");
       if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
         throw new Error("review.brief 的 briefDigest 要是清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
@@ -129,7 +137,7 @@ export function validateEvent(ev, at) {
       }
       break;
     case "review.log":
-      need(ev, "segment");
+      if (ev.scope !== "session") need(ev, "segment");
       need(ev, "by");
       need(ev, "verdict");
       if (!["pass", "fail"].includes(ev.verdict))

@@ -72,6 +72,10 @@ export function bareEvidence(doc) {
 // naming a document with no review.brief behind it), a file in the review
 // folder that no event mentions, or a legacy line that recorded no digest.
 // Each one leaves a conclusion that points at bytes nobody can vouch for.
+// 一份材料属于一段还是一期：整期审的材料没有段这一格，报告里就写"整期"，
+// 别让一条结论的位置显示成 null。
+const whereOf = (one) => one?.segment ?? (one?.scope === "session" ? "整期" : null);
+
 export function auditBriefs(root, doc, sessionId) {
   const edited = [];
   const gone = [];
@@ -93,26 +97,26 @@ export function auditBriefs(root, doc, sessionId) {
         const file = path.resolve(root, one2.brief);
         const inside = path.relative(root, file);
         if (inside.startsWith("..") || path.isAbsolute(inside)) {
-          outside.push({ segment: hand.segment, brief: one2.brief });
+          outside.push({ segment: whereOf(hand), brief: one2.brief });
           continue;
         }
         if (!one2.digest) {
-          unpinned.push({ segment: hand.segment, brief: one2.brief });
+          unpinned.push({ segment: whereOf(hand), brief: one2.brief });
           continue;
         }
         if (!fs.existsSync(file)) {
-          gone.push({ segment: hand.segment, brief: one2.brief });
+          gone.push({ segment: whereOf(hand), brief: one2.brief });
           continue;
         }
         const actual = digest(fs.readFileSync(file));
-        if (actual !== one2.digest) edited.push({ segment: hand.segment, brief: one2.brief, digest: one2.digest, actual });
+        if (actual !== one2.digest) edited.push({ segment: whereOf(hand), brief: one2.brief, digest: one2.digest, actual });
       }
     }
     for (const review of one.reviews) {
       claimed.add(review.brief);
       const handed = one.briefs.some((hand) => hand.brief === review.brief && hand.briefDigest === review.briefDigest);
-      if (!handed && review.briefDigest) orphan.push({ segment: review.segment, brief: review.brief });
-      if (!review.briefDigest) unpinned.push({ segment: review.segment, brief: review.brief });
+      if (!handed && review.briefDigest) orphan.push({ segment: whereOf(review), brief: review.brief });
+      if (!review.briefDigest) unpinned.push({ segment: whereOf(review), brief: review.brief });
     }
   }
   // Files left in the review folder that no line points at: a hand-written

@@ -106,6 +106,78 @@ test("delivery needs evidence, and the reviewer decides what counts", () => {
   assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 0);
 });
 
+// 一期要做成什么：一句话，可改，账本留每一次；整期审与签收都拿它当尺子。
+test("a period says what it is for, and the sentence can change", () => {
+  const cwd = workspace("goal-set");
+  deed(cwd, "init", "--said", "开始");
+  const first = deed(cwd, "goal", "把面板做到一眼看懂", "--by", "user");
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /目的 · S01 · 把面板做到一眼看懂/);
+  const changed = deed(cwd, "goal", "这一期只把面板做完", "--why", "范围收窄", "--by", "user");
+  assert.equal(changed.status, 0, changed.stderr);
+  assert.equal(kinds(cwd).filter((one) => one === "goal.set").length, 2, "改一次也是账本上的一次");
+  assert.equal(fold(readEvents(cwd)).sessions[0].goal.text, "这一期只把面板做完");
+  assert.equal(fold(readEvents(cwd)).sessions[0].goals.length, 1, "旧的那句留在历史里");
+  assert.match(deed(cwd, "state").stdout, /目的 · 这一期只把面板做完/);
+  assert.equal(deed(cwd, "goal", "--by", "user").status, 1, "目的要写成一句话");
+});
+
+// 多段的一期：段都封了还差一句落在整期上的结论；它拿目的当尺子，
+// 一次通过同时封掉还没封的段。
+test("a whole review reads the period, and its pass seals what it read", () => {
+  const cwd = workspace("whole-review");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+  deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "core/b.mjs");
+  deed(cwd, "task", "done", "T2", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.2");
+  assert.equal(deed(cwd, "review", "--segment", "S01.2", "--by", "qa", "--verdict", "pass").status, 0);
+  const aimless = deed(cwd, "review", "--all");
+  assert.equal(aimless.status, 1, "没有目的，整期审没有尺子");
+  assert.match(aimless.stderr, /还没写目的/);
+  assert.equal(deed(cwd, "goal", "把两段活收成一件", "--by", "user").status, 0);
+  assert.match(deed(cwd, "state").stdout, /deed review --all/, "段都封了，下一步是整期一句");
+  const handed = deed(cwd, "review", "--all");
+  assert.equal(handed.status, 0, handed.stderr);
+  assert.match(handed.stdout, /整体审材料/);
+  const pair = briefs(cwd).filter((one) => one.includes("-all-"));
+  assert.equal(pair.length, 2, "整期材料也是清单加角色包");
+  const passed = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "pass");
+  assert.equal(passed.status, 0, passed.stdout + passed.stderr);
+  assert.match(passed.stdout, /整体审通过/);
+  const review = fold(readEvents(cwd)).sessions[0].reviews.at(-1);
+  assert.equal(review.scope, "session");
+  assert.equal(review.segment, null);
+  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 0, "整期结论落了，签收才可行");
+});
+
+// 整期审打回可以点名上一段已经封存的任务：那一段要跟着打开，否则那一条连重新交付都做不了。
+test("a whole review can send back work from a segment it already sealed", () => {
+  const cwd = workspace("whole-rework");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "goal", "把两段活收成一件", "--by", "user");
+  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+  deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "core/b.mjs");
+  deed(cwd, "task", "done", "T2", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.2");
+  assert.equal(deed(cwd, "review", "--segment", "S01.2", "--by", "qa", "--verdict", "pass").status, 0);
+  deed(cwd, "review", "--all");
+  const back = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "第一段的交付记录没说清");
+  assert.equal(back.status, 0, back.stdout + back.stderr);
+  const session = fold(readEvents(cwd)).sessions[0];
+  assert.equal(session.tasks[0].status, "todo", "被点名的回到未做");
+  assert.equal(session.segments[0].closedAt, null, "它所在的那一段跟着打开");
+  assert.equal(session.tasks[1].status, "accepted", "没被点名的段不动");
+  assert.equal(session.segments[1].closedAt !== null, true);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "补了并发记录", "--digest", proof(cwd)).status, 0, "打开了才交得进去");
+});
+
 test("handing the brief out is a fact, and a verdict answers that document", () => {
   const cwd = workspace("brief");
   deed(cwd, "init", "--said", "开始");

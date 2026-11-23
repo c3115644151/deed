@@ -25,6 +25,8 @@ function newSession(doc, at) {
     title: null,
     words: null,
     turns: [],
+    goal: null,
+    goals: [],
     tasks: [],
     asks: [],
     briefs: [],
@@ -239,16 +241,28 @@ export function fold(events) {
         ask.closedAt = ev.at;
         break;
       }
+      // 一期要做成什么：签收和整体审都比着它。可以改，改一次记一条，
+      // 旧的留在 goals 里——"当初说要什么"是能查的事实，不是被覆盖的草稿。
+      case "goal.set": {
+        const session = sessionOf(doc, ev);
+        if (session.goal) session.goals.push(session.goal);
+        session.goal = { text: ev.text, at: ev.at, by: ev.by, why: ev.why ?? null };
+        break;
+      }
       // The brief a reviewer reads has to be a ledger fact, otherwise the verdict
       // below can only pin bytes generated after the reading -- a document
       // nobody answered. Handing out and answering are two lines, one reader.
       case "review.brief": {
         const session = sessionOf(doc, ev);
-        const segment = segmentById(session, ev.segment);
-        if (sealed(segment))
+        const scope = ev.scope === "session" ? "session" : "segment";
+        // 整体审的材料覆盖整期：它没有段这一格，也不该被某一段的封存挡在外面。
+        const segment = scope === "session" ? null : segmentById(session, ev.segment);
+        if (segment && sealed(segment))
           noway(`段 ${segment.id} 已经封存：要再审先由人推翻那份结论（deed judge --overturn <R> --why "…"）`);
         session.briefs.push({
-          segment: segment.id,
+          scope,
+          goal: ev.goal ?? null,
+          segment: segment ? segment.id : null,
           brief: ev.brief,
           briefDigest: ev.briefDigest,
           guide: ev.guide ?? null,
@@ -261,22 +275,32 @@ export function fold(events) {
       }
       case "review.log": {
         const session = sessionOf(doc, ev);
-        const segment = segmentById(session, ev.segment);
-        if (sealed(segment)) noway(`段 ${segment.id} 已经封存，结论不能再落`);
-        const missing = session.tasks.filter((one) => one.segment === segment.id && one.status === "todo");
+        // 两种对象：一段（段审）或整期（整体审）。整期没有"段"这一格，
+        // 它看的是这一期全部任务；它通过时所有还没封的段一起封。
+        const scope = ev.scope === "session" ? "session" : "segment";
+        const segment = scope === "session" ? null : segmentById(session, ev.segment);
+        if (segment && sealed(segment)) noway(`段 ${segment.id} 已经封存，结论不能再落`);
+        const subject = segment ? `段 ${segment.id}` : `这一期 ${session.id}`;
+        const inScope = segment ? session.tasks.filter((one) => one.segment === segment.id) : session.tasks;
+        const missing = inScope.filter((one) => one.status === "todo");
         if (missing.length > 0)
-          noway(`段 ${segment.id} 还有没交付的（${missing.map((one) => one.id).join("、")}）：结论只能落在交付之后`);
+          noway(`${subject} 还有没交付的（${missing.map((one) => one.id).join("、")}）：结论只能落在交付之后`);
         // 谁做的活不能由谁自己清账：那样结论就是交付自己的说法。身份是自述，
         // 所以这里堵的是默认路径（同一个标签两头都用），不是刻意换名字的人。
-        const ownWork = session.tasks
-          .filter((one) => one.segment === segment.id)
+        const ownWork = inScope
           .filter((one) => one.evidence.some((proof) => proof.by === ev.by))
           .map((one) => one.id);
-        if (ownWork.length > 0)
+        if (ownWork.length > 0) {
+          // 段审说的是这一段的活，整体审说的是这一期的活：同一句话，两种说法。
+          const hand = segment ? "段" : "活";
           noway(
-            `段 ${segment.id} 的 ${ownWork.join("、")} 是 ${ev.by} 交付的：同一个人不能判自己交付的段（换一个 --by，或让用户判）`,
+            `${subject} 的 ${ownWork.join("、")} 是 ${ev.by} 交付的：同一个人不能判自己交付的${hand}（换一个 --by，或让用户判）`,
           );
-        const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
+        }
+        // 两种对象各有一份"在案结论"：段审的互斥只看本段，整体审的只看整期。
+        const live = session.reviews.filter(
+          (one) => one.voidedAt === null && (segment ? one.scope === "segment" && one.segment === segment.id : one.scope === "session"),
+        );
         const latest = live[live.length - 1] ?? null;
         // A fail is a decision about this delivery. It is not a draft that a
         // later pass may quietly overwrite: the work it named has to be
@@ -292,11 +316,11 @@ export function fold(events) {
             .map((task) => task.id);
           if (named.length === 0)
             noway(
-              `段 ${segment.id} 在案的结论是不合格（${latest.by}）：它没点名要重做的条目，没有可结清的东西——要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
+              `${subject} 在案的结论是不合格（${latest.by}）：它没点名要重做的条目，没有可结清的东西——要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
             );
           if (stuck.length > 0)
             noway(
-              `段 ${segment.id} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"）`,
+              `${subject} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"）`,
             );
         }
         // 这条新记录自己带的是哪一版的含义：第 3 版起 pass 自己封段、fail 必须点名。
@@ -305,10 +329,12 @@ export function fold(events) {
         // 打回会写到别的段的任务上，而账本只说"已打回"。
         const rework = ev.rework ?? [];
         if (ev.verdict === "fail" && meaning >= 3 && rework.length === 0)
-          noway(`段 ${segment.id} 判不合格要点名重做的条目（--rework T1,T2）：不点名的结论没人能接`);
+          noway(`${subject} 判不合格要点名重做的条目（--rework T1,T2）：不点名的结论没人能接`);
         for (const taskId of rework) {
           const task = taskOf(session, taskId);
-          if (task.segment !== segment.id)
+          // 段审只能点本段的：跨段的打回会把别的段的活退回已交付，
+          // 而账本只说"已打回"。整期审可以点这一期里任何一条。
+          if (segment && task.segment !== segment.id)
             noway(`任务 ${task.id} 不在段 ${segment.id} 里（它在 ${task.segment}），打回不能跨段`);
         }
         const id = `R${session.reviews.length + 1}`;
@@ -320,7 +346,9 @@ export function fold(events) {
         }
         session.reviews.push({
           id,
-          segment: segment.id,
+          scope,
+          segment: segment ? segment.id : null,
+          goal: ev.goal ?? null,
           by: ev.by,
           verdict: ev.verdict,
           brief: ev.brief,
@@ -333,25 +361,52 @@ export function fold(events) {
           supersededBy: null,
         });
         // Keep the pair traceable: which handed-out document this verdict answers.
-        const handed = session.briefs.find((one) => one.brief === ev.brief && one.segment === segment.id);
+        const handed = session.briefs.find((one) => one.brief === ev.brief && one.scope === scope);
         if (handed) handed.answeredBy = id;
-        segment.reviewAt = ev.at;
-        segment.reviewBy = ev.by;
-        segment.reviewVerdict = ev.verdict;
-        // 审查者放行就是这一段的结局：第 3 版起 pass 自己封段，不再等第二个人签字。
-        // 验收那份名单只认一件事——有人独立看过这段活，而且看的是最后发出去的那份。
+        // 段审要在段头上留下"谁、什么时候、什么结论"；整体审没有段头，它落在整期。
+        if (segment) {
+          segment.reviewAt = ev.at;
+          segment.reviewBy = ev.by;
+          segment.reviewVerdict = ev.verdict;
+        }
+        // 审查者放行就是结局，不再等第二个人签字：段审封这一段，整体审把还没封的段
+        // 一起封（单段的一期就是这种情形——那份材料本来就覆盖了它全部的任务）。
         if (ev.verdict === "pass" && meaning >= 3) {
-          for (const task of session.tasks)
-            if (task.segment === segment.id && task.status === "done") task.status = "accepted";
-          segment.verdict = "pass";
-          segment.judgedAt = ev.at;
-          segment.closedAt = ev.at;
+          const shut = segment ? [segment] : session.segments.filter((one) => one.closedAt === null);
+          for (const one of shut) {
+            for (const task of session.tasks)
+              if (task.segment === one.id && task.status === "done") task.status = "accepted";
+            one.verdict = "pass";
+            one.judgedAt = ev.at;
+            one.closedAt = ev.at;
+            if (!segment) {
+              one.reviewAt = ev.at;
+              one.reviewBy = ev.by;
+              one.reviewVerdict = "pass";
+              // 记下是那次整体审封的：人推翻它的时候，要能把这几段一起打开。
+              one.sealedByReview = id;
+            }
+          }
         }
         // 不合格不封段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
-        // 不必再回来问"到底哪几条要重做"。
+        // 不必再回来问"到底哪几条要重做"。（整期审打回时条目可以跨段。）
         if (ev.verdict === "fail") {
           for (const taskId of rework) {
             const task = taskOf(session, taskId);
+            const home = session.segments.find((one) => one.id === task.segment);
+            // 整期审可以点回已经封存的段：那一段得跟着打开，否则被点名的条目
+            // 连重新交付都做不了（已封存的段不收新交付）。
+            if (home && home.closedAt !== null) {
+              for (const other of session.tasks)
+                if (other.segment === home.id && other.status === "accepted") other.status = "done";
+              home.verdict = null;
+              home.judgedAt = null;
+              home.closedAt = null;
+              home.reviewAt = ev.at;
+              home.reviewBy = ev.by;
+              home.reviewVerdict = "fail";
+              home.sealedByReview = null;
+            }
             task.status = "todo";
             task.evidence = [];
             task.deferredWhy = null;
@@ -370,6 +425,22 @@ export function fold(events) {
         review.voidedAt = ev.at;
         review.voidedBy = ev.by;
         review.voidedWhy = ev.why;
+        // 被推翻的是整体审：它封过的段一起打开，活回到桌面上。
+        if (review.scope === "session") {
+          for (const one of session.segments) {
+            if (one.sealedByReview !== review.id) continue;
+            for (const task of session.tasks)
+              if (task.segment === one.id && task.status === "accepted") task.status = "done";
+            one.verdict = null;
+            one.judgedAt = null;
+            one.closedAt = null;
+            one.sealedByReview = null;
+            one.reviewVerdict = null;
+            one.reviewAt = null;
+            one.reviewBy = null;
+          }
+          break;
+        }
         const segment = segmentById(session, review.segment);
         segment.reviewVerdict = null;
         segment.reviewAt = null;
