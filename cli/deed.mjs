@@ -42,6 +42,7 @@ import {
 import {
   DEFAULT_CONFIG,
   append,
+  appendMany,
   changedPaths,
   ensureDirs,
   paths,
@@ -55,6 +56,7 @@ import {
 import { start } from "../board/serve.mjs";
 import { auditBriefs, auditEvidence, bareEvidence, briefTrouble, staleEvidence } from "./audit.mjs";
 import { planBrief, planWhole, writeBrief } from "./brief.mjs";
+import { FORMAT as PLAN_FORMAT, draft as planDraft, parse as parsePlan } from "./plan.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 import { BLOCK as AGENTS_BLOCK, wordsNotice } from "../lib/words.mjs";
 import { hookNotice, silenceNotice } from "../lib/heartbeat.mjs";
@@ -66,7 +68,7 @@ const stamp = () => new Date().toISOString();
 // Flags that carry no value. Everything else must be followed by one: a value
 // that starts with -- is almost always a forgotten quote, and silently storing
 // "true" would turn evidence into a word nobody can check later.
-const BOOLEAN_FLAGS = new Set(["pass", "force", "print-agents", "all"]);
+const BOOLEAN_FLAGS = new Set(["pass", "force", "print-agents", "all", "format"]);
 
 // Two things a flag can mean when it is given twice: "all of these" or "the
 // caller is confused". Only one flag means the first; for the rest, quietly
@@ -151,6 +153,30 @@ function transact(flags, build, commit, mayBind = false) {
     append(ROOT, stamped);
     if (commit) commit(stamped);
     return { doc: after, ev: stamped };
+  });
+}
+
+// 一份清单说几件事，就把几件事一起落进账本：任何一行被拒，磁盘上一个字都不动。
+// 整批先在内存里重放到最后一行，通过了才一次性写——半批落盘会让清单和账本对不上，
+// 而对不上的那一刻没人知道哪一条算数。
+function transactMany(flags, buildAll, commit) {
+  if (!bound(ROOT))
+    fail("这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
+  return withLock(ROOT, () => {
+    const events = readEvents(ROOT);
+    const doc = fold(events);
+    const at = stamp();
+    const specs = buildAll(doc, flags);
+    if (specs.length === 0) fail("清单里没有要落的改动：改了哪一条再来一次");
+    const stamped = specs.map((spec) => {
+      const one = validateEvent(spec, at);
+      one.w = currentVersion() || undefined;
+      return one;
+    });
+    const after = fold([...events, ...stamped]);
+    appendMany(ROOT, stamped);
+    if (commit) commit(stamped, after);
+    return { doc: after, evs: stamped };
   });
 }
 
@@ -253,7 +279,7 @@ const REVIEW_LABEL = {
 function signer(flags, act) {
   if (flags.by) return flags.by;
   if (process.stdin.isTTY && process.stdout.isTTY) return "user";
-  fail(act + "不是从终端敲的：deed 不会替你写「用户按的」。写 --by「谁」（比如 agent:claude）");
+  fail("「" + act + "」没有写名字：deed 不替任何动作填名字。写 --by「谁」（比如 agent:claude）");
 }
 
 function printState() {
@@ -523,6 +549,16 @@ const commands = {
         const scanned = changedPaths(ROOT);
         let moved = scanned.changed;
         let snapshotFiles = scanned.now;
+        // 规模是规则看得见的一半：碰了几个文件数得出来，几个字节得在交付那一刻称。
+        // 删掉的文件记 0——它今天占的字节就是零，不是"没称过"。
+        const sizes = {};
+        for (const one of moved) {
+          try {
+            sizes[one] = fs.statSync(path.join(ROOT, one)).size;
+          } catch {
+            sizes[one] = 0;
+          }
+        }
         transact(
           flags,
           () => {
@@ -537,6 +573,7 @@ const commands = {
               digestPath: pins[0]?.path ?? null,
               files: pins,
               changed: taken.changed,
+              bytes: sizes,
             };
           },
           () => writeSnapshot(ROOT, snapshotFiles),
@@ -853,6 +890,149 @@ const commands = {
     });
   },
 
+  // 清单：人和 agent 改同一份文件，submit 一次落账。命令面因此只剩一个入口，
+  // 而「改了什么」由工作区快照自己称——清单上不写路径，也不写 sha256。
+  plan(argv) {
+    const { flags } = parse(argv);
+    guard(() => {
+      if (flags.format) {
+        console.log(PLAN_FORMAT);
+        return;
+      }
+      const { doc } = load();
+      const one = targetSession(doc, flags);
+      const text = planDraft(one);
+      if (flags.print) {
+        console.log(text);
+        return;
+      }
+      const file = path.join(ROOT, ".deed", "plan.md");
+      if (fs.existsSync(file) && !flags.force)
+        fail("清单已经在 " + rel(ROOT, file) + "：改它，改完 deed submit（要按账本重出一份，加 --force）");
+      ensureDirs(ROOT);
+      fs.writeFileSync(file, text + "\n", "utf8");
+      console.log("清单 · " + rel(ROOT, file) + " · " + one.id + " · " + one.tasks.length + " 条");
+      console.log("  勾上 = 交付（写一行 交付：）；取消勾选 = 撤回（写一行 理由：）；? = 新条目；~~ = 放弃（写一行 理由：）；延后：= 延后");
+    });
+  },
+
+  submit(argv) {
+    const { flags } = parse(argv);
+    guard(() => {
+      const file = path.join(ROOT, ".deed", "plan.md");
+      if (!fs.existsSync(file)) fail("还没有清单：先 deed plan 出一份草稿，改完再 deed submit");
+      const plan = parsePlan(fs.readFileSync(file, "utf8"));
+      if (plan.problems.length > 0)
+        fail("清单有 " + plan.problems.length + " 处看不懂，一个字都没落：" + "\n" + "  " + plan.problems.join("\n" + "  "));
+      // 称重与快照在锁外做：跑一遍工作区是慢的那一半，锁里只做判与落。
+      const scanned = changedPaths(ROOT);
+      const by = flags.by ?? "agent";
+      const sizes = {};
+      for (const one of scanned.changed) {
+        try {
+          sizes[one] = fs.statSync(path.join(ROOT, one)).size;
+        } catch {
+          sizes[one] = 0;
+        }
+      }
+      const pins = [];
+      for (const one of scanned.changed) {
+        const full = path.join(ROOT, one);
+        if (!fs.existsSync(full) || !fs.statSync(full).isFile()) continue;
+        pins.push({ path: one, digest: scanned.now.get(one) });
+      }
+      const { doc, evs } = transactMany(
+        flags,
+        (doc0) => {
+          const one = targetSession(doc0, flags);
+          if (one.closeKind)
+            fail("这一期已经" + (one.closeKind === "signed" ? "签收" : "搁下") + "：账本不往回改；要接着做就记一轮，会话自己开新一期");
+          const specs = [];
+          const said = plan.goal.startsWith("（还没写") ? "" : plan.goal;
+          if (said && said !== (one.goal?.text ?? "")) specs.push({ k: "goal.set", s: one.id, text: said, by });
+          if (plan.items.length === 0 && one.tasks.length === 0) fail("清单里一条都没有：先写一条再 submit");
+          const known = new Map(one.tasks.map((t) => [t.id, t]));
+          const mentioned = new Set();
+          let seq = Number(nextId(doc0, "T").slice(1));
+          for (const item of plan.items) {
+            if (item.box === "?") {
+              if (!item.criteria) fail("第 " + item.at + " 行是新条目，但没有写一行 标准：——没有标准就不算一件事");
+              const id = "T" + seq;
+              seq += 1;
+              specs.push({ k: "task.add", s: one.id, id, title: item.title, criteria: item.criteria, files: [] });
+              mentioned.add(id);
+              continue;
+            }
+            const task = known.get(item.id);
+            if (!task) fail("第 " + item.at + " 行的 " + item.id + " 账本里没有：新条目写成 - ? 标题，submit 时领号");
+            mentioned.add(item.id);
+            if (item.title && item.title !== task.title)
+              fail(item.id + " 的标题和账本不一样：清单只做四件事（勾上、撤勾、~~、?），改标题不算其中");
+            if (item.criteria && item.criteria !== task.criteria)
+              fail(item.id + " 的标准和账本不一样：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做");
+            if (item.box === "~") {
+              if (task.status === "dropped") continue;
+              if (!item.why) fail(item.id + " 要放弃，但没有写一行 理由：——放弃是账本里的一件事实，得说清为什么");
+              specs.push({ k: "task.drop", s: one.id, id: item.id, why: item.why });
+              continue;
+            }
+            if (item.box === "x") {
+              if (task.status === "done") continue;
+              if (task.status === "dropped") fail(item.id + " 已经放弃过：要接着做就新开一条");
+              if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
+              specs.push({
+                k: "task.done",
+                s: one.id,
+                id: item.id,
+                evidence: item.claim,
+                by,
+                digest: pins[0]?.digest ?? null,
+                digestPath: pins[0]?.path ?? null,
+                files: pins,
+                changed: scanned.changed,
+                bytes: sizes,
+              });
+              continue;
+            }
+            if (task.status === "done") {
+              if (!item.why) fail(item.id + " 的勾去掉了，但没有写一行 理由：——撤回一条交付得说清为什么");
+              specs.push({ k: "task.undo", s: one.id, id: item.id, why: item.why, by });
+              continue;
+            }
+            if (item.later) {
+              if (task.status === "deferred") continue;
+              specs.push({ k: "task.defer", s: one.id, id: item.id, why: item.later });
+            }
+          }
+          const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
+          if (gone.length > 0)
+            fail("清单里少了 " + gone.map((t) => t.id).join("、") + "：账本里有的条目不能自己消失——不做了就写 ~~ " + gone[0].id + " " + gone[0].title + "，再加一行 理由：");
+          return specs;
+        },
+        (stamped) => {
+          // 只有真交付过才刷新基线：一次只加条目或只领号的 submit 如果也刷新，
+          // 工作区里那些改动就被它吃掉了——下一条交付看起来什么都没动。
+          if (stamped.some((ev) => ev.k === "task.done")) writeSnapshot(ROOT, scanned.now);
+        },
+      );
+      // 落过账就把清单按账本重写一遍：新条目领到的号要写回去，不然下一次 submit
+      // 会把同一个 ? 再加一条。文件里说过的话都已经在账本上，重写不丢东西。
+      const after = sessionById(doc, evs[0].s ?? targetSession(doc, flags).id);
+      fs.writeFileSync(file, planDraft(after) + "\n", "utf8");
+      for (const ev of evs) {
+        if (ev.k === "goal.set") console.log("目的 · " + ev.s + " · " + ev.text);
+        if (ev.k === "task.add") console.log("写进清单 · " + ev.id + " · " + ev.title);
+        if (ev.k === "task.done") console.log("交付 · " + ev.id + " · " + ev.evidence);
+        if (ev.k === "task.undo") console.log("撤回 · " + ev.id + " · " + ev.why);
+        if (ev.k === "task.defer") console.log("延后 · " + ev.id + " · " + ev.why);
+        if (ev.k === "task.drop") console.log("放弃 · " + ev.id + " · " + ev.why);
+      }
+      console.log("落账 " + evs.length + " 条 · 清单 " + rel(ROOT, file));
+      const step = nextAction(doc, doc.config);
+      console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
+      console.log("  " + step.command);
+    });
+  },
   judge(argv) {
     const { flags, words } = parse(argv);
     guard(() => {

@@ -156,7 +156,7 @@ test("signing refuses to close a period with work still owed", () => {
   assert.throws(() => fold([...asked, sign(6)]), /待裁项/);
 });
 
-// 更早的账本里那些没点名的结论一样挡着 pass：判据是在案那条说了什么，
+// 更早的账本里那些没点名的结论一样挡着 pass：规则是在案那条说了什么，
 // 不是它当时是第几版。否则同一条历史结论会因为"新来的那行是第 4 版"而变得可以被覆盖。
 test("a standing fail written before verdicts named anything still blocks a later pass", () => {
   const old = { v: 2, at: T(5), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b.md", findings: ["x"] };

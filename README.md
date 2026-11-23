@@ -27,7 +27,7 @@ Node ≥ 22，纯 ESM，零依赖，还没有 npm 包（名字没定）。
 git clone <this> deed && cd deed
 node cli/deed.mjs help      # 就地可用
 npm link                    # 之后在任意目录敲 deed
-npm test                    # 123 条，一分钟多一点（每条都起真进程）
+npm test                    # 138 条，一分钟多一点（每条都起真进程）
 ```
 
 vendor、本地 tarball、升级与卸载见 [`docs/INSTALL.md`](docs/INSTALL.md)。
@@ -56,8 +56,9 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 ```md
 ## 治理
 - 每轮对话先 `deed tick --who user|agent --said "…" --did "…"`；会话跟着轮次自己开合，不用手动建。
-- 要做事先 `deed task add "要做的事" --criteria "做完的标准" --files core/a.mjs,cli/b.mjs`（逗号分隔、正斜杠）；做完 `deed task done <T> --evidence "命令与结果" --digest <工作区里的文件>`。
-- 交付说错了话用 `deed task undo <T> --why "为什么收回"`：最后那条退回未做，撤回的理由留在任务上，账本里两条事实都在——不要改写成对的。
+- 要做什么先 `deed plan`：从账本出一份清单草稿 `.deed/plan.md`（每段的任务、标准、交付记录）。在文件里加条目、写标准，改完 `deed submit` 一次落账；整批原子——有一行不合格，一个字都不落。
+- 清单上的写法：`- ? 标题` + 一行 `  标准：` = 新条目（submit 领号）；`- [x] T1 标题` + 一行 `  交付：跑了什么、结果几比几` = 交付；把它改回 `- [ ]` + `  理由：` = 撤回最后那条交付；`~~ T3 标题` + `  理由：` = 放弃；`  延后：什么时候` = 延后。说错了话就把勾去掉，别把话说圆。
+- 清单上已有的条目改了标题或标准会被整批拒：还没有 amend，改就是开一条新条目，旧的留着。
 - 拿不准就问 `deed ask "…" --reading "我理解成…" --why "为什么得你定"`，只有用户能 `ask resolve`。
 - `deed state` 只说下一步是谁；照着做，不要自己另排优先级。
 - 这一期要做成什么，写一句：`deed goal "要做成的样子" --by "谁"`；可以改，旧的那句留在历史里。整期审与签收都拿它当尺子。
@@ -69,7 +70,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 人只在一份结论错了时出手：`deed judge --overturn R1 --why 「为什么」` 把这条结论作废、这一段重新打开。签收 `deed sign --words 「用户原话」 --by 「谁」`：人在终端里敲可以省 `--by`（账本记 user），从管道里跑必须写清谁按的。
 - 门槛说这一段不用审（改动只落在免审路径）：`deed seal --why 「凭什么不审」` 封段。它不是结论，签收时这一段会被列成「没经过审查」。`judge --pass`／`judge --rework` 已经没有了：一段的结局由审查者的结论落。
 - 身份是约定不是鉴权：`--by`、`who` 记的是自述，账本保证「谁说过什么」可回溯，不保证「说的人是谁」；它能做的只有一件事——不替任何动作填名字。
-- 每条交付记录都带 `--digest <工作区里的文件>`（几份就写几遍）：说得清做了什么，也记下了当时的内容；没记文件的仍在账本里，但会挡住要审段的放行。
+- 在清单里勾上时不用挑文件：`submit` 按工作区快照前后差自己算碰了哪些文件、各是什么 sha256。要手工挑着钉才用 `deed task done <T> --evidence "…" --digest <文件>`（几份写几遍）；没记下文件的交付仍在账本里，但会挡住要审段的放行。
 - 查：`deed verify`（交付记录与 sha256）、`deed doctor`（账本能否重放）、`deed serve`（本机只读面板）。
 
 没有落进账本的动作不算发生过；状态是推出来的，不用手写。
@@ -81,8 +82,8 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 | # | 谁敲 | 落下什么 |
 | --- | --- | --- |
 | 1 | `deed tick` | `turn`：谁在第几轮说了什么 |
-| 2 | `deed task add` | `task.add`：一件要做的事 + 做完的标准 |
-| 3 | `deed task done` | `task.done`：交付记录 + 记下的文件 sha256 |
+| 2 | `deed plan` → `deed submit` | `task.add`：一件要做的事 + 做完的标准（清单上 `- ? 标题` + `标准：`） |
+| 3 | `deed submit` | `task.done`：交付记录 + 由工作区快照算出的文件 sha256（清单上勾上并写 `交付：`） |
 | 4 | `deed review` | `review.brief`：发清单与角色包，记两条路径、两个 sha256 |
 | 5 | `deed review --verdict` | `review.log`：结论只回答交出去的那两份；pass 直接封段，fail 点名退回 |
 | 6 | `deed judge --overturn` | `review.overturn`：人推翻一条结论（例外，签收之前） |
@@ -110,11 +111,13 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 | 打回不在这个段里的任务 | `fold`（打回不能跨段） |
 | 审查判了不合格还想判过 | `fold`（被点名的先重新交付） |
 | 任务 id／待裁 id 撞名 | `fold`（T 与 A 共用命名空间） |
-| 没交付记录就交付 | `task done` |
+| 没写 `交付：` 就勾上 | `submit`（整批拒，一个字都不落） |
 | 签收时还有没结清的、还有待裁 | `fold` 与 `signBlockers` |
 | 记下的文件已经变了 | `deed verify`（重算 sha256），要审的段判决前也查 |
 | 交付记录只说了做了什么，没记任何文件 | `deed verify`（单列一档，不混在过期里）；`deed sign`（签收前必须记下一个文件） |
-| `--digest` 指到工作区外面、或指一个目录 | `task done`（只认工作区里的普通文件） |
+| `--digest` 指到工作区外面、或指一个目录 | `task done`／`submit`（只认工作区里的普通文件） |
+| 清单上已有的条目改了标题或标准 | `submit`（还没有 amend：改就是开新条目，旧的留着） |
+| 清单上少了一条、又没有 `~~` | `submit`（整批拒：少一条只能是有人写了不做） |
 | 改门槛却不说为什么 | `init`（`--why` 必填，改动进账本） |
 | 手改 `.deed/config.json` 而不收进账本 | `deed verify`（「门槛对不上」，exit 1；规则根本不读那个文件） |
 | 清单或角色包被改过、丢了、或账本没记它的指纹 | `deed verify`（重算 sha256；exit 1，修法是另出一份再审） |

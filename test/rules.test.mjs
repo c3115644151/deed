@@ -188,3 +188,47 @@ test("the next step names one actor and one action", () => {
   const judged = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
   assert.equal(nextAction(judged, config).what, "签收");
 });
+// 一段都没人要审的一期，没有可比对的东西：整期审的对象本来就是"审查者看过的那些段"。
+// 少了这一条，两段免审的期会被要一份没人能写的整期结论，签收永远差一格。
+test("a period whose segments all sat out review needs no conclusion on the period", () => {
+  const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
+  const doc = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["docs/a.md"]),
+    { v: 1, at: T(4), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+    seal(5, "S01.1"),
+    add(6, "T2", ["docs/b.md"]),
+    { v: 1, at: T(7), k: "task.done", s: null, id: "T2", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/b.md", changed: [] },
+    seal(8, "S01.2"),
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(needsWhole(config, session), false, "两段都免审：没有要审的东西可比对");
+  assert.deepEqual(signBlockers(doc, session, config), []);
+  assert.equal(nextAction(doc, config).what, "签收");
+});
+// 规模由数得出来的事实说话：几个文件、多少字节、跨了几个顶层目录。
+// 免审是给"看起来很小"的改动留的口子，不是给"说自己很小"的。
+test("a small change may sit out review; one that is not small may not", () => {
+  const of = (changed, bytes = {}) => {
+    const session = fold([
+      turn(1), add(2, "T1"),
+      { v: 6, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent",
+        files: [{ path: "docs/a.md", digest: "a".repeat(64) }], changed, bytes },
+    ]).sessions[0];
+    return needsReview(config, session, session.segments[0]);
+  };
+  assert.equal(of(["docs/a.md", "docs/b.md"], { "docs/a.md": 100, "docs/b.md": 120 }), false, "两份小文档照旧免审");
+  assert.equal(of(["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md", "docs/f.md"]), true, "六个文件不算小");
+  assert.equal(of(["docs/a.md"], { "docs/a.md": 30000 }), true, "一份 30KB 的文档不算小");
+  assert.equal(of(["docs/a.md", "notes/b.md", "drafts/c.md"]), true, "跨了三个顶层目录不算小");
+  assert.equal(of(["docs/a.md", "notes/b.md"]), false, "两个顶层目录还在范围内");
+});
+
+// 一条交付没说字节数（旧账本）不是"很大"，是没称过：不能因此把所有老记录拉去重审。
+test("a delivery that never weighed its files is not treated as a large one", () => {
+  const session = fold([
+    turn(1), add(2, "T1", ["docs/a.md"]),
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+  ]).sessions[0];
+  assert.equal(needsReview(config, session, session.segments[0]), false);
+});

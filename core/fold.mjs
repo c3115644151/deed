@@ -157,6 +157,7 @@ export function fold(events) {
           evidence: [],
           undone: [],
           changed: [],
+          sizes: {},
           deferredWhy: null,
         });
         break;
@@ -191,6 +192,8 @@ export function fold(events) {
         // event landed. The review threshold reads this, not the task's own story
         // about which paths it touched.
         task.changed.push(...(ev.changed ?? []));
+        // 每个路径多大，是交付那一刻称的；规则拿它判"这次改动小到不用审"。
+        task.sizes = { ...(task.sizes ?? {}), ...(ev.bytes ?? {}) };
         break;
       }
       // 交付说错了话，只能收回，不能改写：撤回是一条新事实，最后那条交付
@@ -207,6 +210,8 @@ export function fold(events) {
         for (const one of last.changed ?? []) {
           const spot = task.changed.indexOf(one);
           if (spot >= 0) task.changed.splice(spot, 1);
+          // 撤回的交付不再替这些字节说话：下次交付重新称。
+          if (task.sizes) delete task.sizes[one];
         }
         task.status = task.evidence.length > 0 ? "done" : "todo";
         break;

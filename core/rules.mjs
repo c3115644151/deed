@@ -85,9 +85,35 @@ export function configDrift(ledger, disk) {
   return found;
 }
 
+// 规模的三条门槛是内核给的默认值，不由工作区声明：改名换目录的项目照样数得清
+// 这次改了几个文件、多少字节、跨了几个顶层目录。工作区若要在自己这一份里改，
+// 写 review.size（{ files, bytes, dirs }），门槛仍要经 config.change 进账本。
+const SIZE_DEFAULTS = { files: 5, bytes: 20000, dirs: 2 };
+
+const topDir = (file) => {
+  const one = clean(file);
+  return one.includes("/") ? one.slice(0, one.indexOf("/")) : one;
+};
+
+// The size a file had when it was delivered. A path nobody weighed (an older
+// line, or a file that is gone) counts as zero bytes: unknown is not evidence of
+// size, and pretending it is large would put every old delivery under review.
+const task_size = (sizes, file) => {
+  const value = sizes?.[file];
+  return Number.isFinite(value) ? value : 0;
+};
+
+export function sizeOf(tasks, sizes = {}) {
+  const files = [...new Set(tasks.flatMap((task) => [...(task.files ?? []), ...(task.changed ?? [])]))];
+  const bytes = files.reduce((sum, file) => sum + (task_size(sizes, file) ?? 0), 0);
+  const dirs = new Set(files.map(topDir));
+  return { files: files.length, bytes, dirs: dirs.size, list: files };
+}
+
 export function needsReview(config, session, segment) {
   const required = config?.review?.required ?? [];
   const exempt = config?.review?.exempt ?? [];
+  const limits = { ...SIZE_DEFAULTS, ...(config?.review?.size ?? {}) };
   const tasks = tasksIn(session, segment);
   if (tasks.length === 0) return false;
   return tasks.some((task) => {
@@ -97,6 +123,11 @@ export function needsReview(config, session, segment) {
     if (files.length === 0) return true;
     if (files.some(escapes)) return true;
     if (matchesAny(files, required)) return true;
+    // 小改动才谈得上免审：声明过的路径之外，规模由数得出来的事实说话。
+    const size = sizeOf([task], task.sizes ?? {});
+    if (size.files > limits.files) return true;
+    if (size.bytes > limits.bytes) return true;
+    if (size.dirs > limits.dirs) return true;
     return !files.every((file) => matchesAny([file], exempt));
   });
 }
@@ -339,8 +370,8 @@ export function nextAction(doc, config) {
     return {
       who: "agent",
       what: "开段",
-      text: "范围说完就写第一条任务，段跟着开出来",
-      command: `deed task add "…" --criteria "…"`,
+      text: "范围说完就在清单里写第一条任务：deed plan 出草稿，写清标准，改完 deed submit；段跟着条目开出来",
+      command: `deed plan`,
     };
   }
   const segment = openSegment(session) ?? session.segments[session.segments.length - 1];
@@ -360,8 +391,8 @@ export function nextAction(doc, config) {
     return {
       who: "agent",
       what: "交付",
-      text: `${task.id} · ${task.title}（标准：${task.criteria}）`,
-      command: `deed task done ${task.id} --evidence "…"`,
+      text: `${task.id} · ${task.title}（标准：${task.criteria}）在清单里勾上它，写一行 交付：`,
+      command: `deed submit`,
     };
   }
   const state = reviewState(config, session, segment);
@@ -379,8 +410,8 @@ export function nextAction(doc, config) {
       return {
         who: "agent",
         what: "记下文件",
-        text: `${bare.map((one) => one.id).join("、")} 的交付没记下文件：记上工作区里的文件`,
-        command: `deed task done ${bare[0].id} --evidence "…" --digest <工作区里的文件>`,
+        text: `${bare.map((one) => one.id).join("、")} 的交付没记下文件：在清单里重新勾一次，submit 按工作区自己称`,
+        command: `deed submit`,
       };
     }
   }

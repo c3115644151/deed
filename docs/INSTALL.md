@@ -46,8 +46,8 @@ node tools/deed/cli/deed.mjs help        # 用相对路径调用，不占全局
 ### 打一个包带走
 
 ```bash
-npm pack                     # 产出 deed-0.4.0.tgz（private 只挡发布，不挡打包）
-npm i -g ./deed-0.4.0.tgz    # 装到这台机器上
+npm pack                     # 产出 deed-0.5.0.tgz（private 只挡发布，不挡打包）
+npm i -g ./deed-0.5.0.tgz    # 装到这台机器上
 ```
 
 ## 接进一个工作区
@@ -62,6 +62,7 @@ deed init --review "src/**,apps/**" --exempt "docs/**,*.md"
 ```
 .deed/config.json     门槛（要审/免审的路径、门命令、端口）与它们的镜像
 .deed/log/2026-11.jsonl   账本，按月份片，只追加
+.deed/plan.md         这一期的清单草稿（deed plan 出，deed submit 落账）
 .deed/review/         审查清单（发出去时才有文件）
 .deed/workspace.json  上一次交付的内容指纹（第一次交付时才有）
 .deed/log/lock        写锁，只在写的那一瞬间存在
@@ -138,10 +139,10 @@ deed 没有后台进程、没有守护、没有全局状态，`deed serve` 是�
 | `deed: 未知事件：x`，且写着「账本比 deed 新」 | 账本是更新的 deed 写的。升级 deed，不要动那一行 |
 | `deed doctor` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
-| `deed verify` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。重跑那条命令再 `task done`，或在审查里点名退回 |
+| `deed verify` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。在清单里重新勾一次再 `deed submit`，或在审查里点名退回 |
 | `deed verify` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |
 | `deed verify` 报「门槛对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
-| `judge`／`sign` 报「不是从终端敲的」 | 管道里跑必须写 `--by "谁"`；账本不替任何动作填名字 |
+| `seal`／`judge`／`sign` 报「没有写名字」 | 管道里跑必须写 `--by "谁"`；账本不替任何动作填名字 |
 
 ## 它不碰的东西
 
