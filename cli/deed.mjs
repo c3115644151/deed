@@ -173,6 +173,10 @@ function transactMany(flags, buildAll, commit) {
       one.w = currentVersion() || undefined;
       return one;
     });
+    // 一批里的交付共用一次工作区差：进来的 batch: true 在这里换成这一批的时刻，
+    // 读的人据此认出「这几条说的是同一份改动」，而不是每条各钉了各的。
+    const batchAt = stamped.find((one) => one.batch === true)?.at;
+    for (const one of stamped) if (one.batch === true) one.batch = batchAt;
     const after = fold([...events, ...stamped]);
     appendMany(ROOT, stamped);
     if (commit) commit(stamped, after);
@@ -674,6 +678,10 @@ const commands = {
           fail(
             "这一期只有一段：" + one.segments[0].id + " 的审查就是这一期的审查（deed review --segment " + one.segments[0].id + "）",
           );
+        // 门槛说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
+        // 免得账本上留下一条看着像「这一期被整体审过」的结论。
+        if (!needsWhole(doc.config, one))
+          console.log("这一期的各段都免审（门槛说不用审，段是 deed seal 封的）：不需要整期结论——要出一份也行，签收不看它");
         const goal = goalOf(one);
         if (!flags.verdict) {
           if (!goal) fail('这一期还没写目的：先说清这一期要做成什么（deed goal "…"），整体审才有尺子');
@@ -1004,6 +1012,10 @@ const commands = {
               specs.push({ k: "task.defer", s: one.id, id: item.id, why: item.later });
             }
           }
+          // 一批交付不止一条时，工作区只量了一次差：谁改了什么分不出来。
+          // 给它们同一个批号，账本上写着「这几条共用一份差」，而不是谎称各钉各的。
+          const dones = specs.filter((spec) => spec.k === "task.done");
+          if (dones.length > 1) for (const spec of dones) spec.batch = true;
           const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
           if (gone.length > 0)
             fail("清单里少了 " + gone.map((t) => t.id).join("、") + "：账本里有的条目不能自己消失——不做了就写 ~~ " + gone[0].id + " " + gone[0].title + "，再加一行 理由：");

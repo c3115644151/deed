@@ -72,7 +72,16 @@ function guideText(subject, target, briefName) {
 }
 
 // 一条任务在清单上的样子：段审和整体审共用，两种材料说的应该是同一件事。
-function taskBlock(task) {
+// 一批 submit 里的几条交付共用一份工作区差，分不出哪条改了哪份。数出来说清楚，
+// 比让读的人自己发现「三份记录一模一样」好。
+function batchCount(tasks) {
+  const seen = new Map();
+  for (const task of tasks)
+    for (const proof of task.evidence) if (proof.batch) seen.set(proof.batch, (seen.get(proof.batch) ?? 0) + 1);
+  return seen;
+}
+
+function taskBlock(task, batches = new Map()) {
   return [
     "### " + task.id + " · " + task.title,
     "",
@@ -83,7 +92,10 @@ function taskBlock(task) {
       const files = proof.files ?? (proof.digest ? [{ path: proof.path, digest: proof.digest }] : []);
       return (
         "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
-        (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、"))
+        (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")) +
+        (proof.batch
+          ? "\n  - 同批交付：这一批共 " + (batches.get(proof.batch) ?? 1) + " 条，改动记在每一条上（一次 submit 只量一次差）"
+          : "")
       );
     }),
     ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计入"),
@@ -101,7 +113,7 @@ export function planBrief(root, open, segment, at) {
     "",
     "## 要审的任务",
     "",
-    ...tasks.flatMap(taskBlock),
+    ...tasks.flatMap((task) => taskBlock(task, batchCount(tasks))),
     "## 怎么审",
     "",
     "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
@@ -156,7 +168,7 @@ export function planWhole(root, session, at) {
             ? (review.verdict === "pass" ? "段审通过" : "段审不合格") + "（" + review.by + " · " + stamp0(review.at) + "）"
             : "没有段审"),
         "",
-        ...tasksIn(session, segment).flatMap(taskBlock),
+        ...tasksIn(session, segment).flatMap((task) => taskBlock(task, batchCount(session.tasks))),
       ];
     }),
     "## 怎么审",

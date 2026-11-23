@@ -1404,3 +1404,73 @@ test("a plan with a line nobody can read lands nothing, and a task cannot vanish
   assert.equal(gone.status, 1);
   assert.match(gone.stderr, /清单里少了 T1/);
 });
+
+// 一批 submit 只量了一次工作区差：账本得说清"这几条共用一份差"，
+// 而不是让三条一字不差的记录看起来各自钉了各自的东西。
+test("one submit that delivers several entries says the changes belong to the batch", () => {
+  const cwd = workspace("plan-batchmark");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "一次交两条");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  writePlan(
+    cwd,
+    ["# 这一期要做成什么", "把两份说明写完。", "", "- ? 写 a", "  标准：docs/a.md 有一句话", "", "- ? 写 b", "  标准：docs/b.md 有一句话"].join("\n"),
+  );
+  assert.equal(deed(cwd, "submit").status, 0);
+  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
+  writePlan(
+    cwd,
+    readPlan(cwd)
+      .replace("- [ ] T1 写 a", "- [x] T1 写 a")
+      .replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写下 docs/a.md")
+      .replace("- [ ] T2 写 b", "- [x] T2 写 b")
+      .replace("  标准：docs/b.md 有一句话", "  标准：docs/b.md 有一句话\n  交付：写下 docs/b.md"),
+  );
+  const landed = deed(cwd, "submit");
+  assert.equal(landed.status, 0, landed.stderr);
+  const dones = readEvents(cwd).filter((one) => one.k === "task.done");
+  assert.equal(dones.length, 2);
+  assert.ok(dones[0].batch && dones[0].batch === dones[1].batch, "同一批里的两条交付记着同一个批号");
+  const done = readEvents(cwd).find((one) => one.k === "task.done");
+  assert.equal(typeof done.batch, "string", "批号是这一批的时刻，不是 true");
+
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const sheet = fs
+    .readdirSync(path.join(cwd, ".deed", "review"))
+    .filter((one) => one.endsWith(".md") && !one.endsWith("-reviewer.md"))
+    .at(-1);
+  const text = fs.readFileSync(path.join(cwd, ".deed", "review", sheet), "utf8");
+  assert.match(text, /同批交付：这一批共 2 条/, "清单上说清改动属于整批");
+
+  // 单独交一条时不写批号：那份差就是它自己的。
+  deed(cwd, "task", "add", "再写一份", "--criteria", "docs/c.md 有一句话");
+  fs.writeFileSync(path.join(cwd, "docs", "c.md"), "c", "utf8");
+  deed(cwd, "task", "done", "T3", "--evidence", "写下 docs/c.md", "--digest", "docs/c.md");
+  const alone = readEvents(cwd).find((one) => one.k === "task.done" && one.id === "T3");
+  assert.equal(alone.batch, undefined, "一条一批时不写批号");
+});
+
+// 门槛说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
+// 免得账本上留一条看着像"这一期被整体审过"的结论。
+test("a period with nothing to review is told it needs no whole conclusion", () => {
+  const cwd = workspace("whole-not-needed");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
+  deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
+  deed(cwd, "goal", "把两份文档改完", "--by", "user");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
+  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
+  assert.equal(deed(cwd, "seal", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
+
+  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
+  deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
+  deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
+  assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
+
+  const said = deed(cwd, "review", "--all");
+  assert.equal(said.status, 0, said.stderr);
+  assert.match(said.stdout, /不需要整期结论/, "先把话说在前面");
+  assert.equal(deed(cwd, "state").stdout.includes("还没写目的"), false, "目的写着");
+});

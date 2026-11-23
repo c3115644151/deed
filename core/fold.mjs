@@ -187,6 +187,9 @@ export function fold(events) {
           path: files[0]?.path ?? null,
           files,
           changed: ev.changed ?? [],
+          // 一批 submit 落了好几条交付时，工作区只量了一次差：改动的归属是整批，
+          // 不是其中某一条。账本把这件事写下来，读的人就不会以为每条各钉了各的。
+          batch: ev.batch ?? null,
         });
         // What the delivery actually moved in the workspace, computed before the
         // event landed. The review threshold reads this, not the task's own story

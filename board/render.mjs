@@ -210,7 +210,16 @@ function taskRow(task, zone) {
   const undone = (task.undone ?? [])
     .map((one) => '<li class="undone">撤回了：' + esc(one.why) + "（" + esc(one.by) + " · " + when(one.at, zone) + "）</li>")
     .join("");
-  const files = task.files.length === 0 ? "未声明路径" : task.files.join("  ");
+  // 「未声明路径」说的是清单上没写，不是这条交付什么也没碰：submit 建的条目没有声明，
+  // 但它落账时量过工作区差，路径在交付记录里。两件事分开说，别让人以为交付是空的。
+  const files =
+    task.files.length > 0
+      ? task.files.join("  ")
+      : pins > 0
+        ? "没声明路径 · 交付记下 " + pins + " 个"
+        : "未声明路径";
+  const last = task.evidence[task.evidence.length - 1];
+  const batched = Boolean(last && last.batch);
   return (
     '<details class="task" data-status="' + task.status + '">' +
     "<summary>" +
@@ -219,6 +228,7 @@ function taskRow(task, zone) {
     '<span class="ttitle">' + esc(task.title) + "</span>" +
     '<span class="tmeta"><span class="tstate">' + (STATUS_WORD[task.status] ?? "") + "</span>" +
     (pins === 0 ? "" : '<span class="tpins">' + pins + " 份" + "</span>") +
+    (batched ? '<span class="tbatch">同批</span>' : "") +
     ((task.undone && task.undone.length > 0) ? '<span class="tundone">撤 ' + task.undone.length + "</span>" : "") +
     "</span>" +
     '<span class="tfiles">' + esc(files) + "</span>" +
@@ -712,6 +722,7 @@ html[data-theme="light"] body {
 .tstate { font-family: var(--mono); font-size: 8.5px; letter-spacing: .16em; color: var(--dim); }
 .tpins { font-family: var(--mono); font-size: 8.5px; color: var(--dim); border: 1px solid var(--line2); padding: 0 5px; }
 .tundone { font-family: var(--mono); font-size: 8.5px; color: var(--fail); border: 1px dashed currentColor; padding: 0 5px; }
+.tbatch { font-family: var(--mono); font-size: 8.5px; color: var(--warn); border: 1px dotted currentColor; padding: 0 5px; }
 .tfiles { grid-column: 3 / -1; font-family: var(--mono); font-size: 9px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbody { padding: 2px 13px 12px 13px; border-top: 1px dashed var(--line2); background: var(--sunk); }
 .crit { margin: 0; font-size: 12.5px; line-height: 1.5; }
