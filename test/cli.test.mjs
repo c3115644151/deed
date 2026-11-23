@@ -1626,3 +1626,15 @@ test("doctor says when a promise came after the work", () => {
   assert.doesNotMatch(bare.stdout, /先做后记/);
   assert.doesNotMatch(bare.stdout, /没有 git|不在 git/);
 });
+// 门槛的一半是规模，而手工 --digest 常常指一份这次没动、但这条任务得担着的文件：
+// 它不在工作区差里，不称就一直「称不出」，门槛只好按要审算。
+test("pinning a file that did not move this time still weighs it", () => {
+  const cwd = workspace("weigh-pin");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "T1", "--criteria", "做完的标准");
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "第一次", "--digest", proof(cwd)).status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "重钉同一份", "--digest", "proof.txt").status, 0);
+  const last = readEvents(cwd).filter((one) => one.k === "task.done").at(-1);
+  assert.deepEqual(last.changed, [], "这一次什么都没动");
+  assert.equal(last.bytes["proof.txt"], fs.statSync(path.join(cwd, "proof.txt")).size);
+});

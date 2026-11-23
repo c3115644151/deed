@@ -106,8 +106,9 @@ const task_size = (sizes, file) => {
 export function sizeOf(tasks, sizes = {}) {
   const files = [...new Set(tasks.flatMap((task) => [...(task.files ?? []), ...(task.changed ?? [])]))];
   const bytes = files.reduce((sum, file) => sum + (task_size(sizes, file) ?? 0), 0);
+  const unknown = files.filter((file) => !Number.isFinite(sizes?.[file])).length;
   const dirs = new Set(files.map(topDir));
-  return { files: files.length, bytes, dirs: dirs.size, list: files };
+  return { files: files.length, bytes, unknown, dirs: dirs.size, list: files };
 }
 
 export function needsReview(config, session, segment) {
@@ -125,6 +126,12 @@ export function needsReview(config, session, segment) {
     if (matchesAny(files, required)) return true;
     // 小改动才谈得上免审：声明过的路径之外，规模由数得出来的事实说话。
     const size = sizeOf([task], task.sizes ?? {});
+    // 称不出规模就不算小：免审是给「数出来确实很小」的改动留的，不是给「说不清多大」的。
+    // 交付那一刻会替它称（工作区差里的与 --digest 指的都称），所以这条只堵老账本和漏称。
+    // 交付自己记下、却没称过的文件，就是说不清多大：按要审算，别按 0 字节放行。
+    // 只声明过、这次没交付到的不算——路径本身已经把话说了。
+    const pinned = [...new Set((task.evidence ?? []).flatMap((proof) => (proof.files ?? []).map((one) => one.path)))];
+    if (pinned.some((file) => !Number.isFinite(task.sizes?.[file]))) return true;
     if (size.files > limits.files) return true;
     if (size.bytes > limits.bytes) return true;
     if (size.dirs > limits.dirs) return true;

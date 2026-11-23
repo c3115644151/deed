@@ -211,6 +211,24 @@ test("a rework takes back the paths the delivered work touched, not just the cla
   assert.deepEqual(justReworked.sessions[0].tasks[0].changed, [], "退回当场，那批路径就不在任务上了");
   assert.deepEqual(justReworked.sessions[0].tasks[0].sizes, {});
 });
+test("taking a delivery back, or sending it to rework, also gives its paths back", () => {
+  const touched = (n, id, changed) => ({
+    v: 3, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", changed, bytes: { [changed[0]]: 40 },
+  });
+  const undone = fold([
+    turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"]),
+    { v: 3, at: T(4), k: "task.undo", s: null, id: "T1", why: "说错了话" },
+  ]);
+  assert.deepEqual(undone.sessions[0].tasks[0].changed, [], "撤回之后，那条交付碰过的路径不再算这一段的性质");
+  assert.deepEqual(undone.sessions[0].tasks[0].sizes, {});
+  const reworked = fold([
+    turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"]),
+    { v: 5, at: T(4), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b.md" },
+    { v: 5, at: T(5), k: "judge.rework", s: null, segment: "S01.1", tasks: ["T1"], why: "补钉", by: "user" },
+  ]);
+  assert.deepEqual(reworked.sessions[0].tasks[0].changed, [], "人点名重做之后，路径同样归零");
+  assert.deepEqual(reworked.sessions[0].tasks[0].sizes, {});
+});
 test("a delivery that only pins files still counts as touching them", () => {
   const config = { review: { required: ["core/**"], exempt: ["*.md"] } };
   const pinnedOnly = {

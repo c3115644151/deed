@@ -594,6 +594,7 @@ const commands = {
         // 一次交付常常动了不止一个文件，而"记下的那个文件"才是事后能核的唯一凭据：
         // 只收一枚，剩下的只能靠人挑，挑漏的那几份就成了没人担保的字节。
         // --digest 可以写多遍，每一遍指一个文件。
+        const pinSizes = {};
         const pins = list(flags.digest).map((given) => {
           const file = path.resolve(ROOT, String(given));
           const inside = path.relative(ROOT, file);
@@ -606,6 +607,7 @@ const commands = {
             fail("--digest 指的文件不在：" + given);
           }
           if (!stat.isFile()) fail("--digest 要指一个文件，不是目录：" + given + "（例如 docs/a.md）");
+          pinSizes[rel(ROOT, file)] = stat.size;
           return { path: rel(ROOT, file), digest: digest(fs.readFileSync(file)) };
         });
         // Snapshot before taking the lock: hashing the tree is the slow part of a
@@ -624,6 +626,9 @@ const commands = {
             sizes[one] = 0;
           }
         }
+        // 手工 --digest 常常指一份这次没动过、但这条任务得担着的文件：它不在工作区差里，
+        // 于是没人称过它，门槛只好按要审处理。称它一下，规模这一半才说得清。
+        for (const [file, size] of Object.entries(pinSizes)) if (sizes[file] === undefined) sizes[file] = size;
         transact(
           flags,
           () => {

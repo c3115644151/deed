@@ -20,7 +20,7 @@ const turn = (n) => ({ v: 1, at: T(n), k: "turn", s: null, who: "user", said: "x
 const add = (n, id, files = []) => ({ v: 1, at: T(n), k: "task.add", s: null, id, title: id, criteria: "c", files });
 // A delivery pins a file: evidence that names no content cannot be checked
 // later, so the fixtures pin one the way a real run would.
-const done = (n, id, path = "core/fold.mjs") => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: path, changed: [] });
+const done = (n, id, path = "core/fold.mjs") => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: path, changed: [], bytes: { [path]: 100 } });
 const pass = (n, segment = "S01.1") => ({ v: 1, at: T(n), k: "judge.pass", s: null, segment, by: "user" });
 const verdict = (n, v, segment = "S01.1") => ({ v: 1, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: v, brief: "b.md" });
 const ask = (n) => ({ v: 1, at: T(n), k: "ask.raise", s: null, id: "A1", text: "要兼容旧账吗", reading: "不兼容", why: "不确定" });
@@ -104,7 +104,7 @@ test("a segment the gate says not to review waits to be sealed, not to be review
   const doc = fold([
     turn(1),
     add(2, "T1", ["docs/a.md"]),
-    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [], bytes: { "docs/a.md": 100 } },
   ]);
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), [
     "S01.1 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
@@ -116,7 +116,7 @@ test("the step it names is a command that carries its own name", () => {
   const doc = fold([
     turn(1),
     add(2, "T1", ["docs/a.md"]),
-    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [], bytes: { "docs/a.md": 100 } },
   ]);
   const step = nextAction(doc, config);
   assert.equal(step.what, "封存");
@@ -230,10 +230,10 @@ test("a period whose segments all sat out review needs no conclusion on the peri
   const doc = fold([
     turn(1), goal(2),
     add(3, "T1", ["docs/a.md"]),
-    { v: 1, at: T(4), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+    { v: 1, at: T(4), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [], bytes: { "docs/a.md": 100 } },
     seal(5, "S01.1"),
     add(6, "T2", ["docs/b.md"]),
-    { v: 1, at: T(7), k: "task.done", s: null, id: "T2", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/b.md", changed: [] },
+    { v: 1, at: T(7), k: "task.done", s: null, id: "T2", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/b.md", changed: [], bytes: { "docs/b.md": 100 } },
     seal(8, "S01.2"),
   ]);
   const session = doc.sessions[0];
@@ -256,14 +256,15 @@ test("a small change may sit out review; one that is not small may not", () => {
   assert.equal(of(["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md", "docs/f.md"]), true, "六个文件不算小");
   assert.equal(of(["docs/a.md"], { "docs/a.md": 30000 }), true, "一份 30KB 的文档不算小");
   assert.equal(of(["docs/a.md", "notes/b.md", "drafts/c.md"]), true, "跨了三个顶层目录不算小");
-  assert.equal(of(["docs/a.md", "notes/b.md"]), false, "两个顶层目录还在范围内");
+  assert.equal(of(["docs/a.md", "notes/b.md"], { "docs/a.md": 100, "notes/b.md": 100 }), false, "两个顶层目录还在范围内");
 });
 
-// 一条交付没说字节数（旧账本）不是"很大"，是没称过：不能因此把所有老记录拉去重审。
-test("a delivery that never weighed its files is not treated as a large one", () => {
+// 没称过不等于小：说不清多大的改动，门槛按要审处理。交付那一刻会替它称（工作区差里的、
+// --digest 指的都称），所以这条只堵老账本和漏称。
+test("a delivery that never weighed its files is not treated as a small one", () => {
   const session = fold([
     turn(1), add(2, "T1", ["docs/a.md"]),
     { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
   ]).sessions[0];
-  assert.equal(needsReview(config, session, session.segments[0]), false);
+  assert.equal(needsReview(config, session, session.segments[0]), true, "称不出规模，就别指望它按 0 字节放行");
 });
