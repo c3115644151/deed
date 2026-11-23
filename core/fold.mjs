@@ -241,7 +241,7 @@ export function fold(events) {
           by: ev.by ?? "agent",
           at: ev.at,
           batch: last.batch ?? null,
-          undoes: last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []),
+          undoes: ev.undoes ?? last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []),
           changed: last.changed ?? [],
         });
         // 撤回的交付不再替这些字节说话：这一段碰过的路径与大小重新由还在的交付算。

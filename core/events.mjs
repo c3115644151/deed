@@ -110,6 +110,14 @@ export function validateEvent(ev, at) {
     case "task.undo":
       need(ev, "id");
       need(ev, "why");
+      // 撤的是哪份字节，撤的那一刻就得写下来：重放再去推，等于让后来的形状改口。
+      if (ev.undoes !== undefined) {
+        if (!Array.isArray(ev.undoes)) throw new Error("task.undo 的 undoes 要是数组");
+        for (const one of ev.undoes) {
+          if (!one || typeof one.path !== "string" || typeof one.digest !== "string")
+            throw new Error("task.undo 的 undoes 每一项都要有 path 与 digest");
+        }
+      }
       break;
     case "task.defer":
     case "task.drop":

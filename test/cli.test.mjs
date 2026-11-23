@@ -1065,6 +1065,9 @@ test("a delivery that said the wrong thing is taken back, not rewritten", () => 
   // 撤回的那条从账本里消失了，可它当时指着哪份字节是复核这条撤回的唯一依据。
   assert.match(text, /它当时记下的是 proof\.txt/, "撤回也要说清它当时指着什么");
   const taken = readEvents(cwd).find((one) => one.k === "task.undo");
+  // 写在账本那一行上的，不是重放时算出来的：重放会跟着将来的形状改口。
+  assert.equal(taken.undoes[0].path, "proof.txt", "撤回那行自己带着被撤的路径");
+  assert.match(taken.undoes[0].digest, /^[0-9a-f]{64}$/, "撤回那行自己带着被撤的 sha256");
   const logged = fold(readEvents(cwd)).sessions[0].tasks[0].undone;
   assert.equal(logged.length, 1, "账本里留下一条撤回记录");
   assert.equal(logged[0].undoes[0].path, "proof.txt", "撤回带上被撤那条记下的文件与 sha256");

@@ -661,7 +661,20 @@ const commands = {
       if (verb === "undo") {
         if (!id) fail("task undo 要点名任务");
         if (!flags.why) fail("task undo 要说清为什么收回：--why \"…\"");
-        transact(flags, () => ({ k: "task.undo", s: flags.session ?? null, id, why: flags.why, by: flags.by ?? "agent" }));
+        // 撤的是哪份字节，撤的那一刻就写下：重放再去推，等于让后来的形状改口。
+        transact(flags, (doc) => {
+          const one = currentSession(doc);
+          const task = one ? one.tasks.find((t) => t.id === id) : null;
+          if (!task) fail("这个会话里没有任务 " + id);
+          const last = task.evidence[task.evidence.length - 1];
+          const undoes = last
+            ? (last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []))
+            : null;
+          return {
+            k: "task.undo", s: flags.session ?? null, id, why: flags.why, by: flags.by ?? "agent",
+            ...(undoes === null ? {} : { undoes }),
+          };
+        });
         console.log("撤回交付 · " + id + " · " + flags.why);
         return;
       }
@@ -1528,8 +1541,9 @@ if (verb === "--version" || verb === "-v" || verb === "version") {
   process.exit(0);
 }
 // 面板跟着命令走，不跟着开机走：你要用它的那一下，页面应该在；没人用它的时候
-// 它没有理由占着一格端口。serve 与 panel 自己不算（它们就是在做这件事）。
-if (!panelOff() && verb !== "serve" && verb !== "panel" && verb !== "init") {
+// 它没有理由占着一格端口。serve 与 panel 自己不算（它们就是在做这件事）；
+// 还没接 deed 的目录由 ensurePanel 自己放过（没账本就没页面），不在这里另立一条。
+if (!panelOff() && verb !== "serve" && verb !== "panel") {
   try {
     const one = await ensurePanel(ROOT);
     if (one && one.started) console.log("面板 · http://127.0.0.1:" + one.port);
