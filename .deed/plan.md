@@ -90,4 +90,12 @@
   标准：docs/DESIGN.md 的 §6 规模那条与 §12.4 边界段都改写成「`segment.seal` 封过的段不再重算规模」，并说清被审查者 pass 封的段照样重算、结局由结论决定（reviewState / needsWhole 按「有没有人看过」短路）。
   交付：docs/DESIGN.md §6 规模那条改成「`segment.seal` 封过的段不再重算规模」，并说清被审查者 pass 封的段照常重算、结局由结论决定（reviewState 认有效的 pass，needsWhole 认有没有人看过）；§12.4 的边界段同改，另加一段说「needsReview 的返回值不等于结局，要读结局读 reviewState 与 signBlockers」。跑的是这一份字节：node --test 154/154、node --test test/docs.test.mjs 4/4。
 
+## 段 S02.8
+- [x] T46 seal 那道守卫有称过字节的夹具，不靠「没称字节」那条路顺带被覆盖
+  标准：test/rules.test.mjs 里 seal 封段的用例含一段交付称过 92160 字节、被 `segment.seal` 封住，断言 needsReview 为 false；变异：删掉 core/rules.mjs 的 sealedBy/closedAt 守卫，这一条必红。
+  交付：test/rules.test.mjs 的 seal 用例里，第一条交付改成 changed=[docs/a.md] + bytes {docs/a.md: 92160}（第二条 100 字节），用例注释写明「没有那道守卫它就该被审」，所以这条守的是守卫本身而不是「没称字节一律要审」。跑的是这一份字节：node --test 154/154、node --test test/rules.test.mjs 19/19。变异核对（TEMP 副本删掉 core/rules.mjs 的 `if (segment?.sealedBy && segment.closedAt !== null) return false;`）：18 过 1 败，红的正是这条。
+- [x] T47 文档写清那道守卫的两个条件
+  标准：docs/DESIGN.md §12.4 那句「segment.seal 封过的段返回 false」改成同时说明 sealedBy 与 closedAt 两个条件都在才豁免，并说明手改账本造出半个封存不在守卫范围（属「不许做」）。
+  交付：docs/DESIGN.md §12.4 改成「判的是 sealedBy 与 closedAt 两个都在（账本上真写下过一次封存），不是一句 why」，并说明手改账本造出半个封存不在守卫里、属于「不许做」而不是「挡得住」。跑的是这一份字节：node --test 154/154、node --test test/docs.test.mjs 4/4。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

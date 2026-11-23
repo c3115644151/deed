@@ -16,7 +16,7 @@
  "core/events.mjs": "063a08912e6b55cd245291e434c20bc6a7d8dce1a4cc15514ea7abda66c79094",
  "core/fold.mjs": "1a7e738e69b7d266ff147850ecabf78c9673361607a8ab3fcaf5726dd323f19d",
  "core/rules.mjs": "2738a2b1d119f7ac04d266b21b5ea1f8fde399d83547d7297414dd4631d84aea",
- "docs/DESIGN.md": "62751ba6923784f4872ca490bd6846221cbaf72d8eba016d1db71eb016fd838b",
+ "docs/DESIGN.md": "7c8f1033bae11f53b876f80b61f4e2385cc39b69f6d432e2aee6140692ff008f",
  "docs/INSTALL.md": "1ceb5fccd8a39360c74b2a813beafa6ed72bd415710700ae42593ccac412fc63",
  "docs/README.md": "1820ff207e87f47ab0ea312929b98801d4614070535e33db959d47d97dc1030d",
  "docs/architecture.png": "23a7af6f745c3145c5581f2bf60da99a48c94e61c221fbd49076448a5ab7763a",
@@ -37,6 +37,6 @@
  "test/fold.test.mjs": "5bbe225f7d94b03ad247c4157d9dac95dd4e64c04f144f79315dbd41677dc843",
  "test/heartbeat.test.mjs": "d1fc0e0c83799664abedad6f6f27ed9a1bbaf7e647be449ad07a2754c6b032c4",
  "test/plan.test.mjs": "072cafd2893526e2b7edfb70704b6425cf446479122d88d355f28c85f4693f3f",
- "test/rules.test.mjs": "0e673255cb74fe5eade3e40e5bc0e500d31fe9ba00dd7652b2a70a8fb369ae7f",
+ "test/rules.test.mjs": "77d1d5cd375ff8f0856871f0285bb2d1f2bc213cf6ede6fd7035604fad52ca4c",
  "test/version.test.mjs": "4171555d438c11d7f4035cbfb9bde49ce18fd78a55bbc0d0c58a2c6b8ac13d28"
 }

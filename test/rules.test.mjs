@@ -273,15 +273,17 @@ test("a delivery that never weighed its files is not treated as a small one", ()
 // 而签收清单里同时写着「没经过审查」——两句话互相打脸。
 test("a segment sealed before the gate got stricter is not pulled back into review", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
-  const weighed = (n, id, path) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent",
-    digest: "a".repeat(64), digestPath: path, changed: [] });
+  // 第一条交付称出来 92160 字节（超过默认的 20000）：没有那道守卫，它就该被审——
+  // 这样这条用例守的是守卫本身，不是「没称过字节一律要审」那条路。
+  const weighed = (n, id, path, size) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent",
+    digest: "a".repeat(64), digestPath: path, changed: [path], bytes: { [path]: size } });
   const doc = fold([
     turn(1), goal(2),
     add(3, "T1", ["docs/a.md"]),
-    weighed(4, "T1", "docs/a.md"),
+    weighed(4, "T1", "docs/a.md", 92160),
     seal(5, "S01.1"),
     add(6, "T2", ["docs/b.md"]),
-    weighed(7, "T2", "docs/b.md"),
+    weighed(7, "T2", "docs/b.md", 100),
     seal(8, "S01.2"),
   ]);
   const session = doc.sessions[0];
