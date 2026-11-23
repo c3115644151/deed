@@ -163,6 +163,27 @@ export const lastSegmentChange = (session, segment) => {
 export const lastBrief = (session, segmentId) =>
   session.briefs.filter((one) => one.segment === segmentId).at(-1) ?? null;
 
+// 手上那份材料还新鲜吗：发出去之后这一段没有再动过，也还没有人回答。
+// 新鲜的、没人回答的那份，下一步是落结论——再发一份只会让审查者去读旧纸。
+export const freshBrief = (session, segment) => {
+  const handed = lastBrief(session, segment.id);
+  if (!handed) return null;
+  if (session.reviews.some((one) => one.scope !== "session" && one.brief === handed.brief)) return null;
+  const moved = lastSegmentChange(session, segment);
+  if (moved !== null && moved > handed.at) return null;
+  return handed;
+};
+
+// 整期材料同理：整期的结论早于最后一次改动，但材料是改动之后发的，那就落结论。
+export const freshWholeBrief = (session) => {
+  const handed = session.briefs.filter((one) => one.scope === "session").at(-1) ?? null;
+  if (!handed) return null;
+  if (session.reviews.some((one) => one.scope === "session" && one.brief === handed.brief)) return null;
+  const moved = periodChange(session);
+  if (moved !== null && moved > handed.at) return null;
+  return handed;
+};
+
 // 一期要做成什么：签收和整体审都拿它当尺子。可以改，账本留每一次。
 export const goalOf = (session) => session?.goal?.text ?? null;
 
@@ -329,8 +350,7 @@ export const pressure = (session) => {
 
 // 整期审这一步：缺目的先说目的，材料已交出去就落结论，否则发材料。
 function wholeStep(session, whole) {
-  const handed = session.briefs.filter((one) => one.scope === "session").at(-1) ?? null;
-  const waiting = Boolean(handed) && !session.reviews.some((one) => one.scope === "session" && one.brief === handed.brief);
+  const handed = freshWholeBrief(session);
   if (whole === "nogoal")
     return {
       who: "user",
@@ -338,7 +358,7 @@ function wholeStep(session, whole) {
       text: `${session.id} 的活都交付了，账本里还没有「这一期要做成什么」：整体审和签收都拿它当尺子`,
       command: `deed goal "这一期要做成什么" --by "…"`,
     };
-  if (whole === "missing" && waiting)
+  if (handed && whole !== "pass")
     return {
       who: "reviewer",
       what: "落结论",
@@ -407,6 +427,15 @@ export function nextAction(doc, config) {
   }
   const state = reviewState(config, session, segment);
   if (state === "stale") {
+    // 结论旧了要重审，但重审的材料可能已经在手上：那一步是落结论，不是再发一份。
+    const fresh = freshBrief(session, segment);
+    if (fresh)
+      return {
+        who: "reviewer",
+        what: "落结论",
+        text: `${segment.id} 的结论早于最后一次交付，新的一份材料已经交出去了：${fresh.brief}`,
+        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
+      };
     return {
       who: "reviewer",
       what: "重审",
@@ -428,9 +457,8 @@ export function nextAction(doc, config) {
   if (state === "missing") {
     // A handed-out brief that nobody answered decides what the next step is:
     // the reviewer's job is the verdict, not another piece of paper.
-    const handed = lastBrief(session, segment.id);
-    const waiting = handed && !session.reviews.some((one) => one.brief === handed.brief);
-    if (waiting) {
+    const handed = freshBrief(session, segment);
+    if (handed) {
       return {
         who: "reviewer",
         what: "落结论",
@@ -470,9 +498,8 @@ export function nextAction(doc, config) {
       };
     }
     // 手上那份清单是审查者的活：材料发出去、还没人回答，下一步是落结论，不是再发一份。
-    const handed = lastBrief(session, segment.id);
-    const waiting = Boolean(handed) && !session.reviews.some((one) => one.brief === handed.brief);
-    if (waiting)
+    const handed = freshBrief(session, segment);
+    if (handed)
       return {
         who: "reviewer",
         what: "落结论",

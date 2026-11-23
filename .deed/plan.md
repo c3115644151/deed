@@ -45,6 +45,9 @@
   交付：cli/plan.mjs 的草稿把 done 与 accepted 都画成 [x]，判过的条目不再显示成未勾。核：新增用例 the draft keeps judged entries ticked 通过
 - [x] T34 doctor 按文件最后写入时刻查「先做后记」
   标准：deed doctor 对每条现行交付钉的文件查最后一次写入时刻，早于那条任务被记下的时刻就列出来（只报事实，不算坏账）；没有 git 的目录跳过不报错；clone 出来的工作副本 mtime 全是检出时刻，安静不报
-  交付：先做后记只在 git 工作区里比：lateWork 开头 git rev-parse --is-inside-work-tree 不是 true 就整段不报（没有 git 的目录里 mtime 是搬运的时刻，不作数），原来那个写了没人调用的 git 辅助函数现在真被调用。核：node --test test/cli.test.mjs 86/86；新增断言在同一个工作区摘掉 .git 后 doctor exit 0 且输出里没有「先做后记」四字；本仓库当场 deed doctor 报的条目是 T7 lib/version.mjs、T21/T22/T23 cli/audit.mjs、T26 board/render.mjs（不写总数——那个数会随文件改动漂，上一轮写 6 条被审查者按实跑 5 条抓出来）
+  交付：整期审退回 T34 的三件事补完：HANDOFF 的现状段改到账本当前状态（两段都判过、整期审不合格在案），材料指针不再写死文件名、改成看 .deed/review 下最新的那一份，这两种指针都不会过期；T34 只留这一条记录，钉的是已提交的字节（b8ccd22），先跑测试再写字、写完没再动文件。这一份字节上 npm test 147/147、node --test test/cli.test.mjs 86/86；下一份整期材料重出后再由审查者判
+- [x] T35 材料交出去之后，下一步说「落结论」而不是「另出一份」
+  标准：段或整期的在案结论已经旧了、但新材料是改动之后发出且还没人回答时，deed state 与面板给的下一步是「落结论」（带 --verdict pass），不再是「另出一份」；材料旧了才叫另出
+  交付：core/rules.mjs 新出 freshBrief / freshWholeBrief：材料发出去之后这一段（或这一期）没再动过、也还没人回答，才算新鲜。原来「结论过期」与「不合格还在案」两个分支只看到手上有材料、没看它是不是改动之后发的；现在两处都先问新鲜度，整期材料那一步同样。面板与 state 同源，不用改。核：node --test test/rules.test.mjs 17/17——新增 a brief handed out after the last change is answered, not replaced，同一场景先断言「重审」、材料发出后断言「落结论」且命令带 --verdict pass，另断言整期材料被回答后不再算新鲜；npm test 148/148 跑在这一份字节上
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

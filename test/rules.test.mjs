@@ -8,6 +8,7 @@ import {
   reading,
   reviewOf,
   reviewState,
+  freshWholeBrief,
   sealBlockers,
   signBlockers,
   wholeState,
@@ -153,6 +154,40 @@ test("a period with more than one segment needs a conclusion on the period itsel
   ]);
   assert.equal(wholeState(whole.sessions[0]), "pass");
   assert.equal(nextAction(whole, config).what, "签收");
+});
+
+// 材料已经交出去，下一步就是落结论——哪怕在案的结论是旧的。
+// 再叫一次「另出一份」会让审查者去读一份没人回答过的旧纸，而新的那份已经在他手上。
+test("a brief handed out after the last change is answered, not replaced", () => {
+  const base = [
+    turn(1), goal(2),
+    add(3, "T1", ["core/a.mjs"]), done(4, "T1"),
+    { v: 5, at: T(5), k: "review.brief", s: null, segment: "S01.1", brief: "S01.1-1.md", briefDigest: "b".repeat(64) },
+    sealed(6),
+    add(7, "T2", ["core/b.mjs"]), done(8, "T2"), sealed(9, "S01.2"),
+    // 整期审打回 T1：那一段重新打开，任务回到未做，旧的那条通过结论留着但过期
+    { v: 6, at: T(10), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail", rework: ["T1"], why: "记录说错了", brief: "all.md", briefDigest: "c".repeat(64) },
+    done(11, "T1"),
+  ];
+  const old = fold(base);
+  assert.equal(reviewState(config, old.sessions[0], old.sessions[0].segments[0]), "stale");
+  assert.equal(nextAction(old, config).what, "重审", "手上没有新材料，就该另出一份");
+  const fresh = fold([...base,
+    { v: 6, at: T(12), k: "review.brief", s: null, segment: "S01.1", brief: "S01.1-2.md", briefDigest: "d".repeat(64) },
+  ]);
+  const step = nextAction(fresh, config);
+  assert.equal(step.what, "落结论");
+  assert.match(step.text, /S01\.1-2\.md/);
+  assert.match(step.command, /--verdict pass/);
+  // 整期材料同理：交出去、没人回答，就是落结论；被回答了就不再算新鲜。
+  const whole = { ...fresh.sessions[0],
+    briefs: [...fresh.sessions[0].briefs,
+      { scope: "session", segment: null, brief: "S01-all-1.md", briefDigest: "e".repeat(64), at: T(13) },
+    ] };
+  assert.equal(freshWholeBrief(whole).brief, "S01-all-1.md");
+  const answered = { ...whole, reviews: [...whole.reviews,
+    { scope: "session", brief: "S01-all-1.md", verdict: "pass", at: T(14) }] };
+  assert.equal(freshWholeBrief(answered), null);
 });
 
 // 一段的一期不审两遍：那一段的结论已经回答了这一期。
