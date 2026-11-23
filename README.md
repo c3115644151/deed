@@ -7,9 +7,9 @@
 
 **编排器决定 agent 干什么；deed 决定人敢不敢放行。**
 
-![deed 的结构：事件 → 折叠 → 判据 → 下一步](docs/architecture.png)
+![deed 的三态：每一列是一个状态，上面是已发生的事实，中间是状态本身，下面是等你或别人动的那一格](docs/architecture.png)
 
-图是手维护的源文件 [`docs/deed-architecture.html`](docs/deed-architecture.html)，可交互；改图的规矩见 [`docs/README.md`](docs/README.md)。
+大图是 [`docs/deed-architecture.html`](docs/deed-architecture.html)（单文件、离线、可交互），由同目录的 `deed-architecture.candidate.json` 重出；改图的规矩见 [`docs/README.md`](docs/README.md)。
 
 ## 它是什么
 

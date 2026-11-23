@@ -13,7 +13,7 @@
 辅助材料两件：
 
 - [`research.md`](research.md)：对照与出处，「站在哪一格」那一节的底稿。
-- [`deed-architecture.html`](deed-architecture.html)：架构图源文件；`architecture.png` 是它的一张截图，给 README 用。
+- [`deed-architecture.html`](deed-architecture.html)：架构图（单文件、可交互）；同目录的 `deed-architecture.candidate.json` 是它的图源，`architecture.png` 是它的一张截图，给 README 用。
 
 演示数据在 [`../examples/`](../examples/)，不算文档：`examples/contract/NOTES.md` 是那份示例账本的说明。
 
@@ -30,13 +30,21 @@
 
 ## 图的规矩
 
-`deed-architecture.html` 是单文件、离线、可交互，**手维护**：改图就直接改 HTML。
-生成它用过的 archify 规格留在本机 `.archify/`（`.gitignore` 里，不随仓库走），所以 clone 下来拿到的是**手维护的源文件**；
-当初跑过的四门回执对不上现在的字节，已经删掉，不留过期证据。
+`deed-architecture.html` 是单文件、离线、可交互的**成品**，不是手改的：它由图源 `deed-architecture.candidate.json`
+（archify 的 architecture spec）重出，重出来的字节与仓库里那份逐字节相同。改图就改 spec，别改 HTML——手改的部分下次重出就没了。
+
+```
+node "%USERPROFILE%\.dsh\skills\archify\bin\archify.mjs" finalize architecture \
+  docs\deed-architecture.candidate.json docs\deed-architecture.html \
+  --quality showcase --out-dir .tmp\arch-regen
+```
+
+archify 是维护机上装的工具，不在这个仓库里，也不是运行时依赖。四门（validate / deliver / check / browser-check）
+全 pass 才算改完；回执落在 `--out-dir`（`.tmp/` 已忽略），不进仓库。
 
 改图时：
 
-- 只用内联字体与内联脚本，不加外部资源（离线打开不能有半张图缺字）。
-- 改完在浏览器里真开一次：1440 宽无横向溢出，暗色主题下文字对比度够。
-- 改完重拍 `architecture.png`（README 引用它），两张图说的是同一件事。
+- spec 里只用它自己的元件与卡片，成品自带内联字体与脚本（离线打开不能有半张图缺字）。
+- 重出后在浏览器里真开一次：1440 宽无横向溢出，暗色主题下文字对比度够。
+- 重出后重拍 `architecture.png`（README 引用它），两张图说的是同一件事。
 - 节点上写的名字必须是代码里真有的：事件类型、命令、文件。代码删了，图也要删。

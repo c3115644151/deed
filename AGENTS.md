@@ -30,7 +30,7 @@
 ## 文档只认五份
 
 `README.md`（对外入口与定位）· 本文件 · `docs/DESIGN.md`（行为权威）· `docs/INSTALL.md` · `HANDOFF.md`（现状与下一步）。
-另有两件辅助：`docs/research.md`（对照与出处）、`docs/deed-architecture.html`（图源，手维护）。
+另有两件辅助：`docs/research.md`（对照与出处）、`docs/deed-architecture.html`（图，由同目录 `deed-architecture.candidate.json` 重出，别手改 HTML）。
 **新增文档先问三条**（哪一格的事实／谁读了会改变哪个动作／多久过期），规则在 `docs/README.md`。
 过程材料（调研原文、截图、对话记录、临时脚本）不进仓库：需要留的只是结论。
 
