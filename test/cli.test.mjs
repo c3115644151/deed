@@ -1607,6 +1607,8 @@ test("the draft keeps judged entries ticked", () => {
 test("doctor says when a promise came after the work", () => {
   const cwd = workspace("promise-late");
   deed(cwd, "init", "--said", "开始");
+  // 这条检查只在 git 工作区里比：没有 git 的目录里 mtime 是搬运的时刻，不作数。
+  spawnSync("git", ["init"], { cwd, encoding: "utf8" });
   fs.writeFileSync(path.join(cwd, "docs.txt"), "x", "utf8");
   const old = new Date(Date.now() - 3600 * 1000);
   fs.utimesSync(path.join(cwd, "docs.txt"), old, old);
@@ -1616,4 +1618,11 @@ test("doctor says when a promise came after the work", () => {
   assert.equal(doctor.status, 0);
   assert.match(doctor.stdout, /先做后记 1 条/);
   assert.match(doctor.stdout, /T1 的 docs.txt/);
+
+  // 同一个目录，把 git 摘掉：不比了，也不报错。
+  fs.rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
+  const bare = deed(cwd, "doctor");
+  assert.equal(bare.status, 0, bare.stderr);
+  assert.doesNotMatch(bare.stdout, /先做后记/);
+  assert.doesNotMatch(bare.stdout, /没有 git|不在 git/);
 });

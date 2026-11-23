@@ -197,6 +197,10 @@ function lateWork(root, doc) {
     const one = spawnSync("git", args, { cwd: root, encoding: "utf8" });
     return one.status === 0 ? one.stdout.trim() : null;
   };
+  // 只在 git 工作区里比。mtime 只在能被 git 解释的工作树里代表「写下来的时刻」：
+  // 从别处拷来的、解压出来的、检出出来的目录，mtime 是搬运的时刻，比任务被记下
+  // 的时刻早晚都没有意义。没有 git 就整段不报，也不报错。
+  if (git(["rev-parse", "--is-inside-work-tree"]) !== "true") return [];
   const seen = new Map();
   // 比的是文件的最后写入时刻：提交时刻总在任务被记下之后（先写、再记、再提交），
   // 拿它来比永远看不出这件事。代价是 clone 出来的工作副本 mtime 全是检出时刻，

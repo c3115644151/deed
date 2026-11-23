@@ -45,6 +45,6 @@
   交付：cli/plan.mjs 的草稿把 done 与 accepted 都画成 [x]，判过的条目不再显示成未勾。核：新增用例 the draft keeps judged entries ticked 通过
 - [x] T34 doctor 按文件最后写入时刻查「先做后记」
   标准：deed doctor 对每条现行交付钉的文件查最后一次写入时刻，早于那条任务被记下的时刻就列出来（只报事实，不算坏账）；没有 git 的目录跳过不报错；clone 出来的工作副本 mtime 全是检出时刻，安静不报
-  交付：deed doctor 新增「先做后记 N 条（不算坏账）：T1 的 path 最后写于 …，这条任务记于 …」，比的是文件 mtime 与 task.createdAt；只在 git 工作区里跑（rev-parse --is-inside-work-tree）。本仓库实跑报 6 条（T7 lib/version.mjs、T21/T22/T23 cli/audit.mjs、T25 test/cli.test.mjs、T26 board/render.mjs）——正是「先做后补」留下的痕迹。核：新增用例 doctor says when a promise came after the work 通过
+  交付：先做后记只在 git 工作区里比：lateWork 开头 git rev-parse --is-inside-work-tree 不是 true 就整段不报（没有 git 的目录里 mtime 是搬运的时刻，不作数），原来那个写了没人调用的 git 辅助函数现在真被调用。核：node --test test/cli.test.mjs 86/86；新增断言在同一个工作区摘掉 .git 后 doctor exit 0 且输出里没有「先做后记」四字；本仓库当场 deed doctor 报的条目是 T7 lib/version.mjs、T21/T22/T23 cli/audit.mjs、T26 board/render.mjs（不写总数——那个数会随文件改动漂，上一轮写 6 条被审查者按实跑 5 条抓出来）
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->
