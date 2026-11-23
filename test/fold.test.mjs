@@ -240,3 +240,19 @@ test("a delivery that only pins files still counts as touching them", () => {
   assert.deepEqual(task.changed, ["core/fold.mjs"], "手工 --digest 交付没有工作区差，记下的文件就是它碰过的");
   assert.equal(needsReview(config, doc.sessions[0], doc.sessions[0].segments[0]), true);
 });
+// 撤回那行自己写着撤的是哪份字节：重放读它，不拿"最后一条交付"去猜。
+// 猜出来的那份会跟着将来的形状改口——加一条交付，历史里的撤回就换了个说法。
+test("a take-back is read from the line that recorded it, not from the delivery it guesses", () => {
+  const delivered = {
+    v: 8, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent",
+    files: [{ path: "a.txt", digest: "a".repeat(64) }],
+  };
+  const said = {
+    v: 8, at: T(4), k: "task.undo", s: null, id: "T1", why: "说错了话", by: "agent",
+    undoes: [{ path: "b.txt", digest: "b".repeat(64) }],
+  };
+  const doc = fold([turn(1), add(2, "T1"), delivered, said]);
+  assert.equal(doc.sessions[0].tasks[0].undone[0].undoes[0].path, "b.txt", "账本那行说撤的是 b.txt");
+  const older = fold([turn(1), add(2, "T1"), delivered, { ...said, undoes: undefined }]);
+  assert.equal(older.sessions[0].tasks[0].undone[0].undoes[0].path, "a.txt", "旧行没有这一格，才退回最后一条交付");
+});

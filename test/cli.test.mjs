@@ -1150,3 +1150,30 @@ test("the panel stays out of the way when it is told to", () => {
   const run = deed(cwd, "state");
   assert.doesNotMatch(run.stdout, /面板 · /, "DEED_NO_PANEL=1 时一条都不许起");
 });
+// 主路线是清单：把勾去掉再加一行 理由：。它落的那一行，同样要写清撤的是哪份字节——
+// 两条入口落的是同一个事实，只有一条写了就等于事实写在半路上。
+test("taking a delivery back from the plan records the bytes too", () => {
+  const cwd = workspace("undo-plan");
+  deed(cwd, "init", "--said", "开始");
+  const pinned = proof(cwd);
+  deed(cwd, "task", "add", "先说一句要做的事", "--criteria", "做完了", "--files", "proof.txt");
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "说要被撤回的那条", "--digest", pinned).status, 0);
+  deed(cwd, "plan", "--force");
+  fs.writeFileSync(
+    path.join(cwd, ".deed", "plan.md"),
+    ["# 这一期要做成什么", "先说一句要做的事。", "", "- [ ] T1 先说一句要做的事", "  标准：做完了", "  理由：这条交付是我手滑打进去的乱码"].join("\n") + "\n",
+  );
+  const run = deed(cwd, "submit");
+  assert.equal(run.status, 0, run.stderr);
+  const taken = readEvents(cwd).find((one) => one.k === "task.undo");
+  assert.equal(taken.undoes[0].path, "proof.txt", "清单那条路也要把被撤的字节写进账本");
+  assert.match(taken.undoes[0].digest, /^[0-9a-f]{64}$/);
+});
+
+test("a take-back's shape is checked where it is written", () => {
+  const base = { k: "task.undo", id: "T1", why: "说错了话", by: "agent" };
+  assert.ok(validateEvent({ ...base, undoes: [] }), "什么也没记下的交付，撤回时是空数组");
+  assert.ok(validateEvent({ ...base, undoes: [{ path: "a.txt", digest: "a".repeat(64) }] }));
+  assert.throws(() => validateEvent({ ...base, undoes: "a.txt" }), /undoes 要是数组/);
+  assert.throws(() => validateEvent({ ...base, undoes: [{ path: "a.txt" }] }), /path 与 digest/);
+});

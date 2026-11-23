@@ -299,6 +299,14 @@ const guard = (fn) => {
 
 const period = (doc) => "第 " + doc.sessions.length + " 期";
 
+// 撤的是哪份字节，撤的那一刻就写下：重放再去推，等于让后来的形状改口。
+// 两条入口（deed task undo 与 submit 里把勾去掉）落的是同一个事实，共用这一处。
+const undoesOf = (task) => {
+  const last = task.evidence[task.evidence.length - 1];
+  if (!last) return null;
+  return last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []);
+};
+
 function split(value) {
   if (value === undefined || value === null || value === true) return [];
   return String(value)
@@ -661,15 +669,11 @@ const commands = {
       if (verb === "undo") {
         if (!id) fail("task undo 要点名任务");
         if (!flags.why) fail("task undo 要说清为什么收回：--why \"…\"");
-        // 撤的是哪份字节，撤的那一刻就写下：重放再去推，等于让后来的形状改口。
         transact(flags, (doc) => {
           const one = currentSession(doc);
           const task = one ? one.tasks.find((t) => t.id === id) : null;
           if (!task) fail("这个会话里没有任务 " + id);
-          const last = task.evidence[task.evidence.length - 1];
-          const undoes = last
-            ? (last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []))
-            : null;
+          const undoes = undoesOf(task);
           return {
             k: "task.undo", s: flags.session ?? null, id, why: flags.why, by: flags.by ?? "agent",
             ...(undoes === null ? {} : { undoes }),
@@ -1100,7 +1104,11 @@ const commands = {
             }
             if (task.status === "done") {
               if (!item.why) fail(item.id + " 的勾去掉了，但没有写一行 理由：——撤回一条交付得说清为什么");
-              specs.push({ k: "task.undo", s: one.id, id: item.id, why: item.why, by });
+              const undoes = undoesOf(task);
+              specs.push({
+                k: "task.undo", s: one.id, id: item.id, why: item.why, by,
+                ...(undoes === null ? {} : { undoes }),
+              });
               continue;
             }
             if (item.later) {
