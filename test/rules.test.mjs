@@ -288,12 +288,31 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   ]);
   const session = doc.sessions[0];
   const [first, second] = session.segments;
-  assert.equal(needsReview(config, session, first), false, "封过就不重算：账本上那句「不用审」还算数");
-  assert.equal(needsReview(config, session, second), false);
-  assert.equal(reviewState(config, session, first), "exempt");
-  assert.equal(needsWhole(config, session), false, "没人审过的期不必再补一份整期结论");
-  assert.deepEqual(signBlockers(doc, session, config), []);
+  // 门槛只把 1000 字节当「大」：用例自己说多大的改动算大，不用内核默认的 20000，
+  // 否则哪天默认值调大，这条用例就无声地不再为守卫作证。
+  const tight = { ...config, review: { ...config.review, size: { bytes: 1000 } } };
+  assert.equal(needsReview(tight, session, first), false, "封过就不重算：账本上那句「不用审」还算数");
+  assert.equal(needsReview(tight, session, second), false);
+  assert.equal(reviewState(tight, session, first), "exempt");
+  // 守卫读的是「真写下过一次封存」：少了 closedAt 就不算封过，哪怕 sealedBy 有名字。
+  // 这种半个封存只有手改账本造得出来，属于「不许做」，但守卫的读法要对得上那句文档。
+  assert.equal(needsReview(tight, session, { ...first, closedAt: undefined }), true, "没有 closedAt 就不是封存");
+  assert.equal(needsWhole(tight, session), false, "没人审过的期不必再补一份整期结论");
+  assert.deepEqual(signBlockers(doc, session, tight), []);
   assert.equal(nextAction(doc, config).what, "签收");
+});
+
+// 守卫的另一半：被 pass 封的段没有 exemptions——它照常按今天的门槛重算。
+// 少了这一条，把守卫写成「只要 closedAt 不是 null 就豁免」也能全绿，而那会把
+// 审过的段一并免责，与「pass 封的段照样重算」正好相反。
+test("a segment a reviewer passed is still weighed, so the exemption is only for a seal", () => {
+  const heavy = (n, id, path) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent",
+    digest: "a".repeat(64), digestPath: path, changed: [path], bytes: { [path]: 92160 } });
+  const session = fold([turn(1), goal(2), add(3, "T1", ["docs/a.md"]), heavy(4, "T1", "docs/a.md"), sealed(5, "S01.1")]).sessions[0];
+  const first = session.segments[0];
+  assert.equal(first.sealedBy, null, "封段的是结论，不是 deed seal");
+  assert.equal(needsReview(config, session, first), true, "这一份 92160 字节，今天的门槛会把它送去审");
+  assert.equal(reviewState(config, session, first), "pass", "可它已经有人看过：结局不因此改变");
 });
 
 // 整期审的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。

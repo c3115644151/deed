@@ -115,7 +115,7 @@ export function needsReview(config, session, segment) {
   // 封存是账本上已经做出的决定：这一段按当时的事实不用审。后来把门槛写细了，
   // 也不回头改写它——否则一次收紧就能把封过的段重新算成"欠一份结论"，
   // 而签收只能对着旧账本上那句「没经过审查」自相矛盾。
-  if (segment?.sealedBy && segment.closedAt !== null) return false;
+  if (segment?.sealedBy && segment.closedAt) return false;
   const required = config?.review?.required ?? [];
   const exempt = config?.review?.exempt ?? [];
   const limits = { ...SIZE_DEFAULTS, ...(config?.review?.size ?? {}) };

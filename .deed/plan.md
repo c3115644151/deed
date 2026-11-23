@@ -98,4 +98,15 @@
   标准：docs/DESIGN.md §12.4 那句「segment.seal 封过的段返回 false」改成同时说明 sealedBy 与 closedAt 两个条件都在才豁免，并说明手改账本造出半个封存不在守卫范围（属「不许做」）。
   交付：docs/DESIGN.md §12.4 改成「判的是 sealedBy 与 closedAt 两个都在（账本上真写下过一次封存），不是一句 why」，并说明手改账本造出半个封存不在守卫里、属于「不许做」而不是「挡得住」。跑的是这一份字节：node --test 154/154、node --test test/docs.test.mjs 4/4。
 
+## 段 S02.9
+- [x] T48 守卫的两半各有测试看着：pass 封的段照样重算，seal 少了 closedAt 就不算封过
+  标准：test/rules.test.mjs 里有 pass 封段 + 92160 字节断言 needsReview 为 true 的用例；seal 用例断言 sealedBy 在、closedAt 缺时不算封过。变异核对：守卫只留 closedAt → 红的；只留 sealedBy → 红的；整条删掉 → 红的。
+  交付：test/rules.test.mjs 新增「a segment a reviewer passed is still weighed, so the exemption is only for a seal」（pass 封段 + 92160 字节 → needsReview true、reviewState 仍是 pass）；seal 用例补断言「{ ...first, closedAt: undefined } 不算封过」。跑的是这一份字节：node --test 155/155、node --test test/rules.test.mjs 20/20。变异核对（TEMP 副本）：守卫只留 closedAt → 19 过 1 败（红的是新用例）；只留 sealedBy → 19 过 1 败（红的是 seal 用例）；整条删掉 → 19 过 1 败。三处各有用例看着。
+- [x] T49 守卫读的是真值，文档与它逐字一致
+  标准：core/rules.mjs 的守卫写成 sealedBy 与 closedAt 都是真值（不再是 closedAt !== null）；docs/DESIGN.md §12.4 那句话写成「两个都是真值……不是这个字段存在就算」，并说明半个封存照常按门槛重算。
+  交付：core/rules.mjs 的守卫改成 `if (segment?.sealedBy && segment.closedAt) return false;`（原来 `closedAt !== null` 把 undefined 也算在，半个封存会被豁免）；docs/DESIGN.md §12.4 那句写成「判的是 sealedBy 与 closedAt 两个都是真值……不是这个字段存在就算」，并说明半个封存照常按门槛重算。跑的是这一份字节：node --test 155/155、node --test test/docs.test.mjs 4/4、node --test test/rules.test.mjs 20/20。
+- [x] T50 seal 用例的门槛与内核默认值解耦
+  标准：test/rules.test.mjs 的 seal 用例用自己声明的 review.size（bytes 1000）跑，92160 靠这条声明判「大」，不再依赖默认的 20000；把这条声明去掉后用例仍然红得起来（守卫删掉时），改大内核默认值不会让它无声失效。
+  交付：seal 用例改用自己声明的门槛 `const tight = { ...config, review: { ...config.review, size: { bytes: 1000 } } }`，92160 靠这条声明判「大」，不再依赖内核默认的 20000；断言把 config 换成 tight。跑的是这一份字节：node --test 155/155、node --test test/rules.test.mjs 20/20。这条用例现在守两件事（92160 + tight 时只有封存守卫能为它豁免；以及 closedAt 缺失不算封过），所以变异时可能因为任一半而红：把 92160 改回 100 并删掉守卫，它仍然 19 过 1 败，红的是 closedAt 那半。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->
