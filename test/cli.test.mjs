@@ -6,7 +6,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
-import { validateEvent } from "../core/events.mjs";
+import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 
 const CLI = path.join(import.meta.dirname, "..", "cli", "deed.mjs");
 const deed = (cwd, ...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8" });
@@ -769,6 +769,27 @@ test("an invented kind with no writer version is still a broken line", () => {
   assert.match(doctor.stdout, /rejected/);
 });
 
+test("a line this deed cannot read, written by the same version, is told apart by what it means", () => {
+  // 真事：加了 task.undo 但没升版本号，正在跑的老进程（同一个 0.2.0）把它读成坏账，
+  // 还建议整行挪去 rejected——照做就是丢掉一条真交付。行自己的含义版本能分清。
+  const cwd = workspace("meaning-version");
+  deed(cwd, "init", "--said", "开始");
+  const shipped = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", "package.json"), "utf8")).version;
+  const at = new Date().toISOString();
+  writeLines(cwd, [
+    { v: 1, at, k: "turn", s: "S01", who: "user", said: "开始" },
+    { v: EVENT_VERSION + 1, at, k: "task.block", s: "S01", id: "T1", why: "新版本才有的事件", w: shipped },
+  ]);
+  const doctor = deed(cwd, "doctor");
+  assert.equal(doctor.status, 1, "读不动还是读不动：不猜语义");
+  assert.match(doctor.stdout, /账本比 deed 新/);
+  assert.match(doctor.stdout, new RegExp(`事件含义第 ${EVENT_VERSION + 1} 版`));
+  assert.doesNotMatch(doctor.stdout, /rejected/, "同一个版本号的旧程序不该叫人删新行");
+  const state = deed(cwd, "state");
+  assert.equal(state.status, 1);
+  assert.match(state.stderr, /账本比 deed 新/);
+});
+
 test("every line records the deed that wrote it", () => {
   const cwd = workspace("writer-version");
   deed(cwd, "init", "--said", "开始");
@@ -799,6 +820,9 @@ test("a directory with no ledger cannot be written into, or read as if it were f
   assert.equal(tick.status, 1);
   assert.equal(tick.stderr.trim(), "deed: 这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
   assert.deepEqual(kinds(cwd), [], "被拒的那一轮一个字也不该落盘");
+  // 被拒是"什么都没发生"：拿锁时顺手建出来的东西也得擦干净，否则明天有人
+  // 看见 .deed/ 会以为这个目录接过了。
+  assert.equal(fs.existsSync(path.join(cwd, ".deed")), false, "被拒的写操作不该在目录里留下 .deed/");
 
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
@@ -808,7 +832,72 @@ test("a directory with no ledger cannot be written into, or read as if it were f
   const verify = deed(cwd, "verify");
   assert.equal(verify.status, 1);
   assert.equal(verify.stdout.trim(), "这个目录还没接 deed：deed init 之后才有账本和证据可查");
+  assert.equal(fs.existsSync(path.join(cwd, ".deed")), false, "读也不行：看别人的目录不该建出 .deed/");
 });
+
+// 2) --help for a verb with no arguments
+test("asking a verb that takes no arguments answers with its line, not the whole page", () => {
+  const cwd = workspace("usage-noargs");
+  for (const verb of ["state", "verify", "doctor"]) {
+    const run = deed(cwd, verb, "--help");
+    assert.equal(run.status, 0);
+    assert.equal(run.stdout.trim(), "deed " + verb, verb + " --help 只该打这一行");
+  }
+  const task = deed(cwd, "task", "--help");
+  assert.match(task.stdout, /deed task undo/);
+  assert.doesNotMatch(task.stdout, /deed judge --pass/, "问 task 的用法不该回 judge 的行");
+});
+
+// 3) a fail verdict asks for a rework, not for a pass
+test("a failed review asks for a rework, not for the judge's pen", () => {
+  const cwd = workspace("fail-next");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "先交一条", "--criteria", "交了就成", "--files", "proof.txt");
+  const pinned = proof(cwd);
+  deed(cwd, "task", "done", "T1", "--evidence", "交了", "--digest", pinned);
+  const brief = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(brief.status, 0);
+  const log = deed(cwd, "review", "--segment", "S01.1", "--by", "reviewer:x", "--verdict", "fail", "--finding", "证据只说了半句");
+  assert.equal(log.status, 0);
+  const state = deed(cwd, "state");
+  assert.match(state.stdout, /打回重做/);
+  assert.match(state.stdout, /deed judge --rework/);
+  assert.doesNotMatch(state.stdout, /deed judge --pass/, "结论是不合格，下一步不可能是放行");
+});
+
+// 4) a task added after the brief is handed out makes that paper old
+test("a task added after the brief is handed out makes that brief old news", () => {
+  const cwd = workspace("brief-task-drift");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "第一条", "--criteria", "做到", "--files", "proof.txt");
+  const pinned = proof(cwd);
+  deed(cwd, "task", "done", "T1", "--evidence", "做了", "--digest", pinned);
+  const first = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(first.status, 0);
+
+  deed(cwd, "task", "add", "又想起一条", "--criteria", "也得做到", "--files", "proof.txt");
+  const open = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(open.status, 1, "清单里还有没交付的，纸先别出");
+  assert.match(open.stderr, /还有没交付的（T2）/);
+
+  deed(cwd, "task", "done", "T2", "--evidence", "也做了", "--digest", pinned);
+  const again = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(again.status, 0);
+  assert.match(again.stdout, /另出一份/, "交付把旧纸顶掉了，重出一份");
+  const pass = deed(cwd, "review", "--segment", "S01.1", "--by", "reviewer:x", "--verdict", "pass");
+  assert.equal(pass.status, 0);
+
+  // 纸出过之后再交一条：纸上的清单没有它，结论回答不了它。
+  deed(cwd, "task", "add", "第三条", "--criteria", "第三件", "--files", "proof.txt");
+  const early = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(early.status, 1, "还有没交付的条目，纸先别出");
+  assert.match(early.stderr, /还有没交付的/);
+  deed(cwd, "task", "done", "T3", "--evidence", "也做了", "--digest", pinned);
+  const older = deed(cwd, "review", "--segment", "S01.1", "--by", "reviewer:x", "--verdict", "fail", "--finding", "再看法");
+  assert.equal(older.status, 1);
+  assert.match(older.stderr, /又动过/, "纸上没有这一条，结论回答不了它");
+});
+
 
 test("a delivery that said the wrong thing is taken back, not rewritten", () => {
   const cwd = workspace("undo");
@@ -877,7 +966,7 @@ test("a brief handed out before the ledger moved is replaced, not answered", () 
   deed(cwd, "task", "undo", "T1", "--why", "那条证据说错了话");
   deed(cwd, "task", "done", "T1", "--evidence", "第二次交付", "--digest", pinned);
   const third = deed(cwd, "review");
-  assert.match(third.stdout, /出在最后一次交付之前：另出一份/, "账本动了，旧纸就不再是这一段现在的事");
+  assert.match(third.stdout, /出在这一段最近一次改动之前：另出一份/, "账本动了，旧纸就不再是这一段现在的事");
   const fresh = briefs(cwd).filter((one) => !seen.has(one));
   assert.equal(fresh.length, 1, "只该多出一份");
   const text = fs.readFileSync(path.join(cwd, ".deed", "review", fresh[0]), "utf8");

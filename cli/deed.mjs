@@ -22,6 +22,7 @@ import {
   judgeBlockers,
   lastBrief,
   lastDelivery,
+  lastSegmentChange,
   nextAction,
   openSegment,
   pendingAsks,
@@ -95,6 +96,9 @@ function parse(argv) {
   return { flags, words };
 }
 
+// 接过的目录：门槛落过盘（.deed/config.json）。只看这一个文件，不猜。
+const bound = (root) => fs.existsSync(path.join(root, ".deed", "config.json"));
+
 const load = () => {
   const events = readEvents(ROOT);
   return { events, doc: fold(events) };
@@ -104,7 +108,12 @@ const load = () => {
 // inside the lock instead of guessed from a stale read.
 // commit runs only after the line is on disk: derived state (the workspace
 // snapshot) may not move for an event that was refused before appending.
-function transact(flags, build, commit) {
+// mayBind：唯一允许在没接过的目录里写的东西是"把门槛落进账本"（init 自己）。
+function transact(flags, build, commit, mayBind = false) {
+  // 接过的目录才谈得上写：没接过就先拒绝，连 .deed/ 也不该留下——
+  // 拿锁会顺手把目录建出来，而被拒的动作不该在工作区里留下任何痕迹。
+  if (!mayBind && !bound(ROOT))
+    fail("这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
   return withLock(ROOT, () => {
     const events = readEvents(ROOT);
     const doc = fold(events);
@@ -175,7 +184,7 @@ const guard = (fn) => {
     if (err instanceof UnknownKindError) {
       // 账本比程序新时，拒绝是对的（折不动就是折不动），但话要指对路：
       // 这不是坏账，升级 deed 就能读。
-      const notice = unknownKindNotice(err.kind, err.writer);
+      const notice = unknownKindNotice(err.kind, err.writer, currentVersion(), err.meaning);
       reject(notice.headline);
       console.error("  " + notice.advice);
       return undefined;
@@ -363,15 +372,20 @@ const commands = {
       const to = config[key];
       if (sameJson(from, to)) continue;
       if (ledger && !flags.why) fail("改门槛要写清为什么：--why \"…\"（这一改会进账本，谁都能看到）");
-      transact({}, () => ({
-        k: "config.change",
-        s: null,
-        key,
-        from,
-        to,
-        why: flags.why ?? "init 收下的门槛",
-        by: flags.by ?? "user",
-      }));
+      transact(
+        {},
+        () => ({
+          k: "config.change",
+          s: null,
+          key,
+          from,
+          to,
+          why: flags.why ?? "init 收下的门槛",
+          by: flags.by ?? "user",
+        }),
+        undefined,
+        true, // 门槛落盘之前这个目录还不算接过：init 是唯一的例外
+      );
     }
     writeConfig(ROOT, config);
     writeSnapshot(ROOT, changedPaths(ROOT).now);
@@ -542,6 +556,11 @@ const commands = {
         );
       if (seg.closedAt) fail("段 " + seg.id + " 已经封存，结论不能再落");
       if (!flags.verdict) {
+        // 纸写的是"这些条目、这些证据"。还有条目没交，纸就是一份没人能答的卷子：
+        // 交完再出，否则它一出生就是旧的。
+        const pending = tasksIn(one, seg).filter((task) => task.status === "todo");
+        if (pending.length > 0)
+          fail("段 " + seg.id + " 还有没交付的（" + pending.map((task) => task.id).join("、") + "）：任务书等交付完再出");
         const handed = lastBrief(one, seg.id);
         const answered = handed && one.reviews.some((rv) => rv.brief === handed.brief);
         if (handed && !answered) {
@@ -549,11 +568,11 @@ const commands = {
           // 手上那份已经不是账本里记的那一份，谁读它都不算数。
           const file = path.resolve(ROOT, handed.brief);
           const intact = fs.existsSync(file) && digest(fs.readFileSync(file)) === handed.briefDigest;
-          // 任务书写的是它出纸那一刻的证据。之后账本又动了（交付、收回），
-          // 这份纸就不再说这一段现在的事——换一份，别让人审旧内容。
-          const moved = lastDelivery(one, seg);
+          // 任务书写的是它出纸那一刻的清单与证据。之后这一段又动了（加任务、
+          // 交付、收回），这份纸就不再说这一段现在的事——换一份，别让人审旧内容。
+          const moved = lastSegmentChange(one, seg);
           const stale = moved !== null && moved > handed.at;
-          if (intact && stale) console.log("上一份任务书(" + handed.brief + ")出在最后一次交付之前：另出一份");
+          if (intact && stale) console.log("上一份任务书(" + handed.brief + ")出在这一段最近一次改动之前：另出一份");
           else if (intact) {
             console.log("审查任务书 · " + handed.brief + "（这一段已经出过，等结论落盘）");
             console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
@@ -579,6 +598,10 @@ const commands = {
       if (!fs.existsSync(file)) fail("任务书不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
       if (digest(fs.readFileSync(file)) !== handed.briefDigest)
         fail("任务书被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
+      // 纸上的清单变了，结论就没法回答它：那一份写的不是现在这一段。
+      const moved = lastSegmentChange(one, seg);
+      if (moved !== null && moved > handed.at)
+        fail("这一段在任务书出过之后又动过（" + handed.brief + "）：结论只能回答纸上的清单，deed review --segment " + seg.id + " 另出一份再审");
       const findings = list(flags.finding);
       transact(flags, () => ({
         k: "review.log",
@@ -767,7 +790,7 @@ const commands = {
             validateEvent(ev, ev.at);
             fold([...events, ev]);
           } catch (err) {
-            const notice = err instanceof UnknownKindError ? unknownKindNotice(err.kind, err.writer) : null;
+            const notice = err instanceof UnknownKindError ? unknownKindNotice(err.kind, err.writer, currentVersion(), err.meaning) : null;
             bad = {
               file: name,
               line: i + 1,
@@ -892,7 +915,10 @@ const HELP = [
 ].join("\n");
 
 const [verb, ...rest] = process.argv.slice(2);
-const usageOf = (one) => HELP.split("\n").filter((line) => line.startsWith("deed " + one + " "));
+// HELP 里有的动词不带参数（state、verify、doctor），那一行没有尾空格；
+// 要求尾空格会把它们漏掉，再回落成整本帮助。
+const usageOf = (one) =>
+  HELP.split("\n").filter((line) => line === "deed " + one || line.startsWith("deed " + one + " "));
 // `deed review --help` used to hand out a brief: asking what a verb takes is
 // not asking it to do the thing.
 if (rest.some((one) => one === "--help" || one === "-h")) {

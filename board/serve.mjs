@@ -26,12 +26,12 @@ const escape = (text) => String(text ?? "").replace(/[<&]/g, (c) => (c === "<" ?
 
 // /state 与 SSE 只带一句：和页面同一个判断，不另说一套。
 const brokenText = (error) => {
-  const notice = error instanceof UnknownKindError ? unknownKindNotice(error.kind, error.writer, currentVersion()) : null;
+  const notice = error instanceof UnknownKindError ? unknownKindNotice(error.kind, error.writer, currentVersion(), error.meaning) : null;
   return notice ? notice.headline + " · " + notice.advice : String(error && error.message ? error.message : error);
 };
 
 function brokenPage(error) {
-  const notice = error instanceof UnknownKindError ? unknownKindNotice(error.kind, error.writer, currentVersion()) : null;
+  const notice = error instanceof UnknownKindError ? unknownKindNotice(error.kind, error.writer, currentVersion(), error.meaning) : null;
   const title = notice?.newer ? "账本比 deed 新" : "账本里有读不动的行";
   const lead = notice?.newer
     ? "页面照旧只读：这本账是更新的 deed 写的，升级之后这一行就能读，别删也别挪。"

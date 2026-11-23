@@ -146,6 +146,9 @@ export function fold(events) {
           files: ev.files ?? [],
           segment: segment.id,
           createdAt: ev.at,
+          // 这一段最后一次"被改动"的时刻，任务自己的生命周期都算：加了、交了、
+          // 收回了、延后了、弃掉了。任务书与结论都拿它比新旧。
+          touchedAt: ev.at,
           status: "todo",
           evidence: [],
           undone: [],
@@ -158,6 +161,7 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        task.touchedAt = ev.at;
         if (task.status !== "todo" && task.status !== "done")
           noway(`任务 ${task.id} 不在未做状态：${task.status}`);
         task.status = "done";
@@ -181,6 +185,7 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        task.touchedAt = ev.at;
         const last = task.evidence[task.evidence.length - 1];
         if (!last) noway("任务 " + task.id + " 没有可撤回的交付");
         task.evidence.pop();
@@ -199,6 +204,7 @@ export function fold(events) {
         editable(session, task);
         task.status = ev.k === "task.defer" ? "deferred" : "dropped";
         task.deferredWhy = ev.why;
+        task.touchedAt = ev.at;
         break;
       }
       case "ask.raise": {
@@ -370,7 +376,7 @@ export function fold(events) {
       }
       default:
         // 不认得的类型不一定是坏行：账本可能比程序新（w 记着写者版本）。
-        throw new UnknownKindError(ev.k, ev.w);
+        throw new UnknownKindError(ev.k, ev.w, ev.v);
     }
   }
   return doc;

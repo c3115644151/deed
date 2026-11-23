@@ -22,15 +22,22 @@ export const EVENT_KINDS = [
 
 export const WHO = ["user", "agent"];
 
+// 事件含义的版本。每一行都记着写它的那一套含义（v 字段）；加一个事件类型、
+// 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
+// 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
+// 就是账本新；v 不超前才可能是这一行被手写或被改过。
+export const EVENT_VERSION = 2;
+
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
-// core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名与
-// 写者版本，由 CLI 层去比大小、去说人话。
+// core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、
+// 写者版本、这一行自己的含义版本，由 CLI 层去比大小、去说人话。
 export class UnknownKindError extends Error {
-  constructor(kind, writer) {
+  constructor(kind, writer, meaning) {
     super(`未知事件：${kind}`);
     this.name = "UnknownKindError";
     this.kind = kind;
     this.writer = writer ?? null;
+    this.meaning = meaning ?? null;
   }
 }
 
@@ -45,10 +52,11 @@ const need = (ev, field) => {
 // ones. Rules (can this segment be judged?) live in rules.mjs, never here.
 export function validateEvent(ev, at) {
   need(ev, "k");
-  if (!EVENT_KINDS.includes(ev.k)) throw new UnknownKindError(ev.k, ev.w);
+  if (!EVENT_KINDS.includes(ev.k)) throw new UnknownKindError(ev.k, ev.w, ev.v);
   if (ev.at && !/^\d{4}-\d{2}-\d{2}T/.test(String(ev.at)))
     throw new Error(`时间不是 ISO 时刻：${ev.at}`);
-  const stamped = { v: 1, at: ev.at ?? at, ...ev };
+  // v 放在最后，调用方改不了：一行说的是哪一套含义，由写它的程序决定。
+  const stamped = { at: ev.at ?? at, ...ev, v: EVENT_VERSION };
   switch (ev.k) {
     case "turn":
       need(ev, "who");

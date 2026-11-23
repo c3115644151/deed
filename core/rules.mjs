@@ -113,6 +113,20 @@ export const lastDelivery = (session, segment) => {
   return times[times.length - 1] ?? null;
 };
 
+// 这一段最后一次被改动是什么时候。加一条任务也算——任务书写的是一份清单，
+// 清单变了，纸上那份就不再是这一段的事，结论也就回答不了它。
+export const lastSegmentChange = (session, segment) => {
+  const times = tasksIn(session, segment)
+    .flatMap((one) => [
+      one.touchedAt,
+      ...one.evidence.map((proof) => proof.at),
+      ...(one.undone ?? []).map((gone) => gone.at),
+    ])
+    .filter(Boolean)
+    .sort();
+  return times[times.length - 1] ?? null;
+};
+
 // The document the reviewer is holding for this segment: the last one handed
 // out. A verdict answers this one or it is answering something nobody read.
 export const lastBrief = (session, segmentId) =>
@@ -120,7 +134,7 @@ export const lastBrief = (session, segmentId) =>
 
 export const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
-  const last = lastDelivery(session, segment);
+  const last = lastSegmentChange(session, segment);
   return Boolean(review && last && review.at < last);
 };
 
@@ -314,6 +328,17 @@ export function nextAction(doc, config) {
       what: voidedReview(session, segment) ? "重审" : "审这一段",
       text: `${segment.id} 的 ${count.total} 条都交付了，要一份独立结论`,
       command: `deed review --segment ${segment.id}`,
+    };
+  }
+  if (state === "fail") {
+    // 不合格不是"等一句话放行"：先读结论，把要重做的条目打回，再重新交付、重新审。
+    const review = reviewOf(session, segment);
+    const findings = review?.findings?.length ?? 0;
+    return {
+      who: "agent",
+      what: "打回重做",
+      text: `${segment.id} 的审查结论是不合格${findings > 0 ? `（${findings} 条发现）` : ""}：读结论，把要重做的条目打回`,
+      command: `deed judge --rework <要重做的条目> --why "…" --by "…"`,
     };
   }
   return {

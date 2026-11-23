@@ -46,8 +46,8 @@ node tools/deed/cli/deed.mjs help        # 用相对路径调用，不占全局
 ### 打一个包带走
 
 ```bash
-npm pack                     # 产出 deed-0.2.0.tgz（private 只挡发布，不挡打包）
-npm i -g ./deed-0.2.0.tgz    # 装到这台机器上
+npm pack                     # 产出 deed-0.3.0.tgz（private 只挡发布，不挡打包）
+npm i -g ./deed-0.3.0.tgz    # 装到这台机器上
 ```
 
 ## 接进一个工作区
