@@ -1638,3 +1638,21 @@ test("pinning a file that did not move this time still weighs it", () => {
   assert.deepEqual(last.changed, [], "这一次什么都没动");
   assert.equal(last.bytes["proof.txt"], fs.statSync(path.join(cwd, "proof.txt")).size);
 });
+// 勾上就要指着点什么：没改动、也没文件可指时，写下去是一条谁也核不了的空话，
+// 而后面的交付一钉就把它盖住——审计永远看不见它。
+test("a submit with nothing to point at refuses to write the delivery", () => {
+  const cwd = workspace("empty-delivery");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "写一份说明");
+  writePlan(cwd, ["# 这一期要做成什么", "把说明写完。", "", "- ? 写一份说明", "  标准：docs/a.md 有一句话"].join("\n"));
+  assert.equal(deed(cwd, "submit").status, 0, "新条目先落账");
+  writePlan(
+    cwd,
+    ["# 这一期要做成什么", "把说明写完。", "", "- [x] T1 写一份说明", "  标准：docs/a.md 有一句话", "  交付：写了（可工作区里什么都没动）"].join("\n"),
+  );
+  const before = readEvents(cwd).length;
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1, "什么都没动就不算交付");
+  assert.match(refused.stderr, /没有量到任何改动、也没有文件可指/);
+  assert.equal(readEvents(cwd).length, before, "一个字都没落");
+});

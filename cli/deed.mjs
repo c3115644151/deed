@@ -1061,6 +1061,15 @@ const commands = {
               if (task.status === "done" || task.status === "accepted") continue;
               if (task.status === "dropped") fail(item.id + " 已经放弃过：要接着做就新开一条");
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
+              // 一条交付总要指着点什么：工作区没量到改动、也没有文件可指时，写下去就是一条
+              // 谁也核不了的空话——它自己消失得比谁都干净（后面的交付一钉就把这条盖住）。
+              if (pins.length === 0)
+                fail(
+                  item.id +
+                    " 勾上了，但这一批没有量到任何改动、也没有文件可指：先真的动过再勾，或者用 deed task done " +
+                    item.id +
+                    " --evidence \"…\" --digest <工作区里的文件> 手工指那份内容",
+                );
               specs.push({
                 k: "task.done",
                 s: one.id,

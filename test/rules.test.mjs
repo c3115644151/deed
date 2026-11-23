@@ -294,8 +294,11 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   assert.equal(needsReview(tight, session, first), false, "封过就不重算：账本上那句「不用审」还算数");
   assert.equal(needsReview(tight, session, second), false);
   assert.equal(reviewState(tight, session, first), "exempt");
-  // 守卫读的是「真写下过一次封存」：少了 closedAt 就不算封过，哪怕 sealedBy 有名字。
-  // 这种半个封存只有手改账本造得出来，属于「不许做」，但守卫的读法要对得上那句文档。
+  // 守卫读的是「真写下过一次封存」，所以两个字段都要当着：sealedBy 有名字、
+  // closedAt 是那一刻。少了 closedAt 就不算封过——而且这个形状不是手改账本才有的：
+  // 整期审把这一段点回来时，fail 分支就留着 sealedBy、把 closedAt 清成 null。
+  assert.equal(first.sealedBy, "agent", "封它的是 deed seal");
+  assert.notEqual(first.closedAt, null, "账本上真写过一次封存");
   assert.equal(needsReview(tight, session, { ...first, closedAt: undefined }), true, "没有 closedAt 就不是封存");
   assert.equal(needsWhole(tight, session), false, "没人审过的期不必再补一份整期结论");
   assert.deepEqual(signBlockers(doc, session, tight), []);
@@ -313,6 +316,26 @@ test("a segment a reviewer passed is still weighed, so the exemption is only for
   assert.equal(first.sealedBy, null, "封段的是结论，不是 deed seal");
   assert.equal(needsReview(config, session, first), true, "这一份 92160 字节，今天的门槛会把它送去审");
   assert.equal(reviewState(config, session, first), "pass", "可它已经有人看过：结局不因此改变");
+  assert.equal(first.sealedBy, null, "半封存不在这条上");
+});
+
+// 半个封存的真实来路：整期审把一条写在 deed seal 封过的段里的任务点回来，段被重新打开——
+// 留着 sealedBy（写过封存的人），closedAt 清成 null。这不是手改账本才出现的形状，
+// 而是 fail 分支每天都会造出来的；对它按门槛重算是本意，所以这条用例要跟着它走。
+test("a whole-period rework reopens a sealed segment, and that half-seal is weighed again", () => {
+  const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
+  const whole = (n) => ({ v: 5, at: T(n), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail",
+    brief: "b.md", briefDigest: "a".repeat(64), why: "退回 T1", rework: ["T1"] });
+  const session = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["core/a.mjs"]), done(4, "T1", "core/a.mjs"), seal(5, "S01.1"),
+    add(6, "T2", ["docs/b.md"]), done(7, "T2", "docs/b.md"),
+    whole(8),
+  ]).sessions[0];
+  const first = session.segments[0];
+  assert.equal(first.sealedBy, "agent", "写过封存的人还留在这一格上");
+  assert.equal(first.closedAt, null, "可这一段已经被整期审打回、重新打开");
+  assert.equal(needsReview(config, session, first), true, "半个封存不算封过：按今天的门槛重算");
 });
 
 // 整期审的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。

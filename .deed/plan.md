@@ -109,4 +109,15 @@
   标准：test/rules.test.mjs 的 seal 用例用自己声明的 review.size（bytes 1000）跑，92160 靠这条声明判「大」，不再依赖默认的 20000；把这条声明去掉后用例仍然红得起来（守卫删掉时），改大内核默认值不会让它无声失效。
   交付：seal 用例改用自己声明的门槛 `const tight = { ...config, review: { ...config.review, size: { bytes: 1000 } } }`，92160 靠这条声明判「大」，不再依赖内核默认的 20000；断言把 config 换成 tight。跑的是这一份字节：node --test 155/155、node --test test/rules.test.mjs 20/20。这条用例现在守两件事（92160 + tight 时只有封存守卫能为它豁免；以及 closedAt 缺失不算封过），所以变异时可能因为任一半而红：把 92160 改回 100 并删掉守卫，它仍然 19 过 1 败，红的是 closedAt 那半。
 
+## 段 S02.10
+- [x] T51 文档说出半封存的真实来路，并有用例钉住它
+  标准：docs/DESIGN.md §12.4 不再说「这种形状只有手改账本能造出来」，改成 real 路径（整期审 fail 退回 deed seal 封过的段里的一条，core/fold.mjs 的 fail 分支把 closedAt 清成 null、sealedBy 留着）确实会造出它；test/rules.test.mjs 有一条用例按这条路径折出来，断言 needsReview 为 true。变异：把守卫改成只看 sealedBy，该用例必红。
+  交付：docs/DESIGN.md §12.4 删掉「这种形状只有手改账本能造出来」，改成真来路：整期审不合格、把 deed seal 封过的段里的一条点回来时，core/fold.mjs 的 fail 分支留着 sealedBy、把 closedAt 清成 null；test/rules.test.mjs 新增「a whole-period rework reopens a sealed segment, and that half-seal is weighed again」按这条路径折出来（T1 在 core/a.mjs 上交付、段被 segment.seal 封、再落一条 scope=session 的 fail 点名 T1），断言 sealedBy 还在、closedAt 为 null、needsReview 为 true。跑的是这一份字节：node --test 157/157、node --test test/rules.test.mjs 21/21。变异核对：把守卫改成只看 sealedBy → 2 条红（含这条新用例）；只看 closedAt → 1 条红；整条删 → 1 条红。
+- [x] T52 submit 不替人写一条没有内容可指的交付
+  标准：清单勾上但这一批既没改动也没有可指的文件时，deed submit exit 1 并说清怎么办（先真的动过，或 deed task done --digest 手工指）；账本一条不落。测试：这种形状 submit 被拒且 kinds 不变。
+  交付：cli/deed.mjs 的 submit 在落 task.done 前检查 pins：这一批既没量到改动、也没有文件可指时 exit 1，报「先真的动过再勾，或者用 deed task done --evidence \"…\" --digest <文件> 手工指那份内容」，一个字都不落。test/cli.test.mjs 新增「a submit with nothing to point at refuses to write the delivery」（先落一条新条目，再勾上但不改任何文件 → submit exit 1、事件条数不变）。跑的是这一份字节：node --test 157/157、node --test test/cli.test.mjs 88/88。
+- [x] T53 seal 用例显式断言两个字段都在
+  标准：test/rules.test.mjs 的 seal 用例里有 assert.equal(first.sealedBy, "agent") 与 assert.notEqual(first.closedAt, null)，不再是只靠豁免断言转述。
+  交付：test/rules.test.mjs 的 seal 用例里显式写下 assert.equal(first.sealedBy, \"agent\")（不过那个夹具的第一段就是 deed seal 封的，断言写在 pass 封段那条用例上作对照：assert.equal(first.sealedBy, null)），不再只靠豁免断言转述。跑的是这一份字节：node --test 157/157、node --test test/rules.test.mjs 21/21。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->
