@@ -95,9 +95,9 @@ const topDir = (file) => {
   return one.includes("/") ? one.slice(0, one.indexOf("/")) : one;
 };
 
-// The size a file had when it was delivered. A path nobody weighed (an older
-// line, or a file that is gone) counts as zero bytes: unknown is not evidence of
-// size, and pretending it is large would put every old delivery under review.
+// 一条路径在交付那一刻有多重。称不出来的（老账本里没称、或者已经删掉的）在求和时按 0 算，
+// 但那不是放行：`needsReview` 会先把"说不清多大"的挑出来按要审算，0 只用来把几个顶层目录
+// 与文件数数下去，不然一句"不知道"会让整个加法没有结果。
 const task_size = (sizes, file) => {
   const value = sizes?.[file];
   return Number.isFinite(value) ? value : 0;

@@ -145,4 +145,12 @@
   标准：core/rules.mjs 导出 pointsAtNothing，cli/audit.mjs 不再自带一份；删掉一个文件算「指着它动过的那条路径」，不算空交付。改动被用例管住（把它改回只看 files/digest 要红）。
   交付：core/rules.mjs 导出 pointsAtNothing（files 空、且没有 digest+path、且 changed 空），unpinned 用它判现行交付；cli/audit.mjs 删掉自带的那份、改为 import。跑的是这一份字节：node --test 166/166；变异：把 pointsAtNothing 的 changed 那半去掉，删除用例红一条（还原后 96/96）。
 
+## 段 S02.13
+- [x] T61 注释与设计不再跟代码说反话
+  标准：core/rules.mjs 里那条说「称不出的按 0 字节，假装它大就会把所有老交付拉去审」的注释改成讲真话（0 只用于求和，说不清多大的由守卫判要审）；docs/DESIGN.md 里空交付那句把撤回那条来路归还给 bareHistory。
+  交付：core/rules.mjs 的 task_size 上面那条注释改成讲真话（求和时说不清的按 0，放不放行由 needsReview 的守卫说）；docs/DESIGN.md 里空交付那句把「撤回时没记下被撤的内容」归还给 cli/audit.mjs 的 bareHistory。跑的是这一份字节：node --test 167/167。
+- [x] T62 pointsAtNothing 的语义有一条直接用例
+  标准：test/rules.test.mjs 里有用例直接断言 pointsAtNothing 对五种形状的回答（什么都没指、老形状、只删了一条路径、钉了内容、钉了一组内容）；把那半守卫改回只看 files/digest 会红。
+  交付：test/rules.test.mjs 新增一条用例，直接断言 pointsAtNothing 对五种形状的回答（{}、files/changed 都空、只有 changed、有 digest+path、有一组 files），把那半守卫改回只看 files/digest 时它变红（跑过：rules 22 条里 1 条红，还原后 22/22）。跑的是这一份字节：node --test 167/167。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

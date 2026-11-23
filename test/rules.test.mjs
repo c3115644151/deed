@@ -9,6 +9,7 @@ import {
   reviewOf,
   reviewState,
   freshWholeBrief,
+  pointsAtNothing,
   sealBlockers,
   signBlockers,
   wholeState,
@@ -355,4 +356,14 @@ test("a segment a reviewer read counts for the whole review, whatever its delive
   assert.equal(needsReview(config, session, session.segments[0]), false, "这一段的字节数出来确实很小");
   assert.equal(needsWhole(config, session), true, "可它被人看过：整期审还得有一句结论");
   assert.equal(signBlockers(doc, session, config).some((one) => one.includes("整体审")), true);
+});
+
+// 守卫的语义要直接写下来：只删东西的交付指着它动过的那条路径，不算「什么也没指着」。
+// 不写这条，两条删除用例删掉之后这半条守卫就没有任何用例看着（上一轮 T60 就是这么漏的）。
+test("a delivery that points at nothing is told apart from one that points at a path it removed", () => {
+  assert.equal(pointsAtNothing({ files: [], changed: [] }), true, "什么都没指");
+  assert.equal(pointsAtNothing({}), true, "老形状里什么都没有");
+  assert.equal(pointsAtNothing({ changed: ["docs/gone.md"] }), false, "删掉一条路径也算指着它");
+  assert.equal(pointsAtNothing({ digest: "a".repeat(64), path: "docs/a.md" }), false, "钉了内容");
+  assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md", digest: "b".repeat(64) }] }), false, "钉了一组内容");
 });
