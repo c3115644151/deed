@@ -20,7 +20,7 @@ const turn = (n) => ({ v: 1, at: T(n), k: "turn", s: null, who: "user", said: "x
 const add = (n, id, files = []) => ({ v: 1, at: T(n), k: "task.add", s: null, id, title: id, criteria: "c", files });
 // A delivery pins a file: evidence that names no content cannot be checked
 // later, so the fixtures pin one the way a real run would.
-const done = (n, id) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "core/fold.mjs", changed: [] });
+const done = (n, id, path = "core/fold.mjs") => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: path, changed: [] });
 const pass = (n, segment = "S01.1") => ({ v: 1, at: T(n), k: "judge.pass", s: null, segment, by: "user" });
 const verdict = (n, v, segment = "S01.1") => ({ v: 1, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: v, brief: "b.md" });
 const ask = (n) => ({ v: 1, at: T(n), k: "ask.raise", s: null, id: "A1", text: "要兼容旧账吗", reading: "不兼容", why: "不确定" });
@@ -68,7 +68,7 @@ test("a segment that needs review cannot be sealed before the verdict lands", ()
     "这一段按门槛要审：结局得由审查者的结论落（deed review --segment S01.1）",
   ]);
   // 免审段才封得动；要审的那段被封，就是没人看过它却算过了。
-  const exempt = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1")]);
+  const exempt = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
   assert.deepEqual(sealBlockers(config, exempt.sessions[0], exempt.sessions[0].segments[0]), []);
 });
 
@@ -81,7 +81,7 @@ test("a failing review keeps the segment shut until something changes", () => {
 
 // A reviewer who looks and says no is not overruled by a glob.
 test("a failing verdict counts even where review was not required", () => {
-  const doc = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), verdict(4, "fail")]);
+  const doc = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
   assert.equal(sealBlockers(config, session, session.segments[0]).some((one) => one.includes("deed judge --overturn")), true);
@@ -124,13 +124,13 @@ test("the step it names is a command that carries its own name", () => {
 });
 
 test("signing waits for the judgement and for every open question", () => {
-  const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1")]);
+  const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
   assert.deepEqual(signBlockers(delivered, delivered.sessions[0], config), [
     "S01.1 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
   ]);
-  const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4), ask(5)]);
+  const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4), ask(5)]);
   assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）"]);
-  const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
+  const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4)]);
   assert.deepEqual(signBlockers(clean, clean.sessions[0], config), []);
 });
 

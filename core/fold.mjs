@@ -97,7 +97,10 @@ const rederive = (task) => {
   const paths = [];
   const sizes = {};
   for (const proof of task.evidence) {
-    for (const one of proof.changed ?? []) if (!paths.includes(one)) paths.push(one);
+    // 交付自己记下的文件也算碰过：手工 --digest 交付没有工作区差可量（changed 为空），
+    // 只认 changed 就会让门槛看不见它到底动了哪一份字节。
+    const touched = [...(proof.changed ?? []), ...(proof.files ?? []).map((one) => one.path)];
+    for (const one of touched) if (!paths.includes(one)) paths.push(one);
     Object.assign(sizes, proof.sizes ?? {});
   }
   task.changed = paths;

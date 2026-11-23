@@ -203,4 +203,22 @@ test("a rework takes back the paths the delivered work touched, not just the cla
   const config = { review: { required: ["core/**"], exempt: ["*.md"] } };
   assert.equal(needsReview(config, before.sessions[0], before.sessions[0].segments[0]), true, "碰过 .gitignore 的那一批要审");
   assert.equal(needsReview(config, after.sessions[0], after.sessions[0].segments[0]), false, "退回之后再交的只有 *.md，门槛不再判要审");
+  // 退回那一刻也得干净：不等下一次交付重算，被退回的那条交付碰过的路径当场就不再算。
+  const justReworked = fold([
+    turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"]),
+    { v: 3, at: T(4), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b.md", why: "不够", rework: ["T1"] },
+  ]);
+  assert.deepEqual(justReworked.sessions[0].tasks[0].changed, [], "退回当场，那批路径就不在任务上了");
+  assert.deepEqual(justReworked.sessions[0].tasks[0].sizes, {});
+});
+test("a delivery that only pins files still counts as touching them", () => {
+  const config = { review: { required: ["core/**"], exempt: ["*.md"] } };
+  const pinnedOnly = {
+    v: 3, at: T(3), k: "task.done", s: null, id: "T1", evidence: "重钉", by: "agent",
+    files: [{ path: "core/fold.mjs", digest: "a".repeat(64) }], changed: [],
+  };
+  const doc = fold([turn(1), add(2, "T1"), pinnedOnly]);
+  const task = doc.sessions[0].tasks[0];
+  assert.deepEqual(task.changed, ["core/fold.mjs"], "手工 --digest 交付没有工作区差，记下的文件就是它碰过的");
+  assert.equal(needsReview(config, doc.sessions[0], doc.sessions[0].segments[0]), true);
 });
