@@ -115,7 +115,9 @@ export function parse(text) {
 
 const bullet = (task) => {
   if (task.status === "dropped") return "~~ " + task.id + " " + task.title;
-  const box = task.status === "done" ? "[x]" : "[ ]";
+  // 判过的条目也算交过了：草稿把它们画成未勾选，下一次 submit 就会当成
+  // 「还没做」，或者让已经判过的一段重新被勾一遍。
+  const box = task.status === "done" || task.status === "accepted" ? "[x]" : "[ ]";
   return "- " + box + " " + task.id + " " + task.title;
 };
 

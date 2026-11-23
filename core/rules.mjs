@@ -282,6 +282,16 @@ export function signBlockers(doc, session, config = null) {
     else if (whole === "missing") blockers.push(`${session.id} 还没有整体审通过（deed review --all）`);
     else if (whole === "stale") blockers.push(`${session.id} 的整体审结论早于这一期最后一次改动（deed review --all）`);
   }
+  // 一整期的结论判了不合格，就是把这一期否掉了：签收前这件事得有人处理。
+  // 免审的期上也一样——一份已经落账的不合格，不能因为「门槛说不用审」就当
+  // 它没发生；那样面板上会同时出现一张不合格卡和一句「签收可行」。
+  const onWhole = sessionReview(session);
+  if (onWhole && onWhole.verdict === "fail")
+    blockers.push(
+      session.id +
+        " 有一次整体审判了不合格（" + onWhole.by + "）：要么重出一份通过的，要么由人推翻（deed judge --overturn " +
+        onWhole.id + ' --why "…" --by "…"）',
+    );
   // Work owed outside the open segment is what a segment-level view cannot see;
   // inside it, the segment's own blockers already say it.
   const open = openSegment(session);

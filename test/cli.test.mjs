@@ -1431,9 +1431,10 @@ test("one submit that delivers several entries says the changes belong to the ba
   assert.equal(landed.status, 0, landed.stderr);
   const dones = readEvents(cwd).filter((one) => one.k === "task.done");
   assert.equal(dones.length, 2);
-  assert.ok(dones[0].batch && dones[0].batch === dones[1].batch, "同一批里的两条交付记着同一个批号");
+  assert.ok(dones[0].batch && dones[0].batch.at === dones[1].batch.at, "同一批里的两条交付记着同一个批号");
   const done = readEvents(cwd).find((one) => one.k === "task.done");
-  assert.equal(typeof done.batch, "string", "批号是这一批的时刻，不是 true");
+  assert.equal(done.batch.size, 2, "这一批几条也记进账本，不是拿剩下的数现算");
+  assert.equal(typeof done.batch.at, "string", "批号是这一批的时刻，不是 true");
 
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
   const sheet = fs
@@ -1473,4 +1474,146 @@ test("a period with nothing to review is told it needs no whole conclusion", () 
   assert.equal(said.status, 0, said.stderr);
   assert.match(said.stdout, /不需要整期结论/, "先把话说在前面");
   assert.equal(deed(cwd, "state").stdout.includes("还没写目的"), false, "目的写着");
+});
+
+// 撤回同批的一条再重交：数目不能跟着剩下的条数变小，否则两条一批撤回一条
+// 就成了「这一批共 1 条」——那正是标准禁止的单条一批。
+test("taking one delivery back does not shrink the batch it belonged to", () => {
+  const cwd = workspace("plan-batchundo");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "一次交两条");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
+  writePlan(
+    cwd,
+    ["# 这一期要做成什么", "把两份说明写完。", "", "- ? 写 a", "  标准：docs/a.md 有一句话", "", "- ? 写 b", "  标准：docs/b.md 有一句话"].join("\n"),
+  );
+  assert.equal(deed(cwd, "submit").status, 0);
+  writePlan(
+    cwd,
+    readPlan(cwd)
+      .replace("- [ ] T1 写 a", "- [x] T1 写 a")
+      .replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写下 docs/a.md")
+      .replace("- [ ] T2 写 b", "- [x] T2 写 b")
+      .replace("  标准：docs/b.md 有一句话", "  标准：docs/b.md 有一句话\n  交付：写下 docs/b.md"),
+  );
+  assert.equal(deed(cwd, "submit").status, 0);
+  assert.equal(deed(cwd, "task", "undo", "T2", "--why", "这条说错了").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交 docs/b.md", "--digest", "docs/b.md").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const sheet = fs
+    .readdirSync(path.join(cwd, ".deed", "review"))
+    .filter((one) => one.endsWith(".md") && !one.endsWith("-reviewer.md"))
+    .at(-1);
+  const text = fs.readFileSync(path.join(cwd, ".deed", "review", sheet), "utf8");
+  assert.match(text, /同批交付：这一批共 2 条（其中 1 条已撤回）/, "撤回不改变这一批原本几条");
+});
+
+// 一轮记的是「这一轮这个人说了什么」：agent 把用户原话抄进 --said，账本上就会
+// 出现同一句由两个人说的样子。
+test("an agent turn cannot repeat the user's words as its own", () => {
+  const cwd = workspace("turn-copy");
+  deed(cwd, "init", "--said", "开始");
+  const said = "把清单做成一个文件";
+  assert.equal(deed(cwd, "tick", "--who", "user", "--said", said).status, 0);
+  const copied = deed(cwd, "tick", "--who", "agent", "--said", said, "--did", "动手");
+  assert.equal(copied.status, 1);
+  assert.match(copied.stderr, /这句是用户说的/);
+  assert.equal(kinds(cwd).filter((one) => one === "turn").length, 2, "被拒的那轮不落账");
+  assert.equal(deed(cwd, "tick", "--who", "agent", "--said", "先出草稿", "--did", "动手").status, 0);
+});
+
+// 一整期的结论判了不合格，免审的期上也一样：签收前得有人重出或推翻，
+// 不能因为「门槛说不用审」就当它没发生。
+test("a standing whole-period failure still blocks the signature", () => {
+  const cwd = workspace("whole-fail-sign");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
+  deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
+  deed(cwd, "goal", "把两份文档改完", "--by", "user");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
+  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
+  assert.equal(deed(cwd, "seal", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
+  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
+  deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
+  deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
+  assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
+  assert.equal(deed(cwd, "review", "--all").status, 0);
+  assert.equal(deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "文档写得不清楚").status, 0);
+  const signed = deed(cwd, "sign", "--words", "可以", "--by", "user");
+  assert.equal(signed.status, 1, "整期不合格还活着，签收要挡住");
+  assert.match(signed.stderr, /整体审判了不合格/);
+  assert.match(signed.stderr, /judge --overturn/);
+});
+
+// 「各段都免审」那句话排在检查之后：还有段没封的一期上说它，是假话。
+test("the exempt notice waits until the checks it talks about are through", () => {
+  const cwd = workspace("whole-notice-order");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
+  deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
+  deed(cwd, "goal", "把两份文档改完", "--by", "user");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
+  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
+  assert.equal(deed(cwd, "seal", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
+  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
+  deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
+  deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
+  const early = deed(cwd, "review", "--all");
+  assert.equal(early.status, 1);
+  assert.match(early.stderr, /还有段没封/);
+  assert.equal(early.stdout.includes("不需要整期结论"), false, "段没封的一期上不该说各段都免审");
+});
+
+// 一次 submit 不能既新增又交付同一条：任务得在交付之前落账。
+test("an entry that is new cannot be ticked in the same submit", () => {
+  const cwd = workspace("plan-newtick");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "写一条");
+  writePlan(cwd, ["# 这一期要做成什么", "写一句话。", "", "- [x] ? 写一句话", "  标准：docs/a.md 有一句话", "  交付：写了"].join("\n"));
+  const landed = deed(cwd, "submit");
+  assert.equal(landed.status, 1);
+  assert.match(landed.stderr, /一次 submit 不能既新增又交付/);
+  assert.equal(kinds(cwd).filter((one) => one.startsWith("task.")).length, 0, "整批不落账");
+});
+
+// 草稿把判过的条目也画成勾上：否则下一次 submit 会当成还没做。
+test("the draft keeps judged entries ticked", () => {
+  const cwd = workspace("plan-draft-accepted");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "写一条");
+  writePlan(cwd, ["# 这一期要做成什么", "写一句话。", "", "- ? 写一句话", "  标准：docs/a.md 有一句话"].join("\n"));
+  assert.equal(deed(cwd, "submit").status, 0);
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  writePlan(cwd, readPlan(cwd).replace("- [ ] T1 写一句话", "- [x] T1 写一句话").replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写下 docs/a.md"));
+  assert.equal(deed(cwd, "submit").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+  const draft = deed(cwd, "plan", "--force");
+  assert.equal(draft.status, 0, draft.stderr);
+  assert.match(readPlan(cwd), /- \[x\] T1 写一句话/, "判过的条目在草稿里还是勾上的");
+  const again = deed(cwd, "submit");
+  assert.equal(again.status, 1, "判过的条目不会再交一次");
+  assert.match(again.stderr, /没有要落的改动/);
+  assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 1);
+});
+
+// 先做后记：文件在任务被记下之前就写好了，那条任务记的是既成事实。
+// doctor 只报事实，不算坏账。
+test("doctor says when a promise came after the work", () => {
+  const cwd = workspace("promise-late");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(path.join(cwd, "docs.txt"), "x", "utf8");
+  const old = new Date(Date.now() - 3600 * 1000);
+  fs.utimesSync(path.join(cwd, "docs.txt"), old, old);
+  deed(cwd, "task", "add", "改 docs.txt", "--criteria", "docs.txt 有一句话", "--files", "docs.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "写下 docs.txt", "--digest", "docs.txt");
+  const doctor = deed(cwd, "doctor");
+  assert.equal(doctor.status, 0);
+  assert.match(doctor.stdout, /先做后记 1 条/);
+  assert.match(doctor.stdout, /T1 的 docs.txt/);
 });

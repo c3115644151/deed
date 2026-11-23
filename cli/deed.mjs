@@ -168,20 +168,65 @@ function transactMany(flags, buildAll, commit) {
     const at = stamp();
     const specs = buildAll(doc, flags);
     if (specs.length === 0) fail("清单里没有要落的改动：改了哪一条再来一次");
+    // 一批里的交付共用一次工作区差：进来的 batch: true 在这里换成这一批的时刻与条数。
+    // 条数写进账本，撤回同批的一条之后清单仍说得出原本几条；只记时刻的话，
+    // 剩下的条数会当成原来的数目，两条一批撤回一条就成了「单条的一批」。
+    // 换要在校验之前：before: true 不是账本里的形状，校验只看得到最终的 { at, size }。
+    const marked = specs.filter((one) => one.batch === true);
+    if (marked.length > 0) {
+      const batch = { at, size: marked.length };
+      for (const one of marked) one.batch = batch;
+    }
     const stamped = specs.map((spec) => {
       const one = validateEvent(spec, at);
       one.w = currentVersion() || undefined;
       return one;
     });
-    // 一批里的交付共用一次工作区差：进来的 batch: true 在这里换成这一批的时刻，
-    // 读的人据此认出「这几条说的是同一份改动」，而不是每条各钉了各的。
-    const batchAt = stamped.find((one) => one.batch === true)?.at;
-    for (const one of stamped) if (one.batch === true) one.batch = batchAt;
     const after = fold([...events, ...stamped]);
     appendMany(ROOT, stamped);
     if (commit) commit(stamped, after);
     return { doc: after, evs: stamped };
   });
+}
+
+// 「先做后记」：一条交付记下的文件，如果它最后一次写入的时刻早于这条任务
+// 被写进账本的时刻，那这条任务是追认已经做完的事，不是先答应再做。账本里的时刻
+// 改不了；这里拿文件的写入时刻对一次，只报事实——不是坏账，是账本和事实对不上。
+function lateWork(root, doc) {
+  const git = (args) => {
+    const one = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    return one.status === 0 ? one.stdout.trim() : null;
+  };
+  const seen = new Map();
+  // 比的是文件的最后写入时刻：提交时刻总在任务被记下之后（先写、再记、再提交），
+  // 拿它来比永远看不出这件事。代价是 clone 出来的工作副本 mtime 全是检出时刻，
+  // 这条检查在那种副本上不报——报不出来的方向是安静，不是诬告。
+  const when = (file) => {
+    if (!seen.has(file)) {
+      try {
+        seen.set(file, fs.statSync(path.resolve(root, file)).mtimeMs);
+      } catch {
+        seen.set(file, null);
+      }
+    }
+    return seen.get(file);
+  };
+  const late = [];
+  for (const session of doc.sessions) {
+    for (const task of session.tasks) {
+      const last = task.evidence[task.evidence.length - 1];
+      if (!last) continue;
+      const recorded = Date.parse(task.createdAt);
+      if (!Number.isFinite(recorded)) continue;
+      for (const pin of last.files ?? []) {
+        const written = when(pin.path);
+        if (written === null || written >= recorded) continue;
+        late.push({ id: task.id, path: pin.path, written, recorded });
+        break;
+      }
+    }
+  }
+  return late;
 }
 
 const session = (doc) => {
@@ -499,7 +544,19 @@ const commands = {
     const said = flags.said ?? words.join(" ");
     if (!said) fail("tick 要说清这一轮说了什么：deed tick --who user --said \"…\"");
     guard(() => {
-      const { doc, ev } = transact(flags, () => ({ k: "turn", s: flags.session ?? null, who: flags.who ?? "agent", said, did: flags.did }));
+      const { doc, ev } = transact(flags, (doc0) => {
+        const who = flags.who ?? "agent";
+        // 一轮记的是「这一轮这个人说了什么」。agent 把用户原话抄进 --said，
+        // 账本上就成了同一句由两个人说过——那句话只属于说它的人，抄一遍
+        // 会让读的人以为重复了一轮。
+        if (who === "agent") {
+          const one = flags.session ? doc0.sessions.find((s) => s.id === flags.session) : doc0.sessions[doc0.sessions.length - 1];
+          const lastUser = one?.turns.filter((turn) => turn.who === "user").at(-1);
+          if (lastUser && lastUser.said.trim() === said.trim())
+            fail("这句是用户说的（" + lastUser.at + " 那一轮已经记下）：--said 写你自己这一轮说的话");
+        }
+        return { k: "turn", s: flags.session ?? null, who, said, did: flags.did };
+      });
       const one = sessionById(doc, ev.s ?? doc.sessions[doc.sessions.length - 1].id);
       console.log("已记一轮 · 会话 " + one.id + " · 第 " + one.turns.length + " 轮" + (ev.did ? " · 做了：" + ev.did : ""));
     });
@@ -678,10 +735,6 @@ const commands = {
           fail(
             "这一期只有一段：" + one.segments[0].id + " 的审查就是这一期的审查（deed review --segment " + one.segments[0].id + "）",
           );
-        // 门槛说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
-        // 免得账本上留下一条看着像「这一期被整体审过」的结论。
-        if (!needsWhole(doc.config, one))
-          console.log("这一期的各段都免审（门槛说不用审，段是 deed seal 封的）：不需要整期结论——要出一份也行，签收不看它");
         const goal = goalOf(one);
         if (!flags.verdict) {
           if (!goal) fail('这一期还没写目的：先说清这一期要做成什么（deed goal "…"），整体审才有尺子');
@@ -691,6 +744,11 @@ const commands = {
           const pending = one.tasks.filter((task) => task.status === "todo");
           if (pending.length > 0)
             fail("这一期还有没交付的（" + pending.map((task) => task.id).join("、") + "）：整体审的材料等交付完再发");
+          // 门槛说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
+          // 免得账本上留下一条看着像「这一期被整体审过」的结论。这句话排在检查
+          // 之后：还有段没封的期上说「各段都免审」是假话。
+          if (!needsWhole(doc.config, one))
+            console.log("这一期的各段都免审（门槛说不用审，段是 deed seal 封的）：不需要整期结论——要出一份也行，签收不看它");
           const last = one.briefs.filter((b) => b.scope === "session").at(-1) ?? null;
           const answered = last && one.reviews.some((rv) => rv.scope === "session" && rv.brief === last.brief);
           if (last && !answered) {
@@ -971,6 +1029,10 @@ const commands = {
               mentioned.add(id);
               continue;
             }
+            if (item.box === "x" && !item.id)
+              fail(
+                "第 " + item.at + " 行勾上了却没有编号：一次 submit 不能既新增又交付——先把条目写成任务，做完再勾上交",
+              );
             const task = known.get(item.id);
             if (!task) fail("第 " + item.at + " 行的 " + item.id + " 账本里没有：新条目写成 - ? 标题，submit 时领号");
             mentioned.add(item.id);
@@ -985,7 +1047,9 @@ const commands = {
               continue;
             }
             if (item.box === "x") {
-              if (task.status === "done") continue;
+              // 判过（accepted）的条目在清单里也是勾着的：它已经交过、也有人判过，
+              // 再交一次既没有意义，也会撞上「封了的段不能再改」。
+              if (task.status === "done" || task.status === "accepted") continue;
               if (task.status === "dropped") fail(item.id + " 已经放弃过：要接着做就新开一条");
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
               specs.push({
@@ -1269,6 +1333,12 @@ const commands = {
         const { doc } = load();
         const stale = staleEvidence(ROOT, doc);
         if (stale.length > 0) console.log("  交付记录过期 " + stale.length + " 处（不算坏账）：" + stale.map((s) => s.id).join("、"));
+        const late = lateWork(ROOT, doc);
+        if (late && late.length > 0)
+          console.log(
+            "  先做后记 " + late.length + " 条（不算坏账）：" +
+              late.map((one) => one.id + " 的 " + one.path + " 最后写于 " + stamp0(one.written) + "，这条任务记于 " + stamp0(one.recorded)).join("；"),
+          );
         const briefs = auditBriefs(ROOT, doc);
         const loose = briefTrouble(briefs);
         const words = wordsNotice(ROOT);

@@ -189,7 +189,11 @@ export function fold(events) {
           changed: ev.changed ?? [],
           // 一批 submit 落了好几条交付时，工作区只量了一次差：改动的归属是整批，
           // 不是其中某一条。账本把这件事写下来，读的人就不会以为每条各钉了各的。
-          batch: ev.batch ?? null,
+          batch: ev.batch
+            ? typeof ev.batch === "string"
+              ? { at: ev.batch, size: null }
+              : { at: ev.batch.at ?? null, size: ev.batch.size ?? null }
+            : null,
         });
         // What the delivery actually moved in the workspace, computed before the
         // event landed. The review threshold reads this, not the task's own story
@@ -209,7 +213,8 @@ export function fold(events) {
         const last = task.evidence[task.evidence.length - 1];
         if (!last) noway("任务 " + task.id + " 没有可撤回的交付");
         task.evidence.pop();
-        task.undone.push({ claim: last.claim, why: ev.why, by: ev.by ?? "agent", at: ev.at });
+        // 撤回的那条还带着它的批号：剩下同批的那条，数目不能因为撤回而变小。
+        task.undone.push({ claim: last.claim, why: ev.why, by: ev.by ?? "agent", at: ev.at, batch: last.batch ?? null });
         for (const one of last.changed ?? []) {
           const spot = task.changed.indexOf(one);
           if (spot >= 0) task.changed.splice(spot, 1);

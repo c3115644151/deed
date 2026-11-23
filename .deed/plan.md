@@ -12,4 +12,39 @@
   标准：seal 不带 --by 的报错说「没有写名字」；一期各段全免审时不需要整期结论；docs 测试同时守 README 与 AGENTS.md 的粘块并扫禁词
   交付：node --test test/docs.test.mjs 4/4（README 粘块、AGENTS.md 尾段、禁词表）；test/rules.test.mjs 的 a period whose segments all sat out review needs no conclusion on the period 通过
 
+## 段 S02.2
+- [x] T24 一批交付要说明改动属于整批
+  标准：同一批里的多条交付记同一个批号；清单说清这一批几条；单条一批不写批号
+  交付：批号改成 { at, size }：时刻是这一批落账的同一刻，size 是这一批原本几条（撤回同批一条后清单仍说得出「共 N 条（其中 M 条已撤回）」，不再拿剩下的条数现算）。核：node --test test/cli.test.mjs 86/86，含新用例 taking one delivery back does not shrink the batch it belonged to 与 one submit that delivers several entries says the changes belong to the batch（断言 batch.size === 2）
+- [x] T25 门槛说不用审的一期，出整体审材料前先说明不需要
+  标准：deed review --all 在一期各段都免审时先打印一句「不需要整期结论」，仍允许出一份
+  交付：deed review --all 在一期各段都免审（needsWhole 为假）时先打印「这一期的各段都免审……不需要整期结论」，仍允许出一份。核：新增用例 a period with nothing to review is told it needs no whole conclusion 通过；npm test 140/140
+- [x] T26 面板：没声明路径的条目不再印成没内容
+  标准：submit 建的条目 files 为空但交付记下了路径时，卡片说的是交付记下几个，不再写未声明路径；同批交付有标记
+  交付：面板：submit 建的条目 files 为空、但交付记下了路径时，卡片印「没声明路径 · 交付记下 N 个」；同批交付带「同批」标记。核：npm test 的 board 9/9 通过；7317 页面重开看过
+- [x] T27 批号要记下这一批几条，撤回后数目不变
+  标准：submit 落多条交付时事件里带这一批的条数；清单在撤回同批一条后仍说得出原本几条、几条已撤回；单条一批不写同批行
+  交付：task.done 的 batch 改记 { at, size }（core/events.mjs 校验 task.done 的 batch 必须是 at + 不少于 2 的 size；core/fold.mjs 把旧字符串批号归一成 { at, size: null }，task.undo 把批号带进 undone）；cli/brief.mjs 用 batchInfo 记账，撤回后仍说「这一批共 N 条（其中 M 条已撤回）」，单条一批不写这行。核：test/cli.test.mjs 86/86，含 plan-batchmark 与 plan-batchundo
+- [x] T28 整期结论判了不合格，签收也要挡住
+  标准：一期存在未作废的整体审不合格时 signBlockers 挡住签收并给出重出或推翻的命令；state 与面板说法一致
+  交付：signBlockers 增一条——一期若有一条未作废的整体审不合格，签收被挡，说明要重出一份通过的或由人推翻（给 judge --overturn 命令）。免审的一期也一样挡。核：新增用例 a standing whole-period failure still blocks the signature 通过
+- [x] T29 免审那句提示排到检查之后
+  标准：一期还有段没封或缺目的时 review --all 只报缺什么，不打印「各段都免审」；全免审且三项检查都过才打印
+  交付：deed review --all 的「各段都免审」提示挪到「目的／未封段／待交付」三项检查之后——先报缺什么，才说需不需要整期结论。核：新增用例 the exempt notice waits until the checks it talks about are through 通过（段没封时 exit 1 报「还有段没封」，且不打印那句）
+- [x] T30 tick 的 agent 轮不许抄用户原话
+  标准：tick --who agent 时 --said 与最近一条 user 轮的 --said 逐字相同就拒绝并说明该记什么；user 轮不受影响
+  交付：tick --who agent 时把 --said 与最近一条 user 轮逐字比，相同就拒并说明该写自己说的话；user 轮不受影响。核：新增用例 an agent turn cannot repeat the user's words as its own 通过（被拒的那轮不落账）
+~~ T31 doctor 用提交时刻查承诺晚于工作
+  标准：deed doctor 对每条现行交付钉的文件查最后一次提交时刻，早于该任务的承诺时刻就列出来（只报事实，不算坏账）；没有 git 的目录跳过不报错
+  理由：提交时刻总在任务被记下之后，拿它比永远看不出「先做后记」；改成按文件最后写入时刻查，另立一条
+- [x] T32 同一批 submit 不许既新增又交付
+  标准：一次 submit 里同一条既 ? 又勾上交时整批拒，说明先落承诺再做；分两批则通过
+  交付：submit 见到「新条目（?）与勾上（[x]）同一次」就整批拒，说明先把条目写成任务、做完再勾；整批零写入。核：新增用例 an entry that is new cannot be ticked in the same submit 通过
+- [x] T33 清单把已判过的条目画成未勾选
+  标准：deed plan 重出的草稿里已封段中判过的条目保持勾上；再 submit 不会给已判过的条目重复落交付
+  交付：cli/plan.mjs 的草稿把 done 与 accepted 都画成 [x]，判过的条目不再显示成未勾。核：新增用例 the draft keeps judged entries ticked 通过
+- [x] T34 doctor 按文件最后写入时刻查「先做后记」
+  标准：deed doctor 对每条现行交付钉的文件查最后一次写入时刻，早于那条任务被记下的时刻就列出来（只报事实，不算坏账）；没有 git 的目录跳过不报错；clone 出来的工作副本 mtime 全是检出时刻，安静不报
+  交付：deed doctor 新增「先做后记 N 条（不算坏账）：T1 的 path 最后写于 …，这条任务记于 …」，比的是文件 mtime 与 task.createdAt；只在 git 工作区里跑（rev-parse --is-inside-work-tree）。本仓库实跑报 6 条（T7 lib/version.mjs、T21/T22/T23 cli/audit.mjs、T25 test/cli.test.mjs、T26 board/render.mjs）——正是「先做后补」留下的痕迹。核：新增用例 doctor says when a promise came after the work 通过
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

@@ -31,7 +31,7 @@ export const WHO = ["user", "agent"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 6;
+export const EVENT_VERSION = 7;
 
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
 // core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、
@@ -89,6 +89,15 @@ export function validateEvent(ev, at) {
           throw new Error("task.done 的 bytes 要是 {路径: 字节数}");
         for (const [file, size] of Object.entries(ev.bytes))
           if (!Number.isFinite(size) || size < 0) throw new Error("task.done 的 bytes 里 " + file + " 不是字节数");
+      }
+      // 一批交付记的是这一批的时刻与几条：条数写进账本，撤回同批的一条之后
+      // 清单仍说得出原本几条，而不是拿剩下的数现算。
+      if (ev.batch !== undefined) {
+        const one = ev.batch;
+        if (!one || typeof one !== "object" || Array.isArray(one))
+          throw new Error("task.done 的 batch 要是 {at, size}");
+        if (typeof one.at !== "string" || !Number.isInteger(one.size) || one.size < 2)
+          throw new Error("task.done 的 batch 要有 at 与不少于 2 的 size");
       }
       if (ev.files !== undefined) {
         if (!Array.isArray(ev.files)) throw new Error("task.done 的 files 要是 {path, digest} 数组");

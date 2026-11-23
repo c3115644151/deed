@@ -74,11 +74,39 @@ function guideText(subject, target, briefName) {
 // 一条任务在清单上的样子：段审和整体审共用，两种材料说的应该是同一件事。
 // 一批 submit 里的几条交付共用一份工作区差，分不出哪条改了哪份。数出来说清楚，
 // 比让读的人自己发现「三份记录一模一样」好。
-function batchCount(tasks) {
+// 批号说的是「这一批落账那一刻」；条数由落账时的账本记下。撤回同批的一条之后
+// 数目还是原来的那个：剩下的条数做分母的话，2 条一批撤回一条就成了「单条的一批」。
+function batchInfo(tasks) {
   const seen = new Map();
-  for (const task of tasks)
-    for (const proof of task.evidence) if (proof.batch) seen.set(proof.batch, (seen.get(proof.batch) ?? 0) + 1);
+  const book = (key) => {
+    if (!seen.has(key)) seen.set(key, { size: 0, live: 0, undone: 0 });
+    return seen.get(key);
+  };
+  for (const task of tasks) {
+    for (const proof of task.evidence) {
+      if (!proof.batch) continue;
+      const one = book(proof.batch.at);
+      one.live += 1;
+      if (proof.batch.size) one.size = Math.max(one.size, proof.batch.size);
+    }
+    for (const gone of task.undone ?? []) {
+      if (!gone.batch) continue;
+      const one = book(gone.batch.at);
+      one.undone += 1;
+      if (gone.batch.size) one.size = Math.max(one.size, gone.batch.size);
+    }
+  }
+  for (const one of seen.values()) one.size = Math.max(one.size, one.live + one.undone);
   return seen;
+}
+
+function batchLine(one) {
+  if (!one || (one.size < 2 && one.undone === 0)) return "";
+  return (
+    "\n  - 同批交付：这一批共 " + one.size + " 条" +
+    (one.undone > 0 ? "（其中 " + one.undone + " 条已撤回）" : "") +
+    "，改动记在每一条上（一次 submit 只量一次差）"
+  );
 }
 
 function taskBlock(task, batches = new Map()) {
@@ -93,9 +121,7 @@ function taskBlock(task, batches = new Map()) {
       return (
         "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
         (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")) +
-        (proof.batch
-          ? "\n  - 同批交付：这一批共 " + (batches.get(proof.batch) ?? 1) + " 条，改动记在每一条上（一次 submit 只量一次差）"
-          : "")
+        (proof.batch ? batchLine(batches.get(proof.batch.at)) : "")
       );
     }),
     ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计入"),
@@ -113,7 +139,7 @@ export function planBrief(root, open, segment, at) {
     "",
     "## 要审的任务",
     "",
-    ...tasks.flatMap((task) => taskBlock(task, batchCount(tasks))),
+    ...tasks.flatMap((task) => taskBlock(task, batchInfo(tasks))),
     "## 怎么审",
     "",
     "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
@@ -168,7 +194,7 @@ export function planWhole(root, session, at) {
             ? (review.verdict === "pass" ? "段审通过" : "段审不合格") + "（" + review.by + " · " + stamp0(review.at) + "）"
             : "没有段审"),
         "",
-        ...tasksIn(session, segment).flatMap((task) => taskBlock(task, batchCount(session.tasks))),
+        ...tasksIn(session, segment).flatMap((task) => taskBlock(task, batchInfo(session.tasks))),
       ];
     }),
     "## 怎么审",
