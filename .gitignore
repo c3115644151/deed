@@ -24,3 +24,5 @@ node_modules/
 /docs/deed-architecture.finalize.json
 /docs/deed-architecture.finalize-summary.json
 /docs/deed-architecture.browser-check.json
+# 临时拼装文件（压缩摘要的中间稿），不是仓库内容
+/_c.txt
