@@ -173,4 +173,15 @@
   标准：整期材料只列每段的结论（谁、何时、判定、发现、退回的段），不重列段里的条目；整体审的 --rework 只认段号，被点名的段整段重开，段里的条目保持交付；DESIGN §12.6 与 HELP 说同一件事；node --test 全绿
   交付：整期材料改成每段一行（谁判的、什么时候、判定、几条发现、退回的段）+ 各段发现 + 延后/放弃/待裁，段里的条目不重列；整体审的 --rework 只认段号，被点名的段整段重开、旧结论留史作废、条目保持交付，点条目在 core/fold.mjs 就被拒；这条规则落在事件含义第 9 版，旧行照旧读；DESIGN §12.6 与 §8、HELP 两行、HANDOFF 同口径。跑的是这一份字节：node --test 169/169（96 CLI），docs 4/4；变异四处各自红并还原。
 
+## 段 S02.18
+- [x] T67 命令面一动词一个文件，开关只留一张表：拼错的开关被拒
+  标准：cli/verbs/ 里每个动词一个文件；cli/spec.mjs 是唯一那张表，解析与 --help 都从它出；不认的开关 exit 1 并猜最接近的一个；全量测试全绿
+  交付：node --test 170/170（97 条来自 CLI，其余 73 条）；拼错的开关当场被拒：deed task done T1 --evidence x --digset a.md → exit 1「deed task 不认 --digset 这个开关：是不是 --digest？」；review --help 只打自己那几行
+- [x] T68 事件含义变成一张表，写盘时带 v：没带 v 的旧行按第 1 版读
+  标准：MEANING 与 meaningOf 在 core/events.mjs；写盘方显式带 v；doctor 逐行检查仍按每行自己的版本；有用例钉住旧行按旧标准读
+  交付：node --test 170/170；test/version.test.mjs 5/5（旧行按旧标准读、含义超前说「升级」）；deed doctor 逐行检查按每行自己的版本，账本 exit 0
+- [x] T69 删掉迁移壳、按名字落账、把自造词换掉
+  标准：judge 只剩 --overturn，--pass/--rework 不认；ask resolve/withdraw 走 signer；仓库与文档里不再有「材料」这个绰号（「过程材料」除外）
+  交付：node --test 170/170；deed judge --pass → exit 1（judge 不认 --pass）；deed ask resolve … 从管道里跑缺 --by 被拒；全仓 grep「材料」只剩「过程材料」三处（AGENTS、docs/README、docs/research）
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

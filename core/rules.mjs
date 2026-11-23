@@ -35,7 +35,7 @@ const globToRegExp = (glob) => {
   return new RegExp(`^${anchored}$`);
 };
 
-export function matchesAny(files, globs) {
+function matchesAny(files, globs) {
   const patterns = (globs ?? []).map(globToRegExp);
   return (files ?? []).some((file) => patterns.some((one) => one.test(clean(file))));
 }
@@ -103,7 +103,7 @@ const task_size = (sizes, file) => {
   return Number.isFinite(value) ? value : 0;
 };
 
-export function sizeOf(tasks, sizes = {}) {
+function sizeOf(tasks, sizes = {}) {
   const files = [...new Set(tasks.flatMap((task) => [...(task.files ?? []), ...(task.changed ?? [])]))];
   const bytes = files.reduce((sum, file) => sum + (task_size(sizes, file) ?? 0), 0);
   const unknown = files.filter((file) => !Number.isFinite(sizes?.[file])).length;
@@ -179,9 +179,9 @@ export const lastSegmentChange = (session, segment) => {
 export const lastBrief = (session, segmentId) =>
   session.briefs.filter((one) => one.segment === segmentId).at(-1) ?? null;
 
-// 手上那份材料还新鲜吗：发出去之后这一段没有再动过，也还没有人回答。
+// 手上那份清单还新鲜吗：发出去之后这一段没有再动过，也还没有人回答。
 // 新鲜的、没人回答的那份，下一步是落结论——再发一份只会让审查者去读旧纸。
-export const freshBrief = (session, segment) => {
+const freshBrief = (session, segment) => {
   const handed = lastBrief(session, segment.id);
   if (!handed) return null;
   if (session.reviews.some((one) => one.scope !== "session" && one.brief === handed.brief)) return null;
@@ -190,7 +190,7 @@ export const freshBrief = (session, segment) => {
   return handed;
 };
 
-// 整期材料同理：整期的结论早于最后一次改动，但材料是改动之后发的，那就落结论。
+// 整期清单同理：整期的结论早于最后一次改动，但清单是改动之后发的，那就落结论。
 export const freshWholeBrief = (session) => {
   const handed = session.briefs.filter((one) => one.scope === "session").at(-1) ?? null;
   if (!handed) return null;
@@ -212,7 +212,7 @@ export const sessionReview = (session) => {
 
 // 整期最后一次改动：任何一条任务的交付、撤回、增改。
 // 整体审的结论早于它，回答的就是旧的一期。
-// 那句目的只在多段的一期算改动：一段的一期没有整期材料，目的不进任何人的尺子，
+// 那句目的只在多段的一期算改动：一段的一期没有整期清单，目的不进任何人的尺子，
 // 拿它去让段结论过期等于凭空要一次重审。
 export const periodChange = (session) => {
   if (!session) return null;
@@ -247,7 +247,7 @@ export function wholeState(session) {
 // 这一期需不需要一次单独的整体审：一段的一期不需要——它的段审就是整期审。
 // 多段的一期，只要有一段是审查者看过的（或者还开着、按门槛要审），签收前就得
 // 再有一份落在整期上的结论；全都由 deed seal 封的多段期不要——没人需要看的东西
-// 不必再造一份材料。判断只看两件事：这一段有没有结论、还开着的段门槛怎么判。
+// 不必再造一份清单。判断只看两件事：这一段有没有结论、还开着的段门槛怎么判。
 // 不拿已封存段的后来字节重量去重算：那会把「审过了」重新变成「该审而没审」，
 // 也会让封过的免审段翻回要审（上一轮修的就是这一条）。
 export const needsWhole = (config, session) => {
@@ -257,7 +257,7 @@ export const needsWhole = (config, session) => {
   return session.segments.some((one) => read(one) || owed(one));
 };
 
-export const staleReview = (session, segment) => {
+const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
   const last = lastSegmentChange(session, segment);
   return Boolean(review && last && review.at < last);
@@ -304,7 +304,7 @@ export function reading(doc) {
 // A verdict that was voided by a rework is not a missing verdict: somebody
 // looked and the work came back. Saying "no verdict yet" would invite a judge
 // who has not seen anything to seal the segment.
-export const voidedReview = (session, segment) => {
+const voidedReview = (session, segment) => {
   const ever = session.reviews.filter((one) => one.segment === segment?.id);
   return ever.length > 0 && ever.every((one) => one.voidedAt !== null);
 };
@@ -380,7 +380,7 @@ export const pressure = (session) => {
   return { segment: segment.id, tasks: count.total, undecided: count.done };
 };
 
-// 整期审这一步：缺目的先说目的，材料已交出去就落结论，否则发材料。
+// 整期审这一步：缺目的先说目的，清单已交出去就落结论，否则发清单。
 function wholeStep(session, whole) {
   const handed = freshWholeBrief(session);
   if (whole === "nogoal")
@@ -394,7 +394,7 @@ function wholeStep(session, whole) {
     return {
       who: "reviewer",
       what: "落结论",
-      text: `整体审的材料已经交出去了：${handed.brief}（这一期 ${session.tasks.length} 条）`,
+      text: `整体审的清单已经交出去了：${handed.brief}（这一期 ${session.tasks.length} 条）`,
       command: `deed review --all --by "你是谁" --verdict pass`,
     };
   return {
@@ -459,13 +459,13 @@ export function nextAction(doc, config) {
   }
   const state = reviewState(config, session, segment);
   if (state === "stale") {
-    // 结论旧了要重审，但重审的材料可能已经在手上：那一步是落结论，不是再发一份。
+    // 结论旧了要重审，但重审的清单可能已经在手上：那一步是落结论，不是再发一份。
     const fresh = freshBrief(session, segment);
     if (fresh)
       return {
         who: "reviewer",
         what: "落结论",
-        text: `${segment.id} 的结论早于最后一次交付，新的一份材料已经交出去了：${fresh.brief}`,
+        text: `${segment.id} 的结论早于最后一次交付，新的一份清单已经交出去了：${fresh.brief}`,
         command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
       };
     return {
@@ -529,13 +529,13 @@ export function nextAction(doc, config) {
         command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
       };
     }
-    // 手上那份清单是审查者的活：材料发出去、还没人回答，下一步是落结论，不是再发一份。
+    // 手上那份清单是审查者的活：清单发出去、还没人回答，下一步是落结论，不是再发一份。
     const handed = freshBrief(session, segment);
     if (handed)
       return {
         who: "reviewer",
         what: "落结论",
-        text: `${segment.id} 的不合格（${review.by}）还在案；新的一份材料已经交出去了：${handed.brief}`,
+        text: `${segment.id} 的不合格（${review.by}）还在案；新的一份清单已经交出去了：${handed.brief}`,
         command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
       };
     // 旧账本里有点名之前写下的不合格：没有可结清的条目，只能由人推翻。

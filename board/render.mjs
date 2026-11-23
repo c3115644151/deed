@@ -385,7 +385,7 @@ function acceptScreen(doc, session, config, zone, on) {
       '<span class="vmeta">' + esc(wholeReview.by) + " · " + when(wholeReview.at, zone) + "</span>" +
       '<span class="vcount">' + tasks.length + " 条 · " + (wholeReview.findings.length ? "点了 " + wholeReview.findings.length + " 条" : "没有发现") + "</span>" +
       "</div>" +
-      '<p class="vbrief"><span class="k">材料</span>' + esc(String(wholeReview.brief).split(/[\\/]/).pop()) +
+      '<p class="vbrief"><span class="k">清单</span>' + esc(String(wholeReview.brief).split(/[\\/]/).pop()) +
       (wholeReview.rework && wholeReview.rework.length ? '　<span class="k">退回</span>' + esc(wholeReview.rework.join("、")) : "") + "</p>" +
       (wholeReview.findings.length ? '<div class="fds">' + findingList(wholeReview.findings) + "</div>" : "") +
       "</article>"

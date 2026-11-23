@@ -54,7 +54,7 @@ deed("review", "--segment", "S02.2");
 deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "pass");
 
 deed("ask", "示例账本要不要跟着示例一起提交？", "--reading", "一起提交：它是看得见的事实", "--why", "看不见的账本等于没有");
-deed("ask", "resolve", "A1", "--decision", "一起提交，账本随仓库走");
+deed("ask", "resolve", "A1", "--decision", "一起提交，账本随仓库走", "--by", "user");
 
 // 第三段：一条延后、一条没交付，段开着——示意「下一步」怎么指人。
 deed("task", "add", "给面板加跨会话历史", "--criteria", "能翻看已签收那一期的全部轮次", "--files", ".deed/config.json");

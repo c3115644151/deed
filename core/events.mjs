@@ -33,6 +33,18 @@ export const WHO = ["user", "agent"];
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
 export const EVENT_VERSION = 9;
 
+// 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
+// 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
+export const MEANING = {
+  // 不合格必须点名要重做的条目；pass 当场封段（打回不再是另一条命令）。
+  namedFail: 3,
+  // 整期审打回时点名的是段号，不是段里的条目。
+  segmentRework: 9,
+};
+
+// 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
+export const meaningOf = (ev) => ev.v ?? 1;
+
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
 // core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、
 // 写者版本、这一行自己的含义版本，由 CLI 层去比大小、去说人话。
@@ -62,6 +74,10 @@ export function validateEvent(ev, at) {
     throw new Error(`时间不是 ISO 时刻：${ev.at}`);
   // v 放在最后，调用方改不了：一行说的是哪一套含义，由写它的程序决定。
   const stamped = { at: ev.at ?? at, ...ev, v: EVENT_VERSION };
+  // 校验按"这一行自己说的那一版"来。没带 v 的行写在版本字段之前（第 1 版），
+  // 要按当时的标准读；写入方显式带 v（transact 会带上当前版本），才按当前版校验。
+  // 反过来做——拿今天的版本去核旧行——补一个字段就把历史里合法的行全判成坏账。
+  const meaning = ev.v ?? 1;
   switch (ev.k) {
     case "turn":
       need(ev, "who");
@@ -146,7 +162,7 @@ export function validateEvent(ev, at) {
     // Handing the brief out is a fact, not a side effect: without it the
     // ledger cannot say which document a verdict answered.
     case "review.brief":
-      // 整体审的材料覆盖整期，没有"段"这一格；段审的必须有。
+      // 整体审的清单覆盖整期，没有"段"这一格；段审的必须有。
       if (ev.scope === "session") need(ev, "goal");
       else need(ev, "segment");
       need(ev, "brief");
@@ -175,7 +191,7 @@ export function validateEvent(ev, at) {
       // 只说"不合格"而不点名，接到这条记录的人还得回来猜。
       // 第 3 版才并进来（打回不再是另一条命令），所以只查从这一版起写的行：
       // 账本只追加，历史行按它自己那一版的标准读，不回头补字段。
-      if (ev.verdict === "fail" && (ev.v ?? 1) >= 3) {
+      if (ev.verdict === "fail" && meaning >= MEANING.namedFail) {
         need(ev, "why");
         if (!Array.isArray(ev.rework) || ev.rework.length === 0)
           throw new Error("review.log 的 fail 要点名要重做的条目（--rework T1,T2）");

@@ -33,9 +33,12 @@ const proof = (cwd, name = "proof.txt") => {
 
 test("init binds the workspace and records the first turn", () => {
   const cwd = workspace("init");
-  assert.equal(deed(cwd, "init", "--said", "开始").status, 0);
+  const first = deed(cwd, "init", "--said", "开始");
+  assert.equal(first.status, 0);
   const config = JSON.parse(fs.readFileSync(path.join(cwd, ".deed", "config.json"), "utf8"));
-  assert.ok(config.review.required.includes("core/**"));
+  // 门槛不替工作区猜目录：空着的意思就是"任何改动都要审"，要免审由工作区自己声明。
+  assert.deepEqual(config.review, { required: [], exempt: [] });
+  assert.match(first.stdout, /门槛是空的：任何改动都要审/);
   assert.deepEqual(kinds(cwd), ["config.change", "config.change", "config.change", "turn"], "门槛的基线也落在账本里");
 });
 
@@ -144,11 +147,11 @@ test("a whole review reads the period, and its pass seals what it read", () => {
   assert.match(deed(cwd, "state").stdout, /deed review --all/, "段都封了，下一步是整期一句");
   const handed = deed(cwd, "review", "--all");
   assert.equal(handed.status, 0, handed.stderr);
-  assert.match(handed.stdout, /整体审材料/);
+  assert.match(handed.stdout, /整期清单/);
   const pair = briefs(cwd).filter((one) => one.includes("-all-"));
-  assert.equal(pair.length, 2, "整期材料也是清单加角色包");
+  assert.equal(pair.length, 2, "整期清单也是清单加角色包");
   const sheet = fs.readFileSync(path.join(cwd, ".deed", "review", pair.find((one) => !one.includes("-reviewer"))), "utf8");
-  assert.match(sheet, /## 各段的结论/, "整期材料列的是各段的结论");
+  assert.match(sheet, /## 各段的结论/, "整期清单列的是各段的结论");
   assert.match(sheet, /- S01\.1 · 段审通过 · qa · \d\d-\d\d \d\d:\d\d · 1 条/, "每一段一行：谁判的、什么时候、什么结论");
   assert.doesNotMatch(sheet, /### T\d/, "段里的条目不再重列：那一段的审查者已经判过");
   assert.match(sheet, /--rework S02\.3|--rework S0x\.N/, "打回点名的是段");
@@ -209,7 +212,7 @@ test("a period with one segment has one verdict, and --all does not ask for a se
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
   assert.match(state.stdout, /下一步 · user · 签收/, "段放行之后只剩一句话");
-  assert.doesNotMatch(state.stdout, /deed review --all/, "不能又叫一份整期材料");
+  assert.doesNotMatch(state.stdout, /deed review --all/, "不能又叫一份整期清单");
   assert.doesNotMatch(state.stdout, /deed goal/, "一段的一期不要额外的目的");
   assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 0);
 });
@@ -297,7 +300,7 @@ test("a brief that was edited after handing out cannot be answered", () => {
   assert.equal(briefs(cwd).length, 4, "上一对已经过期，另出一对");
   const fresh = readEvents(cwd).filter((one) => one.k === "review.brief").at(-1);
   assert.notEqual(fresh.brief, ".deed/review/" + name);
-  // 角色包被换掉（"怎么审"被改成"随便过"）同样是一份没人读过的材料。
+  // 角色包被换掉（"怎么审"被改成"随便过"）同样是一份没人读过的清单。
   fs.appendFileSync(path.join(cwd, fresh.guide), "\n看两眼就行。\n");
   const packed = deed(cwd, "review", "--by", "qa", "--verdict", "pass");
   assert.equal(packed.status, 1, "角色包也是审的那一份");
@@ -345,7 +348,7 @@ test("verify names the brief nobody handed out and the file nobody claims", () =
 
 test("signing needs a judgement and the user own words", () => {
   const cwd = workspace("sign");
-  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 1, "什么都没交付不能签收");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
@@ -362,7 +365,7 @@ test("signing needs a judgement and the user own words", () => {
 // 判决、签收一条龙之后，记录上写着是用户按的。名字现在必须由写者给。
 test("a piped seal or signing names the hand that typed it", () => {
   const cwd = workspace("name-it");
-  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   const unnamed = deed(cwd, "seal", "--why", "只改了文档");
@@ -401,7 +404,7 @@ test("a turn cannot record a did it never wrote", () => {
 // The slip the review found: an action that fold refuses must leave nothing behind.
 test("a refused action never reaches the ledger, and the workspace keeps working", () => {
   const cwd = workspace("refused");
-  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "一次");
   const before = readEvents(cwd).length;
@@ -421,7 +424,7 @@ test("a refused action never reaches the ledger, and the workspace keeps working
 
 test("a closed period cannot be written into, and no verb invents a new one", () => {
   const cwd = workspace("closed");
-  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
@@ -1840,4 +1843,23 @@ test("removing a file in a submit is not a small change either", () => {
   const done = readEvents(cwd).filter((one) => one.k === "task.done" && one.id === "T2").at(-1);
   assert.deepEqual(done.bytes, {}, "删掉的路径不记 0，记空");
   assert.doesNotMatch(deed(cwd, "state").stdout, /免审（全部落在 exempt）/u, "删掉一万五千字节，不再算小改动");
+});
+
+// 默认门槛是空的：deed 不知道别的项目把代码放在哪。替所有工作区写下一串必审目录，
+// 没写进去的目录就会悄悄免审——外部工作区看不见这条规则，只会觉得"deed 说不用审"。
+test("a fresh workspace reviews everything until it declares its own paths", () => {
+  const cwd = workspace("default-gate");
+  deed(cwd, "init", "--said", "开始");
+  const config = JSON.parse(fs.readFileSync(path.join(cwd, ".deed", "config.json"), "utf8"));
+  assert.deepEqual(config.review.required, [], "不给任何项目预设必审目录");
+  assert.deepEqual(config.review.exempt, [], "也不预设免审目录");
+  fs.mkdirSync(path.join(cwd, "app"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "app", "server.mjs"), "export const port = 1;\n");
+  assert.equal(deed(cwd, "task", "add", "改服务端", "--criteria", "端口能读", "--files", "app/server.mjs").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "node -e 读过", "--digest", "app/server.mjs").status, 0);
+  assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1/, "没人声明过的路径照样要审");
+  assert.equal(deed(cwd, "init", "--force", "--exempt", "app/**", "--why", "服务端不在审查范围").status, 0);
+  const sealed = deed(cwd, "seal", "--why", "app 全部免审", "--by", "user");
+  assert.equal(sealed.status, 0, sealed.stderr);
+  assert.match(sealed.stdout, /封存/, "工作区自己声明之后才算免审");
 });

@@ -6,7 +6,7 @@
 // here first, and the CLI folds before it appends, so a refused action never
 // reaches the ledger. Nothing outside this file decides what can be written.
 
-import { UnknownKindError } from "./events.mjs";
+import { MEANING, UnknownKindError, meaningOf } from "./events.mjs";
 
 const noway = (message) => {
   throw new Error(message);
@@ -293,7 +293,7 @@ export function fold(events) {
       case "review.brief": {
         const session = sessionOf(doc, ev);
         const scope = ev.scope === "session" ? "session" : "segment";
-        // 整体审的材料覆盖整期：它没有段这一格，也不该被某一段的封存挡在外面。
+        // 整体审的清单覆盖整期：它没有段这一格，也不该被某一段的封存挡在外面。
         const segment = scope === "session" ? null : segmentById(session, ev.segment);
         if (segment && sealed(segment))
           noway(`段 ${segment.id} 已经封存：要再审先由人推翻那份结论（deed judge --overturn <R> --why "…"）`);
@@ -365,13 +365,13 @@ export function fold(events) {
             );
         }
         // 这条新记录自己带的是哪一版的含义：第 3 版起 pass 自己封段、fail 必须点名。
-        const meaning = ev.v ?? 1;
+        const meaning = meaningOf(ev);
         // 点名要重做的条目：记录落盘之前先确认它们都在这一段里，否则一条
         // 打回会写到别的段的任务上，而账本只说"已打回"。
         const rework = ev.rework ?? [];
         if (ev.verdict === "fail" && meaning >= 3 && rework.length === 0)
           noway(`${subject} 判不合格要点名重做的条目（--rework T1,T2）：不点名的结论没人能接`);
-        const sessionRework = ev.v !== undefined && ev.v >= 9;
+        const sessionRework = meaning >= MEANING.segmentRework;
         for (const id of rework) {
           // 段审点的是段里的条目；整体审点的是段本身——它看的就是各段的结论，
           // 所以它能退回的也只有"这一段要重做"，段里哪一条不行由那一段自己判。
@@ -403,7 +403,7 @@ export function fold(events) {
           briefDigest: ev.briefDigest ?? null,
           findings: ev.findings ?? [],
           rework,
-          v: ev.v ?? 1,
+          v: meaningOf(ev),
           at: ev.at,
           voidedAt: null,
           voidedBy: null,
@@ -419,7 +419,7 @@ export function fold(events) {
           segment.reviewVerdict = ev.verdict;
         }
         // 审查者放行就是结局，不再等第二个人签字：段审封这一段，整体审把还没封的段
-        // 一起封（单段的一期就是这种情形——那份材料本来就覆盖了它全部的任务）。
+        // 一起封——那几段本身没被它的审查者看过，是整期审替它们封的。
         if (ev.verdict === "pass" && meaning >= 3) {
           const shut = segment ? [segment] : session.segments.filter((one) => one.closedAt === null);
           for (const one of shut) {
@@ -438,13 +438,13 @@ export function fold(events) {
           }
         }
         // 不合格不封段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
-        // 不必再回来问"到底哪几条要重做"。（整期审打回时条目可以跨段。）
+        // 不必再回来问"到底哪几条要重做"。
         if (ev.verdict === "fail" && !segment && sessionRework) {
           // 整体审退回的是段：整段重开，段里的条目保持交付——重新看的是这一段的
           // 结论，不是让每个人再交一遍。段内哪一条不行，由那一段的审查者点名。
-          for (const id of rework) {
-            const home = session.segments.find((one) => one.id === id);
-            // 这一段原先的结论回答的是它自己那份材料；整体审说这一期不对，
+          for (const named of rework) {
+            const home = session.segments.find((one) => one.id === named);
+            // 这一段原先的结论回答的是它自己那份清单；整体审说这一期不对，
             // 那条结论就不再是在案的：留史（voidedAt），段回到没人判过的样子。
             for (const older of session.reviews)
               if (older.scope === "segment" && older.segment === home.id && older.voidedAt === null) {

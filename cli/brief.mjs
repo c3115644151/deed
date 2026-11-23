@@ -73,7 +73,7 @@ function guideText(subject, target, briefName) {
   ].join("\n");
 }
 
-// 一条任务在清单上的样子：段审和整体审共用，两种材料说的应该是同一件事。
+// 一条任务在清单上的样子：段审和整体审共用，两种清单说的应该是同一件事。
 // 一批 submit 里的几条交付共用一份工作区差，分不出哪条改了哪份。数出来说清楚，
 // 比让读的人自己发现「三份记录一模一样」好。
 // 批号说的是「这一批落账那一刻」；条数由落账时的账本记下。撤回同批的一条之后
@@ -166,7 +166,7 @@ export function planBrief(root, open, segment, at) {
   const base = (n) => path.join(p.review, segment.id + "-" + fileStamp(at) + (n === 1 ? "" : "-" + n));
   let n = 1;
   let file = base(n) + ".md";
-  // 清单和角色包同名成对：两份都是这一份交给审查者的材料，谁少了都不算一对。
+  // 清单和角色包同名成对：两份都是这一份交给审查者的清单，谁少了都不算一对。
   while (fs.existsSync(file) || fs.existsSync(base(n) + "-reviewer.md")) {
     n += 1;
     file = base(n) + ".md";
@@ -182,11 +182,11 @@ export function planBrief(root, open, segment, at) {
   };
 }
 
-// 整期审的材料：目的在最上面（签收与这一份比的是它），下面是每一段的活与段审结论。
+// 整期审的清单：目的在最上面（签收与这一份比的是它），下面是每一段的活与段审结论。
 // 单段的一期出这一份就够了——段审和整体审本来就看同一批任务。
 export function planWhole(root, session, at) {
   const p = ensureDirs(root);
-  // 整体审以段为单位：材料列的是每一段的结论，不是段里每条任务的清单。
+  // 整体审以段为单位：清单列的是每一段的结论，不是段里每条任务的清单。
   // 段里每一条标准的判断，段审已经做过并留了依据；整期再审一遍等于把别人的
   // 工作重做，也让「谁判了什么」变成两处都能改的事。
   const verdicts = new Map(

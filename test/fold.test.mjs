@@ -274,4 +274,10 @@ test("a whole-period verdict names segments, and a task id is refused in the led
   assert.equal(session.tasks[0].status, "done", "段里的条目保持交付");
   assert.equal(session.segments[1].closedAt !== null, true, "没被点名的段不动");
   assert.notEqual(session.reviews.find((one) => one.scope === "segment").voidedAt, null, "那一段原先的结论留史作废");
+  // 作废它的是一条结论，所以那一格记的是结论号：记成段号的话，"谁把它顶掉的"
+  // 看着像"这一段顶掉了自己"，跟同名字段的语义（同文件里另一处记 R<n>）也对不上。
+  const older = session.reviews.find((one) => one.scope === "segment");
+  const newer = session.reviews.find((one) => one.scope === "session");
+  assert.equal(older.supersededBy, newer.id, "被整体审作废的结论记下顶掉它的那一条结论号");
+  assert.match(older.supersededBy, /^R\d+$/, "记的是结论号，不是段号");
 });

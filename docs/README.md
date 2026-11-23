@@ -10,7 +10,7 @@
 | [`INSTALL.md`](INSTALL.md) | 装、接、升级、卸、常见故障 | 命令或产物变了就改 |
 | [`../HANDOFF.md`](../HANDOFF.md) | 现状、下一步、没做的 | 每轮收尾 |
 
-辅助材料两件：
+辅助清单两件：
 
 - [`research.md`](research.md)：对照与出处，「站在哪一格」那一节的底稿。
 - [`deed-architecture.html`](deed-architecture.html)：架构图（单文件、可交互）；同目录的 `deed-architecture.candidate.json` 是它的图源，`architecture.png` 是它的一张截图，给 README 用。

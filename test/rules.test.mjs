@@ -157,7 +157,7 @@ test("a period with more than one segment needs a conclusion on the period itsel
   assert.equal(nextAction(whole, config).what, "签收");
 });
 
-// 材料已经交出去，下一步就是落结论——哪怕在案的结论是旧的。
+// 清单已经交出去，下一步就是落结论——哪怕在案的结论是旧的。
 // 再叫一次「另出一份」会让审查者去读一份没人回答过的旧纸，而新的那份已经在他手上。
 test("a brief handed out after the last change is answered, not replaced", () => {
   const base = [
@@ -181,7 +181,7 @@ test("a brief handed out after the last change is answered, not replaced", () =>
   assert.equal(step.what, "落结论");
   assert.match(step.text, /S01\.1-2\.md/);
   assert.match(step.command, /--verdict pass/);
-  // 整期材料同理：交出去、没人回答，就是落结论；被回答了就不再算新鲜。
+  // 整期清单同理：交出去、没人回答，就是落结论；被回答了就不再算新鲜。
   const whole = { ...fresh.sessions[0],
     briefs: [...fresh.sessions[0].briefs,
       { scope: "session", segment: null, brief: "S01-all-1.md", briefDigest: "e".repeat(64), at: T(13) },

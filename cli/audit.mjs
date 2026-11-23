@@ -94,7 +94,7 @@ export function bareHistory(doc) {
 // naming a document with no review.brief behind it), a file in the review
 // folder that no event mentions, or a legacy line that recorded no digest.
 // Each one leaves a conclusion that points at bytes nobody can vouch for.
-// 一份材料属于一段还是一期：整期审的材料没有段这一格，报告里就写"整期"，
+// 一份清单属于一段还是一期：整期审的清单没有段这一格，报告里就写"整期"，
 // 别让一条结论的位置显示成 null。
 const whereOf = (one) => one?.segment ?? (one?.scope === "session" ? "整期" : null);
 
