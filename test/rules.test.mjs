@@ -84,7 +84,7 @@ test("a reworked delivery has no standing verdict left", () => {
   const doc = fold([
     turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"),
     verdict(4, "pass"), pass(5),
-    { v: 1, at: T(6), k: "judge.rework", s: null, segment: "S01.1", tasks: ["T1"], why: "证据不足", by: "qa" },
+    { v: 1, at: T(6), k: "judge.rework", s: null, segment: "S01.1", tasks: ["T1"], why: "交付记录不足", by: "qa" },
     done(7, "T1"),
   ]);
   const session = doc.sessions[0];

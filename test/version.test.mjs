@@ -17,7 +17,7 @@ test("a ledger written by a newer deed is not a broken ledger", () => {
   assert.equal(newer.newer, true);
   assert.match(newer.headline, /账本比 deed 新：task\.block 是 deed 9\.9\.9 写的/);
   assert.match(newer.advice, /别删也别挪/);
-  assert.doesNotMatch(newer.advice, /rejected/, "账本新的时候，指去挪走就是毁证据");
+  assert.doesNotMatch(newer.advice, /rejected/, "账本新的时候，指去挪走就是毁记录");
 
   const hand = unknownKindNotice("task.block", null, "0.2.0");
   assert.equal(hand.newer, false);

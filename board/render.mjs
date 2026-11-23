@@ -79,10 +79,10 @@ function gatesOf(doc, session, config, segment) {
       command: "deed tick \"" + "…" + "\"",
     },
     {
-      key: "promise",
-      name: "承诺",
+      key: "task",
+      name: "任务",
       done: tasks.length > 0,
-      why: "清单是空的：没有承诺就没有交付，也没有可判的东西",
+      why: "清单是空的：没有任务就没有交付，也没有可判的东西",
       command: "deed task add \"" + "…" + "\" --criteria \"" + "…" + "\"",
     },
     {
@@ -188,7 +188,7 @@ function taskCard(task, zone) {
     '<div class="cdetail">' +
     '<p class="label">做完的标准</p><p class="criteria">' + esc(task.criteria) + "</p>" +
     '<p class="label">凭什么算做到</p>' +
-    (proofs ? '<ul class="proofs">' + proofs + "</ul>" : '<p class="none">还没有证据：这条没交付</p>') +
+    (proofs ? '<ul class="proofs">' + proofs + "</ul>" : '<p class="none">还没交付</p>') +
     (task.changed && task.changed.length > 0
       ? '<p class="label">交付时真动过</p><p class="moved">' + esc(task.changed.join("  ")) + "</p>"
       : "") +

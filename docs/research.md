@@ -1,7 +1,7 @@
 # 出处：它站在哪一格，凭什么这么说
 
 这一页是 [`../README.md`](../README.md) 「它站在哪一格」那一节的底稿：每条判断的来源、替质疑者先说的三条反驳，以及可以拿去用的句子。
-措辞在这里可以松，判据必须能复核。
+措辞在这里可以松，规则必须能复核。
 
 ## 一、层的位置
 
@@ -14,14 +14,14 @@
 | decision | 谁定的 | ADR、RFC、会议纪要 | 不能重算；多数靠人记 |
 | authorization | 谁准的、准的是哪一份字节 | PR 审批、邮件、口头 | 不能重算；**平台一换就没了** |
 
-deed 只认领第四格，并把它和前两格钉在一起。**它不新开一层**：这一格本来就在，只是没有载体。
+deed 只认领第四格，并把它和前两格记在一起。**它不新开一层**：这一格本来就在，只是没有载体。
 
-成熟度 3/5：有形态（只追加账本 + 纯函数投影）、有先例（下表的四件套）、有可复算的判据；
+成熟度 3/5：有形态（只追加账本 + 纯函数投影）、有先例（下表的四件套）、有可复算的规则；
 缺的是平台默认（没人替你装）与中立规范（没有标准可引）。所以只说「层候选」。
 
 ## 二、同一件事别人做到哪一步
 
-| 系统 | 钉住了什么 | 停在哪 | 出处 |
+| 系统 | 记下了什么 | 停在哪 | 出处 |
 | --- | --- | --- | --- |
 | Gerrit | vote 绑 patch set（换 patch set 后旧票 "called outdated"）、`ignoreSelfApproval`、submit requirements 谓词、Attention Set | 真相在服务端 DB；对象是 diff；无签收 | gerrit 文档 submit-requirements / attention-set |
 | GitHub 保护分支 | stale approval 处置、"approval from someone other than the last person to push"、CODEOWNERS | 账在平台；粒度 PR；dismiss stale 是可选开关 | GitHub Docs, About protected branches |
@@ -37,7 +37,7 @@ deed 只认领第四格，并把它和前两格钉在一起。**它不新开一�
 | CHAP (arXiv 2606.09751) | 只追加的协作协议，★123 | 是协议不是工作区载体 | arXiv |
 | jj op log / Temporal | 载体形态最像：操作日志可重放 | 没有裁决层 | jj 文档 / Temporal 文档 |
 
-最少见的组合只有三件：判决钉在被交出去那一版的 sha256 上（`review.log` 没有 `briefDigest` 直接拒绝入账）；
+最少见的组合只有三件：判决记在被交出去那一版的 sha256 上（`review.log` 没有 `briefDigest` 直接拒绝入账）；
 新结论显式作废旧结论，fail 不能被后来的 pass 静默覆盖；谁能判、谁能签是纯函数从账本折出来的。
 
 ## 三、替质疑者先说的三条反驳
@@ -48,7 +48,7 @@ deed 只认领第四格，并把它和前两格钉在一起。**它不新开一�
 
 **「这只是流程引擎的子集」**（Temporal 的 durable execution、jj 的 op log 都能重放）。
 重放是它们的手段，不是它们的目的：它们回答「怎么把一段流程跑完」，不回答「谁有权判、下一步该谁动」。
-deed 的判据是纯函数、落在仓库里、离线可跑；流程引擎的判据在配置层和服务端。
+deed 的规则是纯函数、落在仓库里、离线可跑；流程引擎的规则在配置层和服务端。
 
 **「CI gate 已经有了」**（GitHub checks／Jenkins gate 也能挡合并）。
 CI gate 挡的是「这次构建过不过」，不记「谁承诺了什么、谁判的是哪一份字节、判过之后改动是否作废」。
@@ -63,7 +63,7 @@ CI gate 挡的是「这次构建过不过」，不记「谁承诺了什么、谁
 
 ## 五、名字这件事
 
-「agent work ledger」最接近，「agent sign-off ledger」更准；中文圈「台账」被用过五次，全部停在门外（都是排期、持久化、旁路审计，没人拿它当判据来源）。
+「agent work ledger」最接近，「agent sign-off ledger」更准；中文圈「台账」被用过五次，全部停在门外（都是排期、持久化、旁路审计，没人拿它当规则的来源）。
 现在的 `deed` 是暂用名，正式名未定。
 
 ## 六、原始报告在哪

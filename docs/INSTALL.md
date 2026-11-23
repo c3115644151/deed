@@ -62,7 +62,7 @@ deed init --review "src/**,apps/**" --exempt "docs/**,*.md"
 ```
 .deed/config.json     门槛（要审/免审的路径、门命令、端口）与它们的镜像
 .deed/log/2026-11.jsonl   账本，按月份片，只追加
-.deed/review/         审查任务书（出纸时才有文件）
+.deed/review/         审查清单（发出去时才有文件）
 .deed/workspace.json  上一次交付的内容指纹（第一次交付时才有）
 .deed/log/lock        写锁，只在写的那一瞬间存在
 ```
@@ -88,7 +88,7 @@ deed init --force --exempt "docs/**,*.md" --why "文档改动不必审"
 ```
 
 为什么必填：**门槛的每一次改动都进账本**，下一个人能看到是谁、什么时候、为什么放宽了审查。
-`.deed/config.json` 只是账本的镜像；手改文件不改任何判断（判据只读账本），`deed verify` 会报「门槛对不上」，
+`.deed/config.json` 只是账本的镜像；手改文件不改任何判断（规则只读账本），`deed verify` 会报「门槛对不上」，
 `deed init --force --why "…"` 是把它收进账本的唯一方式。
 
 ### 让 agent 知道规矩
@@ -128,7 +128,7 @@ cd /path/to/deed && git pull && npm test
 npm unlink -g deed        # 或删掉 vendor 的那份目录
 ```
 
-`.deed/` 可以留着：它是这个工作区的历史。真要清掉，先 `deed verify` 确认没有未签收的承诺，再整目录删。
+`.deed/` 可以留着：它是这个工作区的历史。真要清掉，先 `deed verify` 确认没有未签收的任务，再整目录删。
 deed 没有后台进程、没有守护、没有全局状态，`deed serve` 是前台只读服务，`Ctrl+C` 就停。
 
 ## 常见故障
@@ -139,7 +139,7 @@ deed 没有后台进程、没有守护、没有全局状态，`deed serve` 是�
 | `deed doctor` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
 | `deed verify` 报「证据过期」 | 证据钉的文件被改过。要么重跑那条命令再 `task done`，要么 `judge --rework` 把活放回桌面 |
-| `deed verify` 报「任务书对不上」 | 交出去的那份纸被改过、丢了、或没被账本记过。打回、重出一份、重新审 |
+| `deed verify` 报「任务书对不上」 | 发出去那份清单被改过、丢了、或没被账本记过。打回、重出一份、重新审 |
 | `deed verify` 报「门槛对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
 | `judge`／`sign` 报「不是从终端敲的」 | 管道里跑必须写 `--by "谁"`；账本不替任何动作填名字 |
 

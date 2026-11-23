@@ -12,8 +12,8 @@ import { workspace } from "../support/lib.mjs";
 const config = { review: { required: ["core/**"], exempt: ["docs/**"] }, board: { port: 0 } };
 const T = (n) => new Date(Date.UTC(2026, 10, 22, 10, n)).toISOString();
 const events = [
-  { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做折叠和条款" },
-  { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "折叠", criteria: "同账本同文档", files: ["docs/x.md"] },
+  { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做重放和条款" },
+  { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["docs/x.md"] },
   { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test 16/16", by: "agent" },
   { v: 1, at: T(4), k: "judge.pass", s: null, segment: "S01.1", by: "user" },
   { v: 1, at: T(5), k: "task.add", s: null, id: "T2", title: "服务", criteria: "SSE", files: ["core/serve.mjs"] },
@@ -64,11 +64,11 @@ test("the same ledger renders the same bytes, and no clock leaks in", () => {
 
 test("a conclusion older than the last delivery says so on the page", () => {
   const stale = [
-    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做折叠" },
-    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "折叠", criteria: "同账本同文档", files: ["core/fold.mjs"] },
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做重放" },
+    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["core/fold.mjs"] },
     { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test", by: "agent", digest: "a".repeat(64), digestPath: "core/fold.mjs", changed: ["core/fold.mjs"] },
     { v: 1, at: T(4), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: ".deed/review/S01.1-x.md", briefDigest: "b".repeat(64), findings: [] },
-    { v: 1, at: T(6), k: "task.add", s: null, id: "T2", title: "再改折叠", criteria: "一样", files: ["core/fold.mjs"] },
+    { v: 1, at: T(6), k: "task.add", s: null, id: "T2", title: "再改重放", criteria: "一样", files: ["core/fold.mjs"] },
     { v: 1, at: T(7), k: "task.done", s: null, id: "T2", evidence: "又跑一遍", by: "agent", digest: "c".repeat(64), digestPath: "core/fold.mjs", changed: ["core/fold.mjs"] },
   ];
   const html = renderBoard(fold(stale), config, { zone, events: stale.length });

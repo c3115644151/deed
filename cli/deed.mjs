@@ -241,7 +241,7 @@ function printState() {
   if (!config) {
     console.log("");
     console.log("这个目录还没接 deed · 先 deed init（把门槛基线记进账本）");
-    console.log("  账本 " + (events.length ? events.length + " 条，但没有门槛：判据无从谈起" : "还没有"));
+    console.log("  账本 " + (events.length ? events.length + " 条，但没有门槛：不知道哪些改动要审" : "还没有"));
     console.log("");
     return;
   }
@@ -260,7 +260,7 @@ function printState() {
     );
     const shown = seg ?? open.segments[open.segments.length - 1];
     if (!shown) {
-      console.log("  还没有段：范围说完就写第一条承诺");
+      console.log("  还没有段：范围说完就写第一条任务");
     } else {
       const count = countIn(open, shown);
       console.log(
@@ -285,7 +285,7 @@ function printState() {
     const watch = pressure(open);
     if (watch && watch.tasks > 3) console.log("  提示 · 这一段已经 " + watch.tasks + " 条，还压着 " + watch.undecided + " 条待判");
     const stale = staleEvidence(ROOT, doc, open.id);
-    if (stale.length > 0) console.log("  证据过期 · " + stale.map((one) => one.id).join("、") + "（钉住的文件变了，deed verify 看细节）");
+    if (stale.length > 0) console.log("  交付记录过期 · " + stale.map((one) => one.id).join("、") + "（记下的文件变了，deed verify 看细节）");
   }
   for (const one of doc.sessions)
     if (one.closedAt)
@@ -297,7 +297,7 @@ function printState() {
   const drift = configDrift(doc.config, readConfigFile(ROOT));
   if (drift.length > 0)
     console.log(
-      "  门槛 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（判据只认账本；deed verify 看细节，改门槛用 deed init --force … --why）",
+      "  门槛 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；deed verify 看细节，改门槛用 deed init --force … --why）",
     );
   const step = nextAction(doc, config);
   console.log("");
@@ -338,13 +338,13 @@ const commands = {
     }
     const p = ensureDirs(ROOT);
     const { doc: before } = load();
-    const ledger = before.config;             // 账本里的门槛：判据只认这个
+    const ledger = before.config;             // 账本里的门槛：规则只认这个
     const disk = readConfigFile(ROOT);        // 磁盘上的草稿：init 收下才算数
     const drift = configDrift(ledger, disk);
     if (ledger && !flags.force) {
       console.log("deed: 这个工作区已经接过钩子（.deed/config.json 在）");
       if (drift.length > 0)
-        console.log("  注意：磁盘上的门槛和账本不一致（" + drift.map((one) => one.key).join("、") + "）；判据只认账本，deed verify 会报出来。");
+        console.log("  注意：磁盘上的门槛和账本不一致（" + drift.map((one) => one.key).join("、") + "）；规则只认账本，deed verify 会报出来。");
       console.log("  要收下磁盘上的值：deed init --force --why \"为什么改\"");
       console.log("  要改门槛：deed init --force --review \"…\" --exempt \"…\" --why \"为什么改\"（改动会记进账本）");
       for (const line of optionalBlock(ledger ?? disk ?? DEFAULT_CONFIG)) console.log(line);
@@ -422,7 +422,7 @@ const commands = {
     guard(() => {
       if (verb === "add") {
         const title = flags.title ?? words.join(" ");
-        if (!title) fail("task add 要写清承诺：deed task add \"…\" --criteria \"…\"");
+        if (!title) fail("task add 要写清这件事：deed task add \"…\" --criteria \"…\"");
         if (!flags.criteria) fail("task add 要写清做完的标准：--criteria \"…\"");
         const { doc, ev } = transact(flags, (doc0) => ({
           k: "task.add",
@@ -439,7 +439,7 @@ const commands = {
       }
       if (verb === "done") {
         if (!id) fail("task done 要点名任务");
-        if (!flags.evidence) fail("task done 必须带证据：--evidence \"命令与结果\"");
+        if (!flags.evidence) fail("task done 必须带一条交付记录：--evidence \"命令与结果\"");
         let pinned;
         let pinnedPath;
         if (flags.digest) {
@@ -480,7 +480,7 @@ const commands = {
           },
           () => writeSnapshot(ROOT, snapshotFiles),
         );
-        console.log("交付 · " + id + " · 证据：" + flags.evidence + (pinned ? " · 钉在 " + pinned.slice(0, 12) : ""));
+        console.log("交付 · " + id + " · 交付记录：" + flags.evidence + (pinned ? " · 记下 " + pinned.slice(0, 12) : ""));
         if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（门槛按它判，不只按声明的 --files）");
         return;
       }
@@ -556,7 +556,7 @@ const commands = {
         );
       if (seg.closedAt) fail("段 " + seg.id + " 已经封存，结论不能再落");
       if (!flags.verdict) {
-        // 纸写的是"这些条目、这些证据"。还有条目没交，纸就是一份没人能答的卷子：
+        // 清单写的是"这些条目、这些交付记录"。还有条目没交，清单就是一份没人能答的卷子：
         // 交完再出，否则它一出生就是旧的。
         const pending = tasksIn(one, seg).filter((task) => task.status === "todo");
         if (pending.length > 0)
@@ -568,8 +568,8 @@ const commands = {
           // 手上那份已经不是账本里记的那一份，谁读它都不算数。
           const file = path.resolve(ROOT, handed.brief);
           const intact = fs.existsSync(file) && digest(fs.readFileSync(file)) === handed.briefDigest;
-          // 任务书写的是它出纸那一刻的清单与证据。之后这一段又动了（加任务、
-          // 交付、收回），这份纸就不再说这一段现在的事——换一份，别让人审旧内容。
+          // 清单写的是它发出那一刻的条目与交付记录。之后这一段又动了（加任务、
+          // 交付、收回），这份清单就不再说这一段现在的事——换一份，别让人审旧内容。
           const moved = lastSegmentChange(one, seg);
           const stale = moved !== null && moved > handed.at;
           if (intact && stale) console.log("上一份任务书(" + handed.brief + ")出在这一段最近一次改动之前：另出一份");
@@ -598,10 +598,10 @@ const commands = {
       if (!fs.existsSync(file)) fail("任务书不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
       if (digest(fs.readFileSync(file)) !== handed.briefDigest)
         fail("任务书被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
-      // 纸上的清单变了，结论就没法回答它：那一份写的不是现在这一段。
+      // 清单变了，结论就没法回答它：那一份写的不是现在这一段。
       const moved = lastSegmentChange(one, seg);
       if (moved !== null && moved > handed.at)
-        fail("这一段在任务书出过之后又动过（" + handed.brief + "）：结论只能回答纸上的清单，deed review --segment " + seg.id + " 另出一份再审");
+        fail("这一段在任务书出过之后又动过（" + handed.brief + "）：结论只能回答清单上那几条，deed review --segment " + seg.id + " 另出一份再审");
       const findings = list(flags.finding);
       transact(flags, () => ({
         k: "review.log",
@@ -645,9 +645,9 @@ const commands = {
         const stale = audit.stale.filter((s) => inSegment.has(s.id));
         const outside = audit.outside.filter((s) => inSegment.has(s.id));
         if (outside.length > 0)
-          fail("这一段有证据指到工作区外面（" + outside.map((s) => s.id + " → " + s.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付");
+          fail("这一段有交付记录指到工作区外面（" + outside.map((s) => s.id + " → " + s.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付");
         if (stale.length > 0)
-          fail("这一段有证据过期（" + stale.map((s) => s.id + " 钉在 " + s.path).join("、") + "），钉住的内容已经变了：重新交付再判");
+          fail("这一段有交付记录过期（" + stale.map((s) => s.id + " 记下 " + s.path).join("、") + "），记下的内容已经变了：重新交付再判");
         const blockers = judgeBlockers(doc.config, one, seg);
         if (blockers.length > 0) fail("这一段还不能判：" + blockers.join("；"));
         const after = transact(flags, () => ({ k: "judge.pass", s: one.id, segment: seg.id, by: signer(flags, "判决") })).doc;
@@ -663,7 +663,7 @@ const commands = {
         const named2 = [...split(flags.rework), ...words].filter(Boolean);
         if (named2.length === 0) fail("judge --rework 要点名要重做的任务");
         if (!flags.why) fail("judge --rework 要说清为什么：--why \"…\"");
-        // 撕掉一张判决纸和签发一张纸一样要署名：否则账本只记得谁判过，不记得谁推翻的。
+        // 撤一条审查结论和发一份清单一样要署名：否则账本只记得谁判过，不记得谁推翻的。
         if (!flags.by) fail("judge --rework 要写清谁打回的：--by \"…\"");
         transact(flags, () => ({ k: "judge.rework", s: one.id, segment: seg.id, tasks: named2, why: flags.why, by: flags.by }));
         console.log("打回 · " + seg.id + " · " + named2.join("、") + " · " + flags.by + " · " + flags.why);
@@ -713,7 +713,7 @@ const commands = {
     guard(() => {
       const { doc } = load();
       if (!doc.config) {
-        console.log("这个目录还没接 deed：deed init 之后才有账本和证据可查");
+        console.log("这个目录还没接 deed：deed init 之后才有账本和交付记录可查");
         process.exitCode = 1;
         return;
       }
@@ -739,20 +739,20 @@ const commands = {
         console.log("门槛对不上 · " + one.key + " · 账本里是 " + JSON.stringify(one.ledger) + "，磁盘上写的是 " + JSON.stringify(one.disk));
       const wrong = stale.length + outside.length;
       if (wrong === 0 && looseBriefs === 0 && drift.length === 0) {
-        if (bare.length === 0) console.log("证据有效：每一条都说得出做了什么，也都钉在一份内容上");
-        else console.log("证据有效：钉在内容上的" + "都还在，另有 " + bare.length + " 条没钉（要审的段判决前会被挡）");
+        if (bare.length === 0) console.log("交付记录有效：每一条都说得出做了什么，也都记下了一份内容的 sha256");
+        else console.log("交付记录有效：记下内容的都还在，另有 " + bare.length + " 条没记文件（要审的段判决前会被挡）");
         return;
       }
-      for (const one of stale) console.log("证据过期 · " + one.id + " · " + one.path + " · 钉在 " + one.digest.slice(0, 12));
+      for (const one of stale) console.log("交付记录过期 · " + one.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12));
       for (const one of outside) console.log("路径越界 · " + one.id + " · " + one.path + "（不在这个工作区里）");
       const reasons = [];
       if (wrong > 0)
         reasons.push(
-          "有 " + wrong + " 处证据对不上" + (stale.length ? "：过期 " + stale.length : "") + (outside.length ? "：越界 " + outside.length : "") + "；重新交付，或者把它们从判决范围里去掉",
+          "有 " + wrong + " 处交付记录对不上" + (stale.length ? "：过期 " + stale.length : "") + (outside.length ? "：越界 " + outside.length : "") + "；重新交付，或者把它们从判决范围里去掉",
         );
       if (drift.length > 0)
         reasons.push(
-          "门槛文件和账本对不上：判据只认账本，这一改没进过账本；要么用 deed init --force --why \"为什么改\" 把磁盘上的值收下，要么把文件改回账本里的值",
+          "门槛文件和账本对不上：规则只认账本，这一改没进过账本；要么用 deed init --force --why \"为什么改\" 把磁盘上的值收下，要么把文件改回账本里的值",
         );
       if (looseBriefs > 0)
         reasons.push(
@@ -805,10 +805,10 @@ const commands = {
         if (bad) break;
       }
       if (!bad) {
-        console.log("账本干净 · " + events.length + " 条事件都能折叠");
+        console.log("账本干净 · " + events.length + " 条事件都能重放");
         const { doc } = load();
         const stale = staleEvidence(ROOT, doc);
-        if (stale.length > 0) console.log("  证据过期 " + stale.length + " 处（不算坏账）：" + stale.map((s) => s.id).join("、"));
+        if (stale.length > 0) console.log("  交付记录过期 " + stale.length + " 处（不算坏账）：" + stale.map((s) => s.id).join("、"));
         const briefs = auditBriefs(ROOT, doc);
         const loose = briefTrouble(briefs);
         const words = wordsNotice(ROOT);
@@ -893,7 +893,7 @@ const HELP = [
   "deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区",
   "deed init [--said \"…\"] [--review \"src/**,…\"] [--exempt \"docs/**\"] [--port 7317]",
   "deed tick --who user|agent --said \"…\" [--did \"…\"] [--session S01]",
-  "deed task add \"<承诺>\" --criteria \"<做完的标准>\" [--files \"src/a.mjs,docs/b.md\"]",
+  "deed task add \"<要做的事>\" --criteria \"<做完的标准>\" [--files \"src/a.mjs,docs/b.md\"]",
   "deed task done <T1> --evidence \"<命令与结果>\" [--digest <路径>] [--session S01]",
   "deed task undo <T1> --why \"…\"         收回最后那条交付（说错了话用它，别改写成对的）",
   "deed task defer|drop <T1> --why \"…\"",
@@ -911,7 +911,7 @@ const HELP = [
   "deed gate [名字…]              按账本里的 gates 顺序跑门，失败即退出",
   "deed serve [--port 7317]",
   "",
-  "所有写操作都先折叠后落盘：会被拒的动作一个字也不会进账本。",
+  "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
 
 const [verb, ...rest] = process.argv.slice(2);

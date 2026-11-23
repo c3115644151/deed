@@ -114,7 +114,7 @@ export const lastDelivery = (session, segment) => {
 };
 
 // 这一段最后一次被改动是什么时候。加一条任务也算——任务书写的是一份清单，
-// 清单变了，纸上那份就不再是这一段的事，结论也就回答不了它。
+// 清单变了，发出去那份就不再是这一段的事，结论也就回答不了它。
 export const lastSegmentChange = (session, segment) => {
   const times = tasksIn(session, segment)
     .flatMap((one) => [
@@ -192,7 +192,7 @@ export function judgeBlockers(config, session, segment = openSegment(session)) {
     const bare = unpinned(session, segment);
     if (bare.length > 0)
       blockers.push(
-        "这些交付的证据没钉任何内容，不算证：" +
+        "这些交付没记下任何文件，不算数：" +
           bare.map((one) => one.id).join("、") +
           "（deed task done " + bare[0].id + ' --evidence "…" --digest <工作区里的文件>）',
       );
@@ -223,7 +223,7 @@ export function signBlockers(doc, session, config = null) {
       .filter((segment) => needsReview(config, session, segment))
       .flatMap((segment) => unpinned(session, segment));
     if (bare.length > 0)
-      blockers.push("这些交付的证据没钉任何内容（" + bare.map((one) => one.id).join("、") + "）：签收前钉一个文件");
+      blockers.push("这些交付没记下任何文件（" + bare.map((one) => one.id).join("、") + "）：签收前记下一个文件");
   }
   return blockers;
 }
@@ -266,7 +266,7 @@ export function nextAction(doc, config) {
     return {
       who: "agent",
       what: "开段",
-      text: "范围说完就写第一条承诺，段跟着开出来",
+      text: "范围说完就写第一条任务，段跟着开出来",
       command: `deed task add "…" --criteria "…"`,
     };
   }
@@ -277,7 +277,7 @@ export function nextAction(doc, config) {
     return {
       who: "user",
       what: "签收",
-      text: blockers.length === 0 ? `${session.id} 的承诺都判过了，等你一句话收口` : blockers.join("；"),
+      text: blockers.length === 0 ? `${session.id} 的任务都判过了，等你一句话收口` : blockers.join("；"),
       command: `deed sign --words "<你的原话>" --title "第 ${doc.sessions.length} 期"`,
     };
   }
@@ -304,8 +304,8 @@ export function nextAction(doc, config) {
     if (bare.length > 0) {
       return {
         who: "agent",
-        what: "钉证据",
-        text: `${bare.map((one) => one.id).join("、")} 的证据是口头的：钉上工作区里的文件`,
+        what: "记下文件",
+        text: `${bare.map((one) => one.id).join("、")} 的交付没记下文件：记上工作区里的文件`,
         command: `deed task done ${bare[0].id} --evidence "…" --digest <工作区里的文件>`,
       };
     }

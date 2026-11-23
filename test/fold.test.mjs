@@ -50,11 +50,11 @@ test("a rework sends the named task back, clears its evidence, and voids the ver
     turn(1), add(2, "T1"), done(3, "T1"),
     review(4, "S01.1", "pass"),
     judgePass(5, "S01.1"),
-    rework(6, "S01.1", ["T1"], "证据不足"),
+    rework(6, "S01.1", ["T1"], "记录不足"),
   ]);
   const session = doc.sessions[0];
   assert.equal(session.tasks[0].status, "todo");
-  assert.equal(session.tasks[0].evidence.length, 0, "旧证据不跟着新交付走");
+  assert.equal(session.tasks[0].evidence.length, 0, "旧交付记录不跟着新交付走");
   assert.equal(session.segments[0].reviewVerdict, null);
   assert.equal(session.segments[0].closedAt, null);
   assert.equal(session.reviews[0].voidedAt, T(6), "结论留在账本里，但不再算数");

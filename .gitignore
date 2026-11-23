@@ -18,5 +18,9 @@ node_modules/
 # Scratch workspaces used while proving a behavior by hand (drift checks etc.).
 .tmp/
 
-# Archify diagram working directory (the exported single-file HTML is the deliverable).
+# Archify diagram working directory and its run receipts (the spec and the HTML are the deliverables).
 .archify/
+/docs/deed-architecture.delivery.json
+/docs/deed-architecture.finalize.json
+/docs/deed-architecture.finalize-summary.json
+/docs/deed-architecture.browser-check.json

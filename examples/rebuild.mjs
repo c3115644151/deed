@@ -47,9 +47,9 @@ deed("judge", "--pass", "--by", "user");
 deed("task", "add", "把说明和账本对上", "--criteria", "README 的六行能走完一整轮", "--files", "NOTES.md");
 deed("task", "done", "T5", "--evidence", "按说明跑了一遍：init 到 sign", "--digest", "NOTES.md");
 deed("review", "--segment", "S02.2");
-deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "fail", "--finding", "说明里没写 --digest：证据没钉内容，过期了查不出来");
+deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "fail", "--finding", "说明里没写 --digest：那条交付记录没记文件，过期了查不出来");
 deed("judge", "--rework", "T5", "--why", "补 --digest，重跑一遍", "--by", "agent:main");
-deed("task", "done", "T5", "--evidence", "重跑：每条证据都钉在一份文件上", "--digest", "NOTES.md");
+deed("task", "done", "T5", "--evidence", "重跑：每条交付记录都记在一份文件上", "--digest", "NOTES.md");
 deed("review", "--segment", "S02.2");
 deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "pass");
 deed("judge", "--pass", "--by", "user");
@@ -58,7 +58,7 @@ deed("ask", "示例账本要不要跟着示例一起提交？", "--reading", "�
 deed("ask", "resolve", "A1", "--decision", "一起提交，账本随仓库走");
 
 deed("task", "add", "给面板加跨会话历史", "--criteria", "能翻看已签收那一期的全部轮次", "--files", ".deed/config.json");
-deed("task", "defer", "T6", "--why", "先让机制稳，视图等下一轮");
+deed("task", "defer", "T6", "--why", "先把账本这件事稳住，页面等下一轮");
 deed("task", "add", "让陌生人只读六行就能动手", "--criteria", "照 NOTES.md 从 init 走到 sign", "--files", "NOTES.md");
 deed("tick", "--who", "agent", "--said", "打回的那一段补完了，说明也改了", "--did", "判过 S02.1、S02.2，重审后封段");
 deed("ask", "这一段要不要现在判？", "--reading", "等 T7 交付再判", "--why", "还差一条没交付");
