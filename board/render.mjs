@@ -161,14 +161,21 @@ function digestChip(digest) {
   );
 }
 
+// A delivery can pin several files; an older line pinned one.
+function pinsOf(proof) {
+  if (proof.files) return proof.files;
+  return proof.digest && proof.path ? [{ path: proof.path, digest: proof.digest }] : [];
+}
+
 function taskCard(task, zone) {
   const proofs = task.evidence
     .map(
       (proof) =>
         '<li class="proof"><span class="pin"></span><span class="pclaim">' + esc(proof.claim) + "</span>" +
         '<span class="pmeta">' + esc(proof.by) + " · " + when(proof.at, zone) + "</span>" +
-        (proof.digestPath ? '<span class="ppath">' + esc(proof.digestPath) + "</span>" : "") +
-        digestChip(proof.digest) +
+        '<span class="pins">' + pinsOf(proof)
+          .map((one) => '<span class="ppin"><span class="ppath">' + esc(one.path) + "</span>" + digestChip(one.digest) + "</span>")
+          .join("") + "</span>" +
         "</li>",
     )
     .join("");
@@ -180,7 +187,7 @@ function taskCard(task, zone) {
     '<span class="cid">' + esc(task.id) + "</span>" +
     '<span class="ctitle">' + esc(task.title) + "</span>" +
     '<span class="cmeta"><span class="tstate">' + (STATUS_WORD[task.status] ?? "") + "</span>" +
-    '<span class="cnail">' + task.evidence.length + " 钉</span>" +
+    '<span class="cnail">' + (task.evidence.length === 0 ? "未钉" : pinsOf(task.evidence[task.evidence.length - 1]).length + " 份内容") + "</span>" +
     ((task.undone && task.undone.length > 0) ? '<span class="cundone">撤 ' + task.undone.length + "</span>" : "") +
     "</span>" +
     '<span class="cfiles">' + esc(files) + "</span>" +
@@ -477,8 +484,10 @@ body { border-top: 9px solid var(--ink); }
 .pin { width: 5px; height: 5px; margin-top: 7px; background: var(--seal); border-radius: 50%; }
 .pclaim { font-size: 12.5px; line-height: 1.45; }
 .pmeta { grid-column: 2; font-family: var(--mono); font-size: 10px; color: var(--soft); }
-.ppath { grid-column: 2; font-family: var(--mono); font-size: 10px; color: var(--soft); }
-.dig { grid-row: 1 / span 3; align-self: center; display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--ink2); background: var(--shade); border: 1px solid var(--rule); padding: 2px 5px; cursor: pointer; }
+.pins { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 2px; }
+.ppin { display: inline-flex; align-items: center; gap: 4px; }
+.ppath { font-family: var(--mono); font-size: 10px; color: var(--soft); }
+.dig { align-self: center; display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--ink2); background: var(--shade); border: 1px solid var(--rule); padding: 2px 5px; cursor: pointer; }
 .dig:hover { border-color: var(--ink2); }
 .dig .dc { font-size: 9px; letter-spacing: .1em; color: var(--soft); }
 .moved { margin: 0; font-family: var(--mono); font-size: 10.5px; color: var(--soft); }

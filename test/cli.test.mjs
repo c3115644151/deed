@@ -993,6 +993,50 @@ test("an older delivery is history, not a claim that keeps going stale", () => {
   assert.match(stale.stdout, /交付记录过期 · T1/);
 });
 
+test("a file pinned again by a later delivery is covered, not stale", () => {
+  const cwd = workspace("repinned");
+  fs.writeFileSync(path.join(cwd, "shared.md"), "v1");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "写第一部分", "--criteria", "写完", "--files", "shared.md");
+  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "shared.md");
+  fs.writeFileSync(path.join(cwd, "shared.md"), "v2");
+  deed(cwd, "task", "add", "接着写第二部分", "--criteria", "写完剩下的", "--files", "shared.md");
+  deed(cwd, "task", "done", "T2", "--evidence", "第二版：文件跟着改了", "--digest", "shared.md");
+
+  const ok = deed(cwd, "verify");
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /早先的交付 1 条/, "后来者重钉过的路径，早先那条算历史");
+
+  fs.writeFileSync(path.join(cwd, "shared.md"), "v3");
+  const stale = deed(cwd, "verify");
+  assert.equal(stale.status, 1, "没人再钉过的字节，得由最后钉它的人负责");
+  assert.match(stale.stdout, /交付记录过期 · T2 · shared\.md/, "只该点名最后钉这一条路径的交付");
+  assert.doesNotMatch(stale.stdout, /交付记录过期 · T1/, "被覆盖的那条不该跟着一起报");
+});
+
+test("one delivery pins every file it says it produced", () => {
+  const cwd = workspace("many-pins");
+  fs.writeFileSync(path.join(cwd, "a.md"), "a1");
+  fs.writeFileSync(path.join(cwd, "b.md"), "b1");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "写两份", "--criteria", "两份都在", "--files", "a.md,b.md");
+  const done = deed(cwd, "task", "done", "T1", "--evidence", "两份都写了", "--digest", "a.md", "--digest", "b.md");
+  assert.equal(done.status, 0, done.stdout + done.stderr);
+  assert.match(done.stdout, /记下 a\.md [0-9a-f]{12}、b\.md [0-9a-f]{12}/, "两枚都要报出来");
+  assert.equal(deed(cwd, "verify").status, 0);
+
+  const review = deed(cwd, "review");
+  assert.equal(review.status, 0, review.stdout + review.stderr);
+  const brief = fs.readFileSync(path.join(cwd, ".deed", "review", briefs(cwd).sort().at(-1)), "utf8");
+  assert.match(brief, /记下：a\.md [0-9a-f]{12}、b\.md [0-9a-f]{12}/, "审查者要拿到每一份的指纹");
+
+  fs.writeFileSync(path.join(cwd, "b.md"), "b2");
+  const stale = deed(cwd, "verify");
+  assert.equal(stale.status, 1);
+  assert.match(stale.stdout, /交付记录过期 · T1 · b\.md/, "改了哪一份就点名哪一份");
+  assert.doesNotMatch(stale.stdout, /过期 · T1 · a\.md/, "没改的那份不该被连坐");
+});
+
 test("the word --help inside evidence is evidence", () => {
   const cwd = workspace("help-in-words");
   deed(cwd, "init", "--said", "开始");

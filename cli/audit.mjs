@@ -6,11 +6,21 @@ import { paths, rel } from "../lib/store.mjs";
 // 核对"账本说的"与"工作区现在的"：这是唯一一条从账本往磁盘看的通道。
 // 工作区当参数传进来，模块自己不认 cwd——同一段判断在哪跑都读同一份。
 
-// 一条任务只有一份现行交付：它最后说的那句话。更早的交付是账本历史（谁在哪天说过什么），
-// 不是这一版交付——它们记下的内容当然会跟着工作区变，那不是错，只是过去了。
-// 所以三条判断只对现行那份做：内容变了（过期）、路径出了工作区、什么都没钉（没得查）。
-// 早先那些钉过的交付单独列出来，报个条数，不算坏账、不挡判决。
+// 一条交付里记下的 sha256 是"当时那份字节"的一句话。它什么时候失效？
+// 两种：工作区里那条路径现在不是那些字节，而且后来也没人重钉过它；或者路径跑出了工作区。
+// 后来的交付重钉了同一条路径，最后那句话才代表现在的字节——旧的那句是被覆盖，不是过期：
+// 它该不该存在由钉它的那条回答，不归更早的那条追问。
+// 少了这一条，文档被后来的任务改一次，所有盯过它的记录都会变成过期，逼着人重交一遍假证据。
+const filesOf = (proof) =>
+  proof.files ?? (proof.digest && proof.path ? [{ path: proof.path, digest: proof.digest }] : []);
+
 export function auditEvidence(root, doc, sessionId) {
+  const pins = [];
+  for (const one of doc.sessions)
+    for (const task of one.tasks)
+      for (const proof of task.evidence)
+        for (const file of filesOf(proof)) pins.push({ at: proof.at, path: file.path, digest: file.digest });
+
   const stale = [];
   const outside = [];
   const covered = [];
@@ -19,19 +29,25 @@ export function auditEvidence(root, doc, sessionId) {
     for (const task of one.tasks) {
       const claim = task.evidence[task.evidence.length - 1];
       for (const proof of task.evidence) {
-        if (!proof.digest || !proof.path) continue;
-        const file = path.resolve(root, proof.path);
-        if (proof !== claim) {
-          covered.push({ id: task.id, path: proof.path, digest: proof.digest });
-          continue;
+        for (const file of filesOf(proof)) {
+          if (proof !== claim) {
+            covered.push({ id: task.id, path: file.path, digest: file.digest });
+            continue;
+          }
+          const abs = path.resolve(root, file.path);
+          const inside = path.relative(root, abs);
+          if (inside.startsWith("..") || path.isAbsolute(inside)) {
+            outside.push({ id: task.id, path: file.path });
+            continue;
+          }
+          const actual = fs.existsSync(abs) ? digest(fs.readFileSync(abs)) : null;
+          if (actual === file.digest) continue;
+          // Whoever pinned this path last owns today's bytes. Whether they were
+          // right is their claim to answer, not the earlier one's.
+          const later = pins.some((pin) => pin.path === file.path && pin.at > proof.at);
+          if (later) covered.push({ id: task.id, path: file.path, digest: file.digest });
+          else stale.push({ id: task.id, path: file.path, digest: file.digest });
         }
-        const inside = path.relative(root, file);
-        if (inside.startsWith("..") || path.isAbsolute(inside)) {
-          outside.push({ id: task.id, path: proof.path });
-          continue;
-        }
-        const actual = fs.existsSync(file) ? digest(fs.readFileSync(file)) : null;
-        if (actual !== proof.digest) stale.push({ id: task.id, path: proof.path, digest: proof.digest });
       }
     }
   }
@@ -45,7 +61,7 @@ export function bareEvidence(doc) {
   for (const one of doc.sessions)
     for (const task of one.tasks) {
       const claim = task.evidence[task.evidence.length - 1];
-      if (claim && !(claim.digest && claim.path)) bare.push({ id: task.id });
+      if (claim && filesOf(claim).length === 0) bare.push({ id: task.id });
     }
   return bare;
 }

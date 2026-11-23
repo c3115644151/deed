@@ -165,12 +165,22 @@ export function fold(events) {
         if (task.status !== "todo" && task.status !== "done")
           noway(`任务 ${task.id} 不在未做状态：${task.status}`);
         task.status = "done";
+        // A delivery pins the content of every file it says it produced. Old
+        // lines pinned one file (digest + digestPath); new lines pin a list.
+        // Both shapes read the same way from here on: one entry per file.
+        const files =
+          ev.files !== undefined
+            ? ev.files.map((one) => ({ path: one.path, digest: one.digest }))
+            : ev.digest && ev.digestPath
+              ? [{ path: ev.digestPath, digest: ev.digest }]
+              : [];
         task.evidence.push({
           claim: ev.evidence,
           by: ev.by,
           at: ev.at,
-          digest: ev.digest ?? null,
-          path: ev.digestPath ?? null,
+          digest: files[0]?.digest ?? null,
+          path: files[0]?.path ?? null,
+          files,
           changed: ev.changed ?? [],
         });
         // What the delivery actually moved in the workspace, computed before the

@@ -67,7 +67,7 @@ const BOOLEAN_FLAGS = new Set(["pass", "force", "print-agents"]);
 // Two things a flag can mean when it is given twice: "all of these" or "the
 // caller is confused". Only one flag means the first; for the rest, quietly
 // keeping the last value throws away what someone typed.
-const REPEATABLE = new Set(["finding"]);
+const REPEATABLE = new Set(["finding", "digest"]);
 
 function parse(argv) {
   const given = new Map();
@@ -459,23 +459,23 @@ const commands = {
       if (verb === "done") {
         if (!id) fail("task done 要点名任务");
         if (!flags.evidence) fail("task done 必须带一条交付记录：--evidence \"命令与结果\"");
-        let pinned;
-        let pinnedPath;
-        if (flags.digest) {
-          const file = path.resolve(ROOT, String(flags.digest));
+        // 一次交付常常动了不止一个文件，而"记下的那个文件"才是事后能核的唯一凭据：
+        // 只收一枚，剩下的只能靠人挑，挑漏的那几份就成了没人担保的字节。
+        // --digest 可以写多遍，每一遍指一个文件。
+        const pins = list(flags.digest).map((given) => {
+          const file = path.resolve(ROOT, String(given));
           const inside = path.relative(ROOT, file);
           if (inside.startsWith("..") || path.isAbsolute(inside))
-            fail("--digest 只认工作区里的文件：" + flags.digest + " 在外面（工作区是 " + ROOT + "）");
+            fail("--digest 只认工作区里的文件：" + given + " 在外面（工作区是 " + ROOT + "）");
           let stat;
           try {
             stat = fs.statSync(file);
           } catch {
-            fail("--digest 指的文件不在：" + flags.digest);
+            fail("--digest 指的文件不在：" + given);
           }
-          if (!stat.isFile()) fail("--digest 要指一个文件，不是目录：" + flags.digest + "（例如 docs/a.md）");
-          pinned = digest(fs.readFileSync(file));
-          pinnedPath = rel(ROOT, file);
-        }
+          if (!stat.isFile()) fail("--digest 要指一个文件，不是目录：" + given + "（例如 docs/a.md）");
+          return { path: rel(ROOT, file), digest: digest(fs.readFileSync(file)) };
+        });
         // Snapshot before taking the lock: hashing the tree is the slow part of a
         // delivery, and holding the lock across it would make every other writer
         // wait for a scan. The snapshot is derived data; the ledger line is not.
@@ -492,14 +492,18 @@ const commands = {
               id,
               evidence: flags.evidence,
               by: flags.by ?? "agent",
-              digest: pinned,
-              digestPath: pinnedPath,
+              digest: pins[0]?.digest ?? null,
+              digestPath: pins[0]?.path ?? null,
+              files: pins,
               changed: taken.changed,
             };
           },
           () => writeSnapshot(ROOT, snapshotFiles),
         );
-        console.log("交付 · " + id + " · 交付记录：" + flags.evidence + (pinned ? " · 记下 " + pinned.slice(0, 12) : ""));
+        console.log(
+          "交付 · " + id + " · 交付记录：" + flags.evidence +
+            (pins.length === 0 ? "" : " · 记下 " + pins.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")),
+        );
         if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（门槛按它判，不只按声明的 --files）");
         return;
       }
@@ -913,7 +917,7 @@ const HELP = [
   "deed init [--said \"…\"] [--review \"src/**,…\"] [--exempt \"docs/**\"] [--port 7317]",
   "deed tick --who user|agent --said \"…\" [--did \"…\"] [--session S01]",
   "deed task add \"<要做的事>\" --criteria \"<做完的标准>\" [--files \"src/a.mjs,docs/b.md\"]",
-  "deed task done <T1> --evidence \"<命令与结果>\" [--digest <路径>] [--session S01]",
+  "deed task done <T1> --evidence \"<命令与结果>\" [--digest <路径> …] [--session S01]",
   "deed task undo <T1> --why \"…\"         收回最后那条交付（说错了话用它，别改写成对的）",
   "deed task defer|drop <T1> --why \"…\"",
   "deed ask \"<问题>\" --reading \"我理解成…\" --why \"…\"",

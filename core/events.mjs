@@ -79,6 +79,13 @@ export function validateEvent(ev, at) {
       need(ev, "by");
       if (ev.changed !== undefined && !Array.isArray(ev.changed))
         throw new Error("task.done 的 changed 要是路径数组");
+      if (ev.files !== undefined) {
+        if (!Array.isArray(ev.files)) throw new Error("task.done 的 files 要是 {path, digest} 数组");
+        for (const one of ev.files) {
+          if (!one || typeof one.path !== "string" || typeof one.digest !== "string")
+            throw new Error("task.done 的 files 每一项都要有 path 与 digest");
+        }
+      }
       break;
     case "task.undo":
       need(ev, "id");

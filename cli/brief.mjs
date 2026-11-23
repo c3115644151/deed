@@ -25,7 +25,13 @@ export function planBrief(root, open, segment, at) {
       "- 做完的标准：" + task.criteria,
       "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
       "- 状态：" + task.status,
-      ...task.evidence.map((proof) => "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）"),
+      ...task.evidence.map((proof) => {
+        const files = proof.files ?? (proof.digest ? [{ path: proof.path, digest: proof.digest }] : []);
+        return (
+          "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
+          (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、"))
+        );
+      }),
       ...(task.undone ?? []).map((one) => "- 撤回的交付：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 那条不计入"),
       "",
     ]),
