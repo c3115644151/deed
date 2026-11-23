@@ -166,13 +166,14 @@ test("a brief handed out after the last change is answered, not replaced", () =>
     { v: 5, at: T(5), k: "review.brief", s: null, segment: "S01.1", brief: "S01.1-1.md", briefDigest: "b".repeat(64) },
     sealed(6),
     add(7, "T2", ["core/b.mjs"]), done(8, "T2"), sealed(9, "S01.2"),
-    // 整期审打回 T1：那一段重新打开，任务回到未做，旧的那条通过结论留着但过期
-    { v: 6, at: T(10), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail", rework: ["T1"], why: "记录说错了", brief: "all.md", briefDigest: "c".repeat(64) },
+    // 整期审打回 S01.1：那一段重新打开，它自己那条通过结论留史但作废，条目保持交付
+    { v: 9, at: T(10), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail", rework: ["S01.1"], why: "记录说错了", brief: "all.md", briefDigest: "c".repeat(64) },
     done(11, "T1"),
   ];
   const old = fold(base);
-  assert.equal(reviewState(config, old.sessions[0], old.sessions[0].segments[0]), "stale");
-  assert.equal(nextAction(old, config).what, "重审", "手上没有新材料，就该另出一份");
+  // 整期审把它那条结论作废了：这一段回到没人判过的样子，不是「结论旧了」。
+  assert.equal(reviewState(config, old.sessions[0], old.sessions[0].segments[0]), "missing");
+  assert.equal(nextAction(old, config).what, "重审", "手上那份早于最后一次交付：另出一份");
   const fresh = fold([...base,
     { v: 6, at: T(12), k: "review.brief", s: null, segment: "S01.1", brief: "S01.1-2.md", briefDigest: "d".repeat(64) },
   ]);
@@ -325,8 +326,8 @@ test("a segment a reviewer passed is still weighed, so the exemption is only for
 // 而是 fail 分支每天都会造出来的；对它按门槛重算是本意，所以这条用例要跟着它走。
 test("a whole-period rework reopens a sealed segment, and that half-seal is weighed again", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
-  const whole = (n) => ({ v: 5, at: T(n), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail",
-    brief: "b.md", briefDigest: "a".repeat(64), why: "退回 T1", rework: ["T1"] });
+  const whole = (n) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail",
+    brief: "b.md", briefDigest: "a".repeat(64), why: "S01.1 的结论没对上这一期", rework: ["S01.1"] });
   const session = fold([
     turn(1), goal(2),
     add(3, "T1", ["core/a.mjs"]), done(4, "T1", "core/a.mjs"), seal(5, "S01.1"),
@@ -367,4 +368,21 @@ test("a delivery that points at nothing is told apart from one that points at a 
   assert.equal(pointsAtNothing({ changed: ["docs/gone.md"] }), false, "删掉一条路径也算指着它");
   assert.equal(pointsAtNothing({ digest: "a".repeat(64), path: "docs/a.md" }), false, "钉了内容");
   assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md", digest: "b".repeat(64) }] }), false, "钉了一组内容");
+});
+
+
+// 整期审打回的是段：那一段还开着就是没结清，一天没人重新看过，这一期就还不算过。
+// 少了这条，整体审判了不合格之后立刻再判一次通过就能把话绕过去。
+test("a whole-period failure stays open until the segment it named is reviewed again", () => {
+  const whole = (n, verdict, rework) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: verdict === "fail" ? "qa" : "qa2",
+    verdict, brief: verdict === "fail" ? "all-1.md" : "all-2.md", briefDigest: "a".repeat(64),
+    ...(verdict === "fail" ? { rework, why: "那一段的结论没对上这一期" } : {}) });
+  const base = [turn(1), goal(2),
+    add(3, "T1", ["core/a.mjs"]), done(4, "T1", "core/a.mjs"), sealed(5, "S01.1"),
+    add(6, "T2", ["core/b.mjs"]), done(7, "T2", "core/b.mjs"), sealed(8, "S01.2"),
+    whole(9, "fail", ["S01.1"]),
+  ];
+  const doc = fold(base);
+  assert.equal(doc.sessions[0].segments[0].closedAt, null, "被点名的段重开了");
+  assert.throws(() => fold([...base, whole(10, "pass")]), /还没结清|没有可结清的东西/, "那一段没重新判过，这一期不能就这么过去");
 });

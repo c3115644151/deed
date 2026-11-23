@@ -18,7 +18,7 @@ function guideText(subject, target, briefName) {
     "",
     target
       ? "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。"
-      : "你要回答一件事：这一期交付的活，合起来够不够得上它写下的目的。段只是批次，判断落在整期。",
+      : "你要回答一件事：这一期各段的结论合起来，够不够得上它写下的目的。段里的条目由段审判过；你要看的是它们之间\u3001与这一期那句话之间还有什么没对齐。",
     "清单在同目录（" + briefName + "）。你判的是清单上那几条，不是整个项目。",
     "",
     "## 先读标准，再读代码",
@@ -55,10 +55,12 @@ function guideText(subject, target, briefName) {
     "",
     "有没达成的：",
     "",
-    "    " + verdict + " --by \"你是谁\" --verdict fail --rework T1,T2 \\",
+    "    " + verdict + " --by \"你是谁\" --verdict fail --rework " + (target ? "T1,T2" : "S0x.N") + " \\",
     "      --why \"一句话总结\" --finding \"…\" --finding \"…\"",
     "",
-    "被点名的条目回到未做（交付记录退回），其余保持交付；段不封，补完再交再审。",
+    target
+      ? "被点名的条目回到未做（交付记录退回），其余保持交付；段不封，补完再交再审。"
+      : "被点名的段整段重开（段里的条目保持交付，谁也不重新交），那一段重新出清单、由它自己的审查者再审。",
     "",
     "## 你不能",
     "",
@@ -184,13 +186,48 @@ export function planBrief(root, open, segment, at) {
 // 单段的一期出这一份就够了——段审和整体审本来就看同一批任务。
 export function planWhole(root, session, at) {
   const p = ensureDirs(root);
+  // 整体审以段为单位：材料列的是每一段的结论，不是段里每条任务的清单。
+  // 段里每一条标准的判断，段审已经做过并留了依据；整期再审一遍等于把别人的
+  // 工作重做，也让「谁判了什么」变成两处都能改的事。
   const verdicts = new Map(
     session.reviews.filter((one) => one.scope !== "session" && !one.voidedAt).map((one) => [one.segment, one]),
   );
+  const segLine = (segment) => {
+    const review = verdicts.get(segment.id) ?? null;
+    const count = tasksIn(session, segment).length;
+    if (review)
+      return (
+        "- " + segment.id + " · " +
+        (review.verdict === "pass" ? "段审通过" : "段审不合格") + " · " +
+        review.by + " · " + stamp0(review.at) + " · " +
+        count + " 条" + (review.findings.length > 0 ? " · " + review.findings.length + " 条发现" : "") +
+        (review.rework.length > 0 ? " · 退回 " + review.rework.join("、") : "")
+      );
+    if (segment.sealedBy)
+      return (
+        "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " +
+        stamp0(segment.closedAt) + " · " + count + " 条 · 门槛说这一段不用审（" + (segment.sealWhy ?? "") + "）"
+      );
+    return "- " + segment.id + " · 没有段审 · " + count + " 条";
+  };
+  const findings = session.segments.flatMap((segment) => {
+    const review = verdicts.get(segment.id);
+    if (!review || review.findings.length === 0) return [];
+    return ["", "  " + segment.id + " 的发现（" + review.by + "）", ...review.findings.map((one) => "  - " + one)];
+  });
+  const carried = session.segments.flatMap((segment) =>
+    tasksIn(session, segment)
+      .filter((task) => task.status === "deferred" || task.status === "dropped")
+      .map((task) =>
+        "- " + task.id + " · " + (task.status === "deferred" ? "延后" : "放弃") +
+        "（" + segment.id + "）· " + task.title + "：" + (task.deferredWhy ?? task.droppedWhy ?? "没有写理由"),
+      ),
+  );
+  const waiting = session.asks.filter((one) => one.resolvedAt === null);
   const text = [
     "# 整体审清单 · " + session.id,
     "",
-    "会话 " + session.id + " · " + session.segments.length + " 段 · " + session.tasks.length + " 条 · 生成于 " + stamp0(at),
+    "会话 " + session.id + " · " + session.segments.length + " 段 · 生成于 " + stamp0(at),
     "",
     "## 这一期要做成什么",
     "",
@@ -198,22 +235,22 @@ export function planWhole(root, session, at) {
       ? session.goal.text + "（" + session.goal.by + " · " + stamp0(session.goal.at) + "）"
       : "（账本里还没写这一期要做成什么）",
     "",
-    ...session.segments.flatMap((segment) => {
-      const review = verdicts.get(segment.id) ?? null;
-      return [
-        "## 段 " + segment.id + " · " +
-          (review
-            ? (review.verdict === "pass" ? "段审通过" : "段审不合格") + "（" + review.by + " · " + stamp0(review.at) + "）"
-            : "没有段审"),
-        "",
-        ...tasksIn(session, segment).flatMap((task) => taskBlock(task, batchInfo(session.tasks))),
-      ];
-    }),
+    "## 各段的结论",
+    "",
+    ...session.segments.map(segLine),
+    ...findings,
+    "",
+    "## 段的结论之外，还留在这一期里的",
+    "",
+    ...(carried.length > 0 ? carried : ["- 没有延后或放弃的条目"]),
+    ...waiting.map((one) => "- 待裁 " + one.id + " · " + one.text),
+    "",
     "## 怎么审",
     "",
-    "1. 拿这一期写下的目的当尺子：这些交付合起来，兑现了那句话没有。",
-    "2. 段审看的是单条标准；你要看它们合起来还缺什么——缺的那一块，就是这一期没做成的事。",
-    "3. 结论落盘：deed review --all --by \"<你是谁>\" --verdict pass|fail --finding \"<缺的那一块>\"",
+    "1. 你手上是每一段自己的结论，不是段里每条任务的清单：段内每条标准判没判过，那一段的审查者已经判过、也留了依据。",
+    "2. 拿这一期写下的那句话当尺子：这些段合起来，兑现了没有；有没有两段互相打脸（同一件事两种说法、后一段假设前一段没做的行为、两段的门宽窄不一样）。",
+    "3. 看不出来的地方就去读代码与账本，别停在结论上：结论只有一句话，为什么这么判在它的发现里。",
+    "4. 结论落盘：deed review --all --by \"<你是谁>\" --verdict pass|fail；打回点名的是段（--rework S02.3 --why \"…\"），那一段整段重开，段里的条目由它自己的审查者重新看。",
     "",
     "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
     "",

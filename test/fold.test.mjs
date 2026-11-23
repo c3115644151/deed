@@ -256,3 +256,22 @@ test("a take-back is read from the line that recorded it, not from the delivery 
   const older = fold([turn(1), add(2, "T1"), delivered, { ...said, undoes: undefined }]);
   assert.equal(older.sessions[0].tasks[0].undone[0].undoes[0].path, "a.txt", "旧行没有这一格，才退回最后一条交付");
 });
+
+
+// 整体审的对象是各段的结论，所以它退回去的也只能是段：点条目在账本这一层就该拒，
+// 不能只靠 CLI 挡——别的地方照样能写出这个形状的行。
+test("a whole-period verdict names segments, and a task id is refused in the ledger too", () => {
+  const pass = (n, segment) => ({ v: 9, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: "pass",
+    brief: segment + ".md", briefDigest: "a".repeat(64) });
+  const whole = (n, verdict, rework) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: "qa2",
+    verdict, brief: "all-1.md", briefDigest: "b".repeat(64),
+    ...(verdict === "fail" ? { rework, why: "那一段的结论没对上这一期" } : {}) });
+  const base = [turn(1), add(2, "T1"), done(3, "T1"), pass(4, "S01.1"),
+    add(5, "T2"), done(6, "T2"), pass(7, "S01.2")];
+  assert.throws(() => fold([...base, whole(8, "fail", ["T1"])]), /不是段/, "整体审点不了条目");
+  const session = fold([...base, whole(8, "fail", ["S01.1"])]).sessions[0];
+  assert.equal(session.segments[0].closedAt, null, "被点名的段整段重开");
+  assert.equal(session.tasks[0].status, "done", "段里的条目保持交付");
+  assert.equal(session.segments[1].closedAt !== null, true, "没被点名的段不动");
+  assert.notEqual(session.reviews.find((one) => one.scope === "segment").voidedAt, null, "那一段原先的结论留史作废");
+});

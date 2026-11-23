@@ -348,10 +348,13 @@ export function fold(events) {
         // 旧账本里的 fail 没点名任何条目，也就没有可结清的东西——那种结论只能由人推翻。
         if (latest && latest.verdict === "fail" && ev.verdict === "pass") {
           const named = latest.rework ?? [];
-          const stuck = named
-            .map((id) => taskOf(session, id))
-            .filter((task) => task.status !== "done" && task.status !== "accepted")
-            .map((task) => task.id);
+          // 整体审的结论点的是段：那一段还开着（或还没重新判过）就是没结清。
+          const stuck = latest.scope === "session" && (latest.v ?? 1) >= 9
+            ? named.filter((id) => session.segments.some((one) => one.id === id && one.closedAt === null))
+            : named
+                .map((id) => taskOf(session, id))
+                .filter((task) => task.status !== "done" && task.status !== "accepted")
+                .map((task) => task.id);
           if (named.length === 0)
             noway(
               `${subject} 在案的结论是不合格（${latest.by}）：它没点名要重做的条目，没有可结清的东西——要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
@@ -368,12 +371,19 @@ export function fold(events) {
         const rework = ev.rework ?? [];
         if (ev.verdict === "fail" && meaning >= 3 && rework.length === 0)
           noway(`${subject} 判不合格要点名重做的条目（--rework T1,T2）：不点名的结论没人能接`);
-        for (const taskId of rework) {
-          const task = taskOf(session, taskId);
-          // 段审只能点本段的：跨段的打回会把别的段的活退回已交付，
-          // 而账本只说"已打回"。整期审可以点这一期里任何一条。
-          if (segment && task.segment !== segment.id)
-            noway(`任务 ${task.id} 不在段 ${segment.id} 里（它在 ${task.segment}），打回不能跨段`);
+        const sessionRework = ev.v !== undefined && ev.v >= 9;
+        for (const id of rework) {
+          // 段审点的是段里的条目；整体审点的是段本身——它看的就是各段的结论，
+          // 所以它能退回的也只有"这一段要重做"，段里哪一条不行由那一段自己判。
+          // 第 9 版之前整体审点的是条目：那种行按当时的写法读，不拿今天的口径重判历史。
+          if (!segment && !sessionRework) continue;
+          if (segment) {
+            const task = taskOf(session, id);
+            if (task.segment !== segment.id)
+              noway(`任务 ${task.id} 不在段 ${segment.id} 里（它在 ${task.segment}），打回不能跨段`);
+          } else if (!session.segments.some((one) => one.id === id)) {
+            noway(`整体审点名的是段（${id} 不是段）：段里的条目由那一段的审查者点名`);
+          }
         }
         const id = `R${session.reviews.length + 1}`;
         // Every live verdict is replaced explicitly, so two conclusions never
@@ -393,6 +403,7 @@ export function fold(events) {
           briefDigest: ev.briefDigest ?? null,
           findings: ev.findings ?? [],
           rework,
+          v: ev.v ?? 1,
           at: ev.at,
           voidedAt: null,
           voidedBy: null,
@@ -428,7 +439,32 @@ export function fold(events) {
         }
         // 不合格不封段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
         // 不必再回来问"到底哪几条要重做"。（整期审打回时条目可以跨段。）
-        if (ev.verdict === "fail") {
+        if (ev.verdict === "fail" && !segment && sessionRework) {
+          // 整体审退回的是段：整段重开，段里的条目保持交付——重新看的是这一段的
+          // 结论，不是让每个人再交一遍。段内哪一条不行，由那一段的审查者点名。
+          for (const id of rework) {
+            const home = session.segments.find((one) => one.id === id);
+            // 这一段原先的结论回答的是它自己那份材料；整体审说这一期不对，
+            // 那条结论就不再是在案的：留史（voidedAt），段回到没人判过的样子。
+            for (const older of session.reviews)
+              if (older.scope === "segment" && older.segment === home.id && older.voidedAt === null) {
+                older.voidedAt = ev.at;
+                older.voidedBy = ev.by;
+                older.supersededBy = id;
+              }
+            for (const other of session.tasks)
+              if (other.segment === home.id && other.status === "accepted") other.status = "done";
+            home.verdict = null;
+            home.judgedAt = null;
+            home.closedAt = null;
+            home.reviewAt = ev.at;
+            home.reviewBy = ev.by;
+            home.reviewVerdict = "fail";
+            home.sealedByReview = null;
+            home.touchedAt = ev.at;
+          }
+        }
+        if (ev.verdict === "fail" && (segment || !sessionRework)) {
           for (const taskId of rework) {
             const task = taskOf(session, taskId);
             const home = session.segments.find((one) => one.id === task.segment);

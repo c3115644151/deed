@@ -840,10 +840,16 @@ const commands = {
         const findings = list(flags.finding);
         const rework = split(flags.rework).filter(Boolean);
         if (flags.verdict === "fail") {
-          if (rework.length === 0) fail("不合格要点名要重做的条目：--rework T1,T2（不点名的结论没人能接）");
+          // 整体审点的是段：它手上就是各段的结论，段里哪一条不行由那一段自己判。
+          if (rework.length === 0) fail("不合格要点名要重做的段：--rework S0x.N,S0x.M（不点名的结论没人能接）");
+          const unknown = rework.filter((id) => !one.segments.some((seg) => seg.id === id));
+          if (unknown.length > 0)
+            fail(
+              unknown.join("、") + " 不是段：整体审退回的是段（" + one.segments.map((seg) => seg.id).join("、") + "），段里的条目由那一段的审查者点名",
+            );
           if (!flags.why) fail('不合格要说清为什么：--why "一句话总结"（具体问题写在 --finding 里）');
         } else if (rework.length > 0) {
-          fail("--rework 只跟 --verdict fail 一起用：pass 的意思是这一期过了，没有要退回的条目");
+          fail("--rework 只跟 --verdict fail 一起用：pass 的意思是这一期过了，没有要退回的段");
         }
         const after = transact(flags, () => ({
           k: "review.log",
@@ -865,7 +871,7 @@ const commands = {
           console.log("整体审不合格 · " + one.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
           console.log("  材料 " + handed.brief);
           for (const one2 of findings) console.log("  发现 · " + one2);
-          console.log("  被点名的条目回到未做；补完再交，deed review --all 另出材料再审");
+          console.log("  被点名的段整段重开（段里的条目保持交付）；先给它重出清单，再由它自己的审查者再审");
         }
         const step = nextAction(after, after.config);
         console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
@@ -1510,10 +1516,10 @@ const HELP = [
   "deed ask resolve|withdraw <A1> [--decision \"…\"] [--why \"…\"]",
   "deed goal \"<这一期要做成什么>\" [--why \"…\"]   签收与整体审都拿它当尺子",
   "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
-  "deed review --all                      发整期材料（段都封之后用它；一段的一期由那一段的结论回答）",
+  "deed review --all                      发整期材料（列各段的结论；段都封之后用它，一段的一期由那一段的结论回答）",
   "deed review --segment S01.1 --by \"谁\" --verdict pass [--finding \"…\"]   pass 直接封段",
   "deed review --segment S01.1 --by \"谁\" --verdict fail --rework T1,T2 --why \"…\" [--finding \"…\"]",
-  "deed review --all --by \"谁\" --verdict pass|fail [--rework T1,…] [--why \"…\"]   结论落在整期",
+  "deed review --all --by \"谁\" --verdict pass|fail [--rework S0x.N,…] [--why \"…\"]   结论落在整期（点名的是段）",
   "deed seal [--segment S01.1] --why \"…\"  封一个免审段（门槛说不用审，没人审过）",
   "deed judge --overturn R1 --why \"…\"    推翻一条在案的结论（例外，不是步骤）",
   "deed sign --words \"<用户原话>\" [--title \"<这一期的名字>\"]",

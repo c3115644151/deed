@@ -147,6 +147,12 @@ test("a whole review reads the period, and its pass seals what it read", () => {
   assert.match(handed.stdout, /整体审材料/);
   const pair = briefs(cwd).filter((one) => one.includes("-all-"));
   assert.equal(pair.length, 2, "整期材料也是清单加角色包");
+  const sheet = fs.readFileSync(path.join(cwd, ".deed", "review", pair.find((one) => !one.includes("-reviewer"))), "utf8");
+  assert.match(sheet, /## 各段的结论/, "整期材料列的是各段的结论");
+  assert.match(sheet, /- S01\.1 · 段审通过 · qa · \d\d-\d\d \d\d:\d\d · 1 条/, "每一段一行：谁判的、什么时候、什么结论");
+  assert.doesNotMatch(sheet, /### T\d/, "段里的条目不再重列：那一段的审查者已经判过");
+  assert.match(sheet, /--rework S02\.3|--rework S0x\.N/, "打回点名的是段");
+  assert.match(sheet, /这一期要做成什么/, "尺子就是那一句目的");
   const passed = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "pass");
   assert.equal(passed.status, 0, passed.stdout + passed.stderr);
   assert.match(passed.stdout, /整体审通过/);
@@ -157,7 +163,9 @@ test("a whole review reads the period, and its pass seals what it read", () => {
 });
 
 // 整期审打回可以点名上一段已经封存的任务：那一段要跟着打开，否则那一条连重新交付都做不了。
-test("a whole review can send back work from a segment it already sealed", () => {
+// 整体审退回的是段：它手上就是各段的结论，段内哪一条不行由那一段自己判。
+// 整段重开，段里的条目保持交付——重新看的是这一段的结论，不是让人再交一遍。
+test("a whole review sends back a segment, not the entries inside it", () => {
   const cwd = workspace("whole-rework");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "goal", "把两段活收成一件", "--by", "user");
@@ -170,14 +178,16 @@ test("a whole review can send back work from a segment it already sealed", () =>
   deed(cwd, "review", "--segment", "S01.2");
   assert.equal(deed(cwd, "review", "--segment", "S01.2", "--by", "qa", "--verdict", "pass").status, 0);
   deed(cwd, "review", "--all");
-  const back = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "第一段的交付记录没说清");
+  const byTask = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "第一段不对");
+  assert.equal(byTask.status, 1, "整体审点不了条目");
+  assert.match(byTask.stderr, /不是段/);
+  const back = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "S01.1", "--why", "第一段的结论没对上这一期的目的");
   assert.equal(back.status, 0, back.stdout + back.stderr);
   const session = fold(readEvents(cwd)).sessions[0];
-  assert.equal(session.tasks[0].status, "todo", "被点名的回到未做");
-  assert.equal(session.segments[0].closedAt, null, "它所在的那一段跟着打开");
-  assert.equal(session.tasks[1].status, "accepted", "没被点名的段不动");
-  assert.equal(session.segments[1].closedAt !== null, true);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "补了并发记录", "--digest", proof(cwd)).status, 0, "打开了才交得进去");
+  assert.equal(session.segments[0].closedAt, null, "被点名的段整段重开");
+  assert.equal(session.tasks[0].status, "done", "段里的条目保持交付：没人要重交一遍");
+  assert.equal(session.segments[1].closedAt !== null, true, "没被点名的段不动");
+  assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1/, "下一步是给那一段重出清单");
 });
 
 // 一段的一期不审两遍：段放行就是这一期的结局，下一步直接是签收；
@@ -1665,7 +1675,7 @@ test("a standing whole-period failure still blocks the signature", () => {
   deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
   assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
   assert.equal(deed(cwd, "review", "--all").status, 0);
-  assert.equal(deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "文档写得不清楚").status, 0);
+  assert.equal(deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "S01.1", "--why", "文档写得不清楚").status, 0);
   const signed = deed(cwd, "sign", "--words", "可以", "--by", "user");
   assert.equal(signed.status, 1, "整期不合格还活着，签收要挡住");
   assert.match(signed.stderr, /整体审判了不合格/);
