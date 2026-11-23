@@ -82,4 +82,12 @@
   标准：needsWhole 不靠重算已封存段的规模来决定「这一期要不要整期审」——审过的段算数、deed seal 的段不算；docs/DESIGN.md 那两处话与代码一致，并写明账本层为什么不重查门槛；HANDOFF 的「没做的」列出这两条边界与理由
   交付：core/rules.mjs 的 needsWhole 改成 read(one) || owed(one)（read = 这一段有审查者的 pass，owed = 不是免审且门槛要审），不再拿已封存段的字节重量重算；docs/DESIGN.md §12.4 那段改成「规模规则只管还开着的段」并补一句「要不要整期审只看有没有人看过它」，§6 的规模那条跟着改，§8 新增「账本层不重查门槛」一段（fold 只拒自相矛盾的事件，该审的段封不了由 sealBlockers 挡，拿今天的门槛核历史行会把合法历史判成坏账）；HANDOFF 新增这一轮一节、「没做的」列上这两条边界与其理由、下一步改到 S02.6 与 deed review --all。测试：test/rules.test.mjs 新增「a segment a reviewer read counts for the whole review, whatever its deliveries weigh later」（一段很小被 pass 封住、一段 deed seal 封住 → 前段 needsReview false 而整期审仍要有结论）。跑的是这一份字节：node --test 154/154（rules 19/19）、node --test test/docs.test.mjs 4/4（它在改完 HANDOFF 之后跑的）。变异核对：把 read 那行改成 false && …，rules 立刻 2 条红（17 过 2 败），还原 19/19。
 
+## 段 S02.7
+- [x] T44 整期审那条用例站在顶层，父用例自己的收尾留在父用例里
+  标准：test/rules.test.mjs 里「a segment a reviewer read counts…」是顶层 test；它上面那条 seal 用例在 :293 之后自己收口（signBlockers 与 nextAction 断言都在同一个 test 里）。变异核对：把 read 那行改成 false && …，只有这一条用例红（18 过 1 败），不是把父用例一起带红。
+  交付：test/rules.test.mjs 里那条 seal 用例在 :293-295 自己收口（signBlockers 与 nextAction 断言都在同一个 test 里），「a segment a reviewer read counts…」提到顶层、夹具自己建（:297-315）；原来收尾断言被挤在新用例之后，一次变异会把两条用例一起带红。跑的是这一份字节：node --test 154/154、node --test test/rules.test.mjs 19/19。变异核对（TEMP 副本把 core/rules.mjs 的 read 改成 false && …）：18 过 1 败，红的只有新用例，父用例不再跟着红。
+- [x] T45 文档只说 deed seal 封过的段不再重算规模，被 pass 封的段照样重算
+  标准：docs/DESIGN.md 的 §6 规模那条与 §12.4 边界段都改写成「`segment.seal` 封过的段不再重算规模」，并说清被审查者 pass 封的段照样重算、结局由结论决定（reviewState / needsWhole 按「有没有人看过」短路）。
+  交付：docs/DESIGN.md §6 规模那条改成「`segment.seal` 封过的段不再重算规模」，并说清被审查者 pass 封的段照常重算、结局由结论决定（reviewState 认有效的 pass，needsWhole 认有没有人看过）；§12.4 的边界段同改，另加一段说「needsReview 的返回值不等于结局，要读结局读 reviewState 与 signBlockers」。跑的是这一份字节：node --test 154/154、node --test test/docs.test.mjs 4/4。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->
