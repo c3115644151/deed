@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
+import { needsReview } from "../core/rules.mjs";
 
 const T = (n) => new Date(Date.UTC(2026, 10, 22, 10, n)).toISOString();
 
@@ -198,4 +199,8 @@ test("a rework takes back the paths the delivered work touched, not just the cla
   const task = after.sessions[0].tasks[0];
   assert.deepEqual(task.changed, ["notes.md"], "退回的那条交付碰过的路径不再算这一段的性质");
   assert.deepEqual(Object.keys(task.sizes), ["notes.md"]);
+  // 门槛就在这几条路径上判：退回之前那一批有 .gitignore，要审；退回之后只剩 *.md，免审。
+  const config = { review: { required: ["core/**"], exempt: ["*.md"] } };
+  assert.equal(needsReview(config, before.sessions[0], before.sessions[0].segments[0]), true, "碰过 .gitignore 的那一批要审");
+  assert.equal(needsReview(config, after.sessions[0], after.sessions[0].segments[0]), false, "退回之后再交的只有 *.md，门槛不再判要审");
 });
