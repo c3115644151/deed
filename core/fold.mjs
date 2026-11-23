@@ -147,7 +147,7 @@ export function fold(events) {
           segment: segment.id,
           createdAt: ev.at,
           // 这一段最后一次"被改动"的时刻，任务自己的生命周期都算：加了、交了、
-          // 收回了、延后了、弃掉了。任务书与结论都拿它比新旧。
+          // 收回了、延后了、弃掉了。清单与结论都拿它比新旧。
           touchedAt: ev.at,
           status: "todo",
           evidence: [],
@@ -190,7 +190,7 @@ export function fold(events) {
         break;
       }
       // 交付说错了话，只能收回，不能改写：撤回是一条新事实，最后那条交付
-      // 退回未做，理由留在任务上——审查任务书要能说清哪一条不算数。
+      // 退回未做，理由留在任务上——审查清单要能说清哪一条不算数。
       case "task.undo": {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
@@ -249,6 +249,8 @@ export function fold(events) {
           segment: segment.id,
           brief: ev.brief,
           briefDigest: ev.briefDigest,
+          guide: ev.guide ?? null,
+          guideDigest: ev.guideDigest ?? null,
           at: ev.at,
           by: ev.by ?? null,
           answeredBy: null,
@@ -277,8 +279,21 @@ export function fold(events) {
         // A fail is a decision about this delivery. It is not a draft that a
         // later pass may quietly overwrite: overturning it is a rework, which
         // puts the work back on the table first.
-        if (latest && latest.verdict === "fail" && ev.verdict === "pass")
+        // 第 3 版把"打回"并进了不合格那条记录：fail 自己点名、自己把活放回桌面，
+        // 所以它之后出现的 pass 是重新审过的。旧账本里的 fail 不带点名，仍旧要人来打回。
+        const meaning = ev.v ?? 1;
+        if (latest && latest.verdict === "fail" && ev.verdict === "pass" && meaning < 3)
           noway(`段 ${segment.id} 在案的结论是不合格（${latest.by}）：要改判先打回（judge --rework），再重新审`);
+        // 点名要重做的条目：记录落盘之前先确认它们都在这一段里，否则一条
+        // 打回会写到别的段的任务上，而账本只说"已打回"。
+        const rework = ev.rework ?? [];
+        if (ev.verdict === "fail" && meaning >= 3 && rework.length === 0)
+          noway(`段 ${segment.id} 判不合格要点名重做的条目（--rework T1,T2）：不点名的结论没人能接`);
+        for (const taskId of rework) {
+          const task = taskOf(session, taskId);
+          if (task.segment !== segment.id)
+            noway(`任务 ${task.id} 不在段 ${segment.id} 里（它在 ${task.segment}），打回不能跨段`);
+        }
         const id = `R${session.reviews.length + 1}`;
         // Every live verdict is replaced explicitly, so two conclusions never
         // both claim to be the current one.
@@ -294,6 +309,7 @@ export function fold(events) {
           brief: ev.brief,
           briefDigest: ev.briefDigest ?? null,
           findings: ev.findings ?? [],
+          rework,
           at: ev.at,
           voidedAt: null,
           voidedBy: null,
@@ -305,6 +321,49 @@ export function fold(events) {
         segment.reviewAt = ev.at;
         segment.reviewBy = ev.by;
         segment.reviewVerdict = ev.verdict;
+        // 审查者放行就是这一段的结局：第 3 版起 pass 自己封段，不再等第二个人签字。
+        // 验收那份名单只认一件事——有人独立看过这段活，而且看的是最后发出去的那份。
+        if (ev.verdict === "pass" && meaning >= 3) {
+          for (const task of session.tasks)
+            if (task.segment === segment.id && task.status === "done") task.status = "accepted";
+          segment.verdict = "pass";
+          segment.judgedAt = ev.at;
+          segment.closedAt = ev.at;
+        }
+        // 不合格不封段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
+        // 不必再回来问"到底哪几条要重做"。
+        if (ev.verdict === "fail") {
+          for (const taskId of rework) {
+            const task = taskOf(session, taskId);
+            task.status = "todo";
+            task.evidence = [];
+            task.deferredWhy = null;
+            task.touchedAt = ev.at;
+          }
+        }
+        break;
+      }
+      // 人推翻结论是例外，不是步骤：它把一条在案的结论作废，并把这一段重新打开，
+      // 让活回到桌面上——原先"判过"的那批任务退回已交付。
+      case "review.overturn": {
+        const session = sessionOf(doc, ev);
+        const review = session.reviews.find((one) => one.id === ev.review);
+        if (!review) noway(`这个会话里没有结论 ${ev.review}`);
+        if (review.voidedAt !== null) noway(`结论 ${review.id} 已经作废过（${review.voidedBy}）`);
+        review.voidedAt = ev.at;
+        review.voidedBy = ev.by;
+        review.voidedWhy = ev.why;
+        const segment = segmentById(session, review.segment);
+        segment.reviewVerdict = null;
+        segment.reviewAt = null;
+        segment.reviewBy = null;
+        if (segment.closedAt !== null) {
+          for (const task of session.tasks)
+            if (task.segment === segment.id && task.status === "accepted") task.status = "done";
+          segment.verdict = null;
+          segment.judgedAt = null;
+          segment.closedAt = null;
+        }
         break;
       }
       case "judge.pass": {

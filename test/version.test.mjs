@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EVENT_VERSION } from "../core/events.mjs";
+import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { compareVersions, currentVersion, unknownKindNotice } from "../lib/version.mjs";
 
 test("versions compare by three numbers, and only by them", () => {
@@ -42,10 +42,30 @@ test("a line from a newer vocabulary is newer even when the version string match
   const same = unknownKindNotice("task.undo", "0.2.0", "0.2.0", EVENT_VERSION);
   assert.equal(same.newer, false, "含义版本不超前，才轮到「手写或被改过」这条解释");
   assert.match(same.advice, /\.deed\/log\/rejected/);
-  assert.match(same.headline, /含义第 2 版，当前第 2 版/);
+  assert.match(same.headline, new RegExp(`含义第 ${EVENT_VERSION} 版，当前第 ${EVENT_VERSION} 版`));
 
   const old = unknownKindNotice("task.undo", "0.2.0", "0.2.0", 1);
   assert.equal(old.newer, false, "旧行不认得的类型，也不是账本新");
+});
+
+test("an older line is read by the standard it was written under, not today's", () => {
+  // 第 3 版把打回并进了不合格：新写的 fail 必须点名、必须说为什么。
+  // 但 doctor 会逐行校验旧账本——用今天的规矩去验 11-23 之前的行，等于把一份
+  // 干净的账本判成坏的。历史行按它自己那一版读。
+  const line = {
+    k: "review.log",
+    s: "S01",
+    segment: "S01.1",
+    by: "reviewer:old",
+    verdict: "fail",
+    brief: ".deed/review/S01.1-1.md",
+    briefDigest: "a".repeat(64),
+    at: "2026-11-23T00:00:00.000Z",
+  };
+  assert.doesNotThrow(() => validateEvent({ ...line, v: 2 }, line.at), "第 2 版的行不带 why/rework 也成立");
+  assert.doesNotThrow(() => validateEvent({ ...line, v: undefined }, line.at), "没写 v 的行更早");
+  assert.throws(() => validateEvent({ ...line, v: 3 }, line.at), /why/);
+  assert.throws(() => validateEvent({ ...line, v: 3, why: "看不清" }, line.at), /rework/);
 });
 
 test("the running version comes from the package it ships with", () => {

@@ -408,7 +408,7 @@ const commands = {
     }
     writeConfig(ROOT, config);
     writeSnapshot(ROOT, changedPaths(ROOT).now);
-    console.log("deed: 建好 " + path.relative(ROOT, p.dir) + "/（账本、审查任务书、配置）");
+    console.log("deed: 建好 " + path.relative(ROOT, p.dir) + "/（账本、审查清单、配置）");
     console.log("  要审的路径：" + show(config.review.required));
     console.log("  免审的路径：" + show(config.review.exempt));
     const said = flags.said ?? words.join(" ");
@@ -583,30 +583,41 @@ const commands = {
         // 交完再出，否则它一出生就是旧的。
         const pending = tasksIn(one, seg).filter((task) => task.status === "todo");
         if (pending.length > 0)
-          fail("段 " + seg.id + " 还有没交付的（" + pending.map((task) => task.id).join("、") + "）：任务书等交付完再出");
+          fail("段 " + seg.id + " 还有没交付的（" + pending.map((task) => task.id).join("、") + "）：清单等交付完再出");
         const handed = lastBrief(one, seg.id);
         const answered = handed && one.reviews.some((rv) => rv.brief === handed.brief);
         if (handed && !answered) {
           // 交出去的那份只要没被动过，就在等结论；被改过或删了就另出一份——
           // 手上那份已经不是账本里记的那一份，谁读它都不算数。
           const file = path.resolve(ROOT, handed.brief);
-          const intact = fs.existsSync(file) && digest(fs.readFileSync(file)) === handed.briefDigest;
+          const pack = handed.guide ? path.resolve(ROOT, handed.guide) : null;
+          // 两份材料是一起交出去的：任何一份被动过，手上就不是审查者读过的那一份。
+          const intact =
+            fs.existsSync(file) &&
+            digest(fs.readFileSync(file)) === handed.briefDigest &&
+            (!pack || (fs.existsSync(pack) && digest(fs.readFileSync(pack)) === handed.guideDigest));
           // 清单写的是它发出那一刻的条目与交付记录。之后这一段又动了（加任务、
           // 交付、收回），这份清单就不再说这一段现在的事——换一份，别让人审旧内容。
           const moved = lastSegmentChange(one, seg);
           const stale = moved !== null && moved > handed.at;
-          if (intact && stale) console.log("上一份任务书(" + handed.brief + ")出在这一段最近一次改动之前：另出一份");
+          if (intact && stale) console.log("上一份清单(" + handed.brief + ")出在这一段最近一次改动之前：另出一份");
           else if (intact) {
-            console.log("审查任务书 · " + handed.brief + "（这一段已经出过，等结论落盘）");
+            console.log("审查清单 · " + handed.brief + "（这一段已经出过，等结论落盘）");
             console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
             return;
-          } else console.log("上一份任务书(" + handed.brief + ")改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
+          } else console.log("上一份材料(" + handed.brief + " 与角色包)改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
         }
         const plan = planBrief(ROOT, one, seg, stamp());
         const brief = rel(ROOT, plan.file);
-        transact(flags, () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, briefDigest: plan.digest }), () => writeBrief(plan, brief));
-        console.log("审查任务书 · " + brief);
-        console.log("  交给审查者；结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
+        const guide = rel(ROOT, plan.guideFile);
+        transact(
+          flags,
+          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, briefDigest: plan.digest, guide, guideDigest: plan.guideDigest }),
+          () => writeBrief(plan, brief),
+        );
+        console.log("审查清单 · " + brief + "（审什么）");
+        console.log("  角色包 · " + guide + "（怎么审）· 两份一起交给审查者");
+        console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
         return;
       }
       if (!flags.by) fail("review 要给结论就要写清谁审的：--by \"…\"");
@@ -616,17 +627,34 @@ const commands = {
       // A verdict answers the document that was handed out. Writing a fresh one
       // here would pin bytes produced after the reading -- a brief nobody read.
       const handed = lastBrief(one, seg.id);
-      if (!handed) fail("这一段还没有任务书：先 deed review --segment " + seg.id + " 出任务书，再把结论落回来");
+      if (!handed) fail("这一段还没有清单：先 deed review --segment " + seg.id + " 出清单，再把结论落回来");
       const file = path.resolve(ROOT, handed.brief);
-      if (!fs.existsSync(file)) fail("任务书不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
+      if (!fs.existsSync(file)) fail("清单不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
       if (digest(fs.readFileSync(file)) !== handed.briefDigest)
-        fail("任务书被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
+        fail("清单被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
+      // 角色包和清单成对交出去，结论回答的是两份一起。换掉角色包（"怎么审"
+      // 被改成"随便过"）同样是一份没人读过的材料。
+      if (handed.guide) {
+        const pack = path.resolve(ROOT, handed.guide);
+        if (!fs.existsSync(pack)) fail("角色包不在了（" + handed.guide + "）：先 deed review --segment " + seg.id + " 重出一份");
+        if (digest(fs.readFileSync(pack)) !== handed.guideDigest)
+          fail("角色包被改过（" + handed.guide + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
+      }
       // 清单变了，结论就没法回答它：那一份写的不是现在这一段。
       const moved = lastSegmentChange(one, seg);
       if (moved !== null && moved > handed.at)
-        fail("这一段在任务书出过之后又动过（" + handed.brief + "）：结论只能回答清单上那几条，deed review --segment " + seg.id + " 另出一份再审");
+        fail("这一段在清单出过之后又动过（" + handed.brief + "）：结论只能回答清单上那几条，deed review --segment " + seg.id + " 另出一份再审");
       const findings = list(flags.finding);
-      transact(flags, () => ({
+      // 一条结论要么放行，要么说清哪几条要重做。不合格而不点名，接到结论的人
+      // 只能回来猜——那是把判断留给没看过活的人。
+      const rework = split(flags.rework).filter(Boolean);
+      if (flags.verdict === "fail") {
+        if (rework.length === 0) fail("不合格要点名要重做的条目：--rework T1,T2（不点名的结论没人能接）");
+        if (!flags.why) fail("不合格要说清为什么：--why \"一句话总结\"（具体问题写在 --finding 里）");
+      } else if (rework.length > 0) {
+        fail("--rework 只跟 --verdict fail 一起用：pass 的意思是这一段过了，没有要退回的条目");
+      }
+      const after = transact(flags, () => ({
         k: "review.log",
         s: one.id,
         segment: seg.id,
@@ -635,10 +663,21 @@ const commands = {
         brief: handed.brief,
         briefDigest: handed.briefDigest,
         findings,
-      }));
-      console.log("审查落盘 · " + seg.id + " · " + flags.by + " · " + flags.verdict);
-      console.log("  任务书 " + handed.brief);
+        ...(flags.verdict === "fail" ? { rework, why: flags.why } : {}),
+      })).doc;
+      if (flags.verdict === "pass") {
+        console.log("审查通过 · " + seg.id + " · " + flags.by + " · 段已封存");
+        console.log("  清单 " + handed.brief);
+        for (const one2 of findings) console.log("  发现 · " + one2);
+        const step = nextAction(after, after.config);
+        console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
+        console.log("  " + step.command);
+        return;
+      }
+      console.log("审查不合格 · " + seg.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
+      console.log("  清单 " + handed.brief);
       for (const one2 of findings) console.log("  发现 · " + one2);
+      console.log("  被点名的条目回到未做；补完再交，deed review --segment " + seg.id + " 另出清单再审");
     });
   },
 
@@ -646,7 +685,40 @@ const commands = {
     const { flags, words } = parse(argv);
     guard(() => {
       const { doc } = load();
-      const one = targetSession(doc, flags);
+      // 推翻一条结论是例外，不是步骤：段由审查者的 pass 自己封，人不签字；
+      // 人只在"这一份结论错了"的时候出手，而且要写明为什么。它会点名一条结论，
+      // 所以按结论找会话，而不是按"现在开着哪一期"找。
+      const overturned = flags.overturn
+        ? doc.sessions.flatMap((one2) => one2.reviews.map((rv) => ({ session: one2, review: rv }))).find((pair) => pair.review.id === flags.overturn)
+        : null;
+      if (flags.overturn && !overturned) {
+        const known = doc.sessions.flatMap((one2) => one2.reviews.map((rv) => one2.id + "/" + rv.id + "（" + rv.verdict + "）"));
+        fail("账本里没有结论 " + flags.overturn + "：账本里的结论是 " + (known.join("、") || "（一条都没有）"));
+      }
+      const one = overturned ? overturned.session : targetSession(doc, flags);
+      if (flags.overturn) {
+        const review = overturned.review;
+        if (review.voidedAt) fail("结论 " + review.id + " 已经作废过（" + review.voidedBy + "）：再推翻它没有意义");
+        if (!flags.why) fail("推翻一条结论要说清为什么：--why \"…\"");
+        if (one.closeKind)
+          fail(
+            "这一期已经" + (one.closeKind === "signed" ? "签收" : "搁下") + "（" + one.words + "）：账本不往回改，" +
+              "错在哪就开新一期把要补的记进去；要推翻结论得在签收之前",
+          );
+        const after = transact(flags, () => ({
+          k: "review.overturn",
+          s: one.id,
+          review: review.id,
+          why: flags.why,
+          by: signer(flags, "推翻结论"),
+        })).doc;
+        console.log("推翻 · 段 " + review.segment + " · " + review.id + " · " + flags.by + " · " + flags.why);
+        console.log("  这一段回到没判过的样子：重新出清单、重新审");
+        const step = nextAction(after, after.config);
+        console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
+        console.log("  " + step.command);
+        return;
+      }
       // A pass judges the segment still open; a rework may reach back into the
       // one a verdict just closed, because that is how settled work reopens.
       const newest = one.segments[one.segments.length - 1];
@@ -693,7 +765,7 @@ const commands = {
         console.log("  段没封，补完再判；上一份审查结论已经作废");
         return;
       }
-      fail("judge 只认 --pass 或 --rework <任务…> --why \"…\" --by \"…\"");
+      fail("judge 只认 --overturn <R1> --why \"…\"（推翻一条结论）；审查者放行就是封段，不再需要人签字");
     });
   },
 
@@ -747,14 +819,14 @@ const commands = {
       const briefs = auditBriefs(ROOT, doc);
       const looseBriefs = briefTrouble(briefs);
       for (const one of bare) console.log("没钉内容 · " + one.id + "（--evidence 里没有 --digest：说得出做了什么，查不了）");
-      for (const one of briefs.unpinned) console.log("任务书没指纹 · " + one.segment + " · " + one.brief + "（账本没记 sha256：改没改过查不出来）");
+      for (const one of briefs.unpinned) console.log("清单没指纹 · " + one.segment + " · " + one.brief + "（账本没记 sha256：改没改过查不出来）");
       for (const one of briefs.orphan)
-        console.log("任务书没人发过 · " + one.segment + " · " + one.brief + "（账本里没有 review.brief：这份结论读的是谁给的？）");
-      for (const one of briefs.stray) console.log("任务书没人认领 · " + one.brief + "（账本没记过这一份：手写的，或者出了没落成事件）");
-      for (const one of briefs.gone) console.log("任务书不在了 · " + one.segment + " · " + one.brief);
+        console.log("清单没人发过 · " + one.segment + " · " + one.brief + "（账本里没有 review.brief：这份结论读的是谁给的？）");
+      for (const one of briefs.stray) console.log("清单没人认领 · " + one.brief + "（账本没记过这一份：手写的，或者出了没落成事件）");
+      for (const one of briefs.gone) console.log("清单不在了 · " + one.segment + " · " + one.brief);
       for (const one of briefs.edited)
-        console.log("任务书对不上 · " + one.segment + " · " + one.brief + " · 账本记的 " + one.digest.slice(0, 12) + "，现在是 " + one.actual.slice(0, 12));
-      for (const one of briefs.outside) console.log("任务书越界 · " + one.segment + " · " + one.brief + "（不在这个工作区里）");
+        console.log("清单对不上 · " + one.segment + " · " + one.brief + " · 账本记的 " + one.digest.slice(0, 12) + "，现在是 " + one.actual.slice(0, 12));
+      for (const one of briefs.outside) console.log("清单越界 · " + one.segment + " · " + one.brief + "（不在这个工作区里）");
       // The threshold is a ledger fact; the file is a mirror. A mirror that
       // disagrees is not a broken ledger -- it is a decision nobody recorded.
       const drift = configDrift(doc.config, readConfigFile(ROOT));
@@ -779,7 +851,7 @@ const commands = {
         );
       if (looseBriefs > 0)
         reasons.push(
-          "有 " + looseBriefs + " 份任务书对不上账本：结论读的那份被改过、丢了、没人发过，或者目录里躺着一份账本不认识的；先打回（deed judge --rework --why …），再重新出一份、重新审一次——出任务书本身会记成事件，指纹在那条事件上",
+          "有 " + looseBriefs + " 份清单对不上账本：结论读的那份被改过、丢了、没人发过，或者目录里躺着一份账本不认识的；审查者判不合格就点名退回（--verdict fail --rework T1 --why 「为什么」），再重新出一份、重新审一次——发清单本身会记成事件，指纹在那条事件上",
         );
       fail(reasons.join("；"));
     });
@@ -841,7 +913,7 @@ const commands = {
         console.log("  心跳 · " + hookNotice(ROOT) + (silence ? " · " + silence : ""));
         if (loose > 0)
           console.log(
-            "  任务书对不上 " + loose + " 份（不算坏账，deed verify 看细节）：" +
+            "  清单对不上 " + loose + " 份（不算坏账，deed verify 看细节）：" +
               [...briefs.unpinned, ...briefs.gone, ...briefs.edited, ...briefs.outside, ...briefs.orphan].map((s) => s.segment).join("、") +
               (briefs.stray.length ? (briefs.unpinned.length + briefs.gone.length + briefs.edited.length + briefs.outside.length + briefs.orphan.length ? "、" : "") + briefs.stray.map((s) => s.brief).join("、") : ""),
           );
@@ -922,10 +994,10 @@ const HELP = [
   "deed task defer|drop <T1> --why \"…\"",
   "deed ask \"<问题>\" --reading \"我理解成…\" --why \"…\"",
   "deed ask resolve|withdraw <A1> [--decision \"…\"] [--why \"…\"]",
-  "deed review [--segment S01.1]            出任务书（记一条 review.brief），打印路径",
-  "deed review --segment S01.1 --by \"谁\" --verdict pass|fail [--finding \"…\" --finding \"…\"]",
-  "deed judge --pass [--segment S01.1]",
-  "deed judge --rework T1,T2 --why \"…\" --by \"…\" [--segment S01.1]",
+  "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
+  "deed review --segment S01.1 --by \"谁\" --verdict pass [--finding \"…\"]   pass 直接封段",
+  "deed review --segment S01.1 --by \"谁\" --verdict fail --rework T1,T2 --why \"…\" [--finding \"…\"]",
+  "deed judge --overturn R1 --why \"…\"    推翻一条在案的结论（例外，不是步骤）",
   "deed sign --words \"<用户原话>\" [--title \"<这一期的名字>\"]",
   "deed shelve --why \"…\"",
   "deed state",

@@ -117,7 +117,7 @@ cd /path/to/deed && git pull && npm test
 
 `npm link` 装的会立刻生效；vendor 的要重新拷。升级前后都跑一次 `deed doctor`：
 
-- **账本比 deed 新**（每条事件都记着写它的版本 `w`）：`doctor`／`state`／`verify`／面板都说「升级 deed 就能读」。**别删也别挪**，那一行是有效事实，不是坏账。
+- **账本比 deed 新**（每条事件都记着事件含义的版本 `v` 与写它的版本 `w`，先比 `v`）：`doctor`／`state`／`verify`／面板都说「升级 deed 就能读」。**别删也别挪**，那一行是有效事实，不是坏账。
 - **deed 比账本新**：安全，事件类型只做加法，老事件照样折。
 
 账本是纯文本，崩了也不丢：`.deed/log/*.jsonl` 可以直接 `git diff` 看，`deed verify`／`doctor` 是唯一的核对手段。
@@ -138,8 +138,8 @@ deed 没有后台进程、没有守护、没有全局状态，`deed serve` 是�
 | `deed: 未知事件：x`，且写着「账本比 deed 新」 | 账本是更新的 deed 写的。升级 deed，不要动那一行 |
 | `deed doctor` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
-| `deed verify` 报「证据过期」 | 证据钉的文件被改过。要么重跑那条命令再 `task done`，要么 `judge --rework` 把活放回桌面 |
-| `deed verify` 报「任务书对不上」 | 发出去那份清单被改过、丢了、或没被账本记过。打回、重出一份、重新审 |
+| `deed verify` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。重跑那条命令再 `task done`，或在审查里点名退回 |
+| `deed verify` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |
 | `deed verify` 报「门槛对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
 | `judge`／`sign` 报「不是从终端敲的」 | 管道里跑必须写 `--by "谁"`；账本不替任何动作填名字 |
 

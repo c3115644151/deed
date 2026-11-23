@@ -59,7 +59,7 @@ test("a segment that needs review cannot be judged before the verdict lands", ()
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "missing");
   assert.deepEqual(judgeBlockers(config, session, session.segments[0]), [
-    "这一段要审，结论还没落盘：deed review --segment S01.1 出任务书",
+    "这一段要审，结论还没落盘：deed review --segment S01.1 出清单",
   ]);
   const reviewed = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"), verdict(4, "pass")]);
   assert.deepEqual(judgeBlockers(config, reviewed.sessions[0], reviewed.sessions[0].segments[0]), []);
@@ -94,7 +94,7 @@ test("a reworked delivery has no standing verdict left", () => {
 
 test("signing waits for the judgement and for every open question", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1")]);
-  assert.deepEqual(signBlockers(delivered, delivered.sessions[0]), ["当前段还没判决"]);
+  assert.deepEqual(signBlockers(delivered, delivered.sessions[0]), ["S01.1 还没有审查通过（审查者的 pass 就封段）"]);
   const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4), ask(5)]);
   assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）"]);
   const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
@@ -112,7 +112,7 @@ test("the next step names one actor and one action", () => {
   assert.match(nextAction(todo, config).text, /T1/);
   const unreviewed = fold([turn(1), add(2, "T1", ["core/x.mjs"]), done(3, "T1")]);
   assert.equal(nextAction(unreviewed, config).who, "reviewer");
-  assert.match(nextAction(unreviewed, config).command, /deed review --segment S01\.1/, "下一步只出任务书,不替人写结论");
+  assert.match(nextAction(unreviewed, config).command, /deed review --segment S01\.1/, "下一步只出清单,不替人写结论");
   const judged = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
   assert.equal(nextAction(judged, config).what, "签收");
 });

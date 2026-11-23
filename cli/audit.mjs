@@ -81,24 +81,32 @@ export function auditBriefs(root, doc, sessionId) {
   const claimed = new Set();
   for (const one of doc.sessions) {
     if (sessionId && one.id !== sessionId) continue;
+    // 交出去的是两份：清单（审什么）和角色包（怎么审）。两份都记了指纹，
+    // 所以两份都要核——只核清单，换掉角色包没人看得出来。
     for (const hand of one.briefs) {
-      claimed.add(hand.brief);
-      const file = path.resolve(root, hand.brief);
-      const inside = path.relative(root, file);
-      if (inside.startsWith("..") || path.isAbsolute(inside)) {
-        outside.push({ segment: hand.segment, brief: hand.brief });
-        continue;
+      const pair = [
+        { brief: hand.brief, digest: hand.briefDigest },
+        ...(hand.guide ? [{ brief: hand.guide, digest: hand.guideDigest }] : []),
+      ];
+      for (const one2 of pair) {
+        claimed.add(one2.brief);
+        const file = path.resolve(root, one2.brief);
+        const inside = path.relative(root, file);
+        if (inside.startsWith("..") || path.isAbsolute(inside)) {
+          outside.push({ segment: hand.segment, brief: one2.brief });
+          continue;
+        }
+        if (!one2.digest) {
+          unpinned.push({ segment: hand.segment, brief: one2.brief });
+          continue;
+        }
+        if (!fs.existsSync(file)) {
+          gone.push({ segment: hand.segment, brief: one2.brief });
+          continue;
+        }
+        const actual = digest(fs.readFileSync(file));
+        if (actual !== one2.digest) edited.push({ segment: hand.segment, brief: one2.brief, digest: one2.digest, actual });
       }
-      if (!hand.briefDigest) {
-        unpinned.push({ segment: hand.segment, brief: hand.brief });
-        continue;
-      }
-      if (!fs.existsSync(file)) {
-        gone.push({ segment: hand.segment, brief: hand.brief });
-        continue;
-      }
-      const actual = digest(fs.readFileSync(file));
-      if (actual !== hand.briefDigest) edited.push({ segment: hand.segment, brief: hand.brief, digest: hand.briefDigest, actual });
     }
     for (const review of one.reviews) {
       claimed.add(review.brief);

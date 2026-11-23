@@ -13,6 +13,7 @@ export const EVENT_KINDS = [
   "ask.withdraw",
   "review.brief",
   "review.log",
+  "review.overturn",
   "judge.pass",
   "judge.rework",
   "sign",
@@ -26,7 +27,7 @@ export const WHO = ["user", "agent"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 2;
+export const EVENT_VERSION = 3;
 
 // 读到不认得的事件类型，和"这一行坏了"是两件事：账本可能只是比程序新。
 // core 不知道当前版本（也不许读文件），所以这里只把事实带出去——类型名、
@@ -116,7 +117,13 @@ export function validateEvent(ev, at) {
       need(ev, "segment");
       need(ev, "brief");
       if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
-        throw new Error("review.brief 的 briefDigest 要是任务书的 sha256（64 位小写 hex）：" + ev.briefDigest);
+        throw new Error("review.brief 的 briefDigest 要是清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
+      // 角色包和清单成对交出去：两份都记下指纹，谁改了哪一份都查得出来。
+      if (ev.guide !== undefined) {
+        need(ev, "guide");
+        if (!/^[0-9a-f]{64}$/.test(String(need(ev, "guideDigest"))))
+          throw new Error("review.brief 的 guideDigest 要是角色包的 sha256（64 位小写 hex）：" + ev.guideDigest);
+      }
       break;
     case "review.log":
       need(ev, "segment");
@@ -129,7 +136,21 @@ export function validateEvent(ev, at) {
       // to the words the reviewer read is its sha256. A line without one is a
       // conclusion nobody can check.
       if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
-        throw new Error("review.log 的 briefDigest 要是任务书的 sha256（64 位小写 hex）：" + ev.briefDigest);
+        throw new Error("review.log 的 briefDigest 要是清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
+      // 不合格必须点名：一条结论要么放行，要么说清哪几条要重做。
+      // 只说"不合格"而不点名，接到这条记录的人还得回来猜。
+      // 第 3 版才并进来（打回不再是另一条命令），所以只查从这一版起写的行：
+      // 账本只追加，历史行按它自己那一版的标准读，不回头补字段。
+      if (ev.verdict === "fail" && (ev.v ?? 1) >= 3) {
+        need(ev, "why");
+        if (!Array.isArray(ev.rework) || ev.rework.length === 0)
+          throw new Error("review.log 的 fail 要点名要重做的条目（--rework T1,T2）");
+      }
+      break;
+    case "review.overturn":
+      need(ev, "review");
+      need(ev, "why");
+      need(ev, "by");
       break;
     case "judge.pass":
       need(ev, "segment");

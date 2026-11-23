@@ -113,7 +113,7 @@ export const lastDelivery = (session, segment) => {
   return times[times.length - 1] ?? null;
 };
 
-// 这一段最后一次被改动是什么时候。加一条任务也算——任务书写的是一份清单，
+// 这一段最后一次被改动是什么时候。加一条任务也算——清单写的是一份清单，
 // 清单变了，发出去那份就不再是这一段的事，结论也就回答不了它。
 export const lastSegmentChange = (session, segment) => {
   const times = tasksIn(session, segment)
@@ -187,7 +187,7 @@ export function judgeBlockers(config, session, segment = openSegment(session)) {
   if (voidedReview(session, segment))
     blockers.push("审查结论已经被打回作废：重新审一次再判（deed review --segment " + segment.id + "）");
   else if (state === "missing")
-    blockers.push("这一段要审，结论还没落盘：" + ("deed review --segment " + segment.id) + " 出任务书");
+    blockers.push("这一段要审，结论还没落盘：" + ("deed review --segment " + segment.id) + " 出清单");
   if (needsReview(config, session, segment)) {
     const bare = unpinned(session, segment);
     if (bare.length > 0)
@@ -206,7 +206,8 @@ export function signBlockers(doc, session, config = null) {
   if (!session) return ["现在没有在推进的会话"];
   const blockers = [];
   if (session.segments.length === 0) blockers.push("还没有交付过任何东西");
-  if (openSegment(session)) blockers.push("当前段还没判决");
+  const shut = openSegment(session);
+  if (shut) blockers.push(shut.id + " 还没有审查通过（审查者的 pass 就封段）");
   // Work owed outside the open segment is what a segment-level view cannot see;
   // inside it, the segment's own blockers already say it.
   const open = openSegment(session);
@@ -319,8 +320,8 @@ export function nextAction(doc, config) {
       return {
         who: "reviewer",
         what: "落结论",
-        text: `${segment.id} 的任务书已经出过：${handed.brief}（${count.total} 条都交付了）`,
-        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass|fail`,
+        text: `${segment.id} 的清单与角色包已经交出去了：${handed.brief}（${count.total} 条都交付了）`,
+        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
       };
     }
     return {
@@ -331,14 +332,15 @@ export function nextAction(doc, config) {
     };
   }
   if (state === "fail") {
-    // 不合格不是"等一句话放行"：先读结论，把要重做的条目打回，再重新交付、重新审。
+    // 旧账本里的不合格没有点名，得有人打回一次；第 3 版起 fail 自己把条目放回桌面，
+    // 于是这里几乎不会被走到——走到就说明这一段的活还在别人手里。
     const review = reviewOf(session, segment);
     const findings = review?.findings?.length ?? 0;
     return {
       who: "agent",
-      what: "打回重做",
-      text: `${segment.id} 的审查结论是不合格${findings > 0 ? `（${findings} 条发现）` : ""}：读结论，把要重做的条目打回`,
-      command: `deed judge --rework <要重做的条目> --why "…" --by "…"`,
+      what: "读结论",
+      text: `${segment.id} 的审查结论是不合格${findings > 0 ? `（${findings} 条发现）` : ""}：读结论，看哪几条没达成`,
+      command: `deed review --segment ${segment.id} --by "你是谁" --verdict fail --rework T1,T2 --why "…"`,
     };
   }
   return {

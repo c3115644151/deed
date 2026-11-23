@@ -43,7 +43,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 
 门槛里写的是**你这个工作区**的目录名。deed 不替你猜 `src/`、`app/` 这类名字：什么都不声明，就全部要审。
 
-它建三样：`.deed/config.json`（门槛与端口）、`.deed/log/`（账本）、`.deed/review/`（任务书）；
+它建三样：`.deed/config.json`（门槛与端口）、`.deed/log/`（账本）、`.deed/review/`（审查清单与角色包）；
 第一次交付时再加 `.deed/workspace.json`（上一次交付的内容指纹，用来算「这一交付实际动了哪些路径」）。
 
 门槛不是冻住的：`deed init --force --exempt "docs/**" --why "为什么改"` 改得动，`--why` 必填，改动进账本。
@@ -60,12 +60,13 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 交付说错了话用 `deed task undo <T> --why "为什么收回"`：最后那条退回未做，撤回的理由留在任务上，账本里两条事实都在——不要改写成对的。
 - 拿不准就问 `deed ask "…" --reading "我理解成…" --why "为什么得你定"`，只有用户能 `ask resolve`。
 - `deed state` 只说下一步是谁；照着做，不要自己另排优先级。
-- 要审的段：`deed review --segment S0x.N` 发审查清单（记一条 `review.brief`，不写结论），审查者照它落 `--by "谁" --verdict pass|fail`；结论要求这一段已经全部交付（还有未做的会被拒），并且是这一段的最后一份结论。
-- 只有发出去过的清单才能被回答：没发过清单就落结论会被拒；发出去之后那份字节被改过、或文件不在了，结论也落不下来（`deed review --segment S0x.N` 另出一份，旧的那条记录留着让 `verify` 报）。
-- 结论记的是发出去那一刻的 sha256（`briefDigest`，必填），不是落结论时现写的一份；`deed verify` 会重算核对。
-- 判决 `deed judge --pass --by 「谁」`／`deed judge --rework T1,T2 --why 「为什么」 --by 「谁」`，签收 `deed sign --words 「用户原话」 --by 「谁」`：人在终端里敲可以省 `--by`（账本记 user），从管道里跑必须写清谁按的。
+- 要审的段：`deed review --segment S0x.N` 发两份材料——清单（审什么）与角色包（怎么审），记一条 `review.brief`，不写结论；结论要求这一段已经全部交付（还有未做的会被拒）。
+- 只有发出去过的材料才能被回答：没发过清单就落结论会被拒；发出去之后那两份字节被改过、或文件不在了，结论也落不下来（`deed review --segment S0x.N` 另出一份，旧的那条记录留着让 `verify` 报）。
+- 结论记的是发出去那一刻两份的 sha256（`briefDigest`+`guideDigest`），不是落结论时现写的一份；`deed verify` 会重算核对。
+- 审查者放行就是这一段的结局：`deed review --segment S0x.N --by 「谁」 --verdict pass` 直接封段，不需要第二个人签字。判不合格要 `--verdict fail --rework T1,T2 --why 「为什么」`：被点名的条目回到未做，其余保持交付，段不封。
+- 人只在一份结论错了时出手：`deed judge --overturn R1 --why 「为什么」` 把这条结论作废、这一段重新打开。签收 `deed sign --words 「用户原话」 --by 「谁」`：人在终端里敲可以省 `--by`（账本记 user），从管道里跑必须写清谁按的。
 - 身份是约定不是鉴权：`--by`、`who` 记的是自述，账本保证「谁说过什么」可回溯，不保证「说的人是谁」；它能做的只有一件事——不替任何动作填名字。
-- 每条交付记录都带 `--digest <工作区里的文件>`：说得清做了什么，也记下了当时的内容；没记文件的仍在账本里，但会挡住要审段的判决。
+- 每条交付记录都带 `--digest <工作区里的文件>`（几份就写几遍）：说得清做了什么，也记下了当时的内容；没记文件的仍在账本里，但会挡住要审段的放行。
 - 查：`deed verify`（交付记录与 sha256）、`deed doctor`（账本能否重放）、`deed serve`（本机只读面板）。
 
 没有落进账本的动作不算发生过；状态是推出来的，不用手写。
@@ -79,9 +80,9 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 | 1 | `deed tick` | `turn`：谁在第几轮说了什么 |
 | 2 | `deed task add` | `task.add`：一件要做的事 + 做完的标准 |
 | 3 | `deed task done` | `task.done`：交付记录 + 记下的文件 sha256 |
-| 4 | `deed review` | `review.brief`：出任务书，记路径与 sha256 |
-| 5 | `deed review --verdict` | `review.log`：结论只回答交出去的那一份 |
-| 6 | `deed judge --pass` | `judge.pass`：判过这一段（不合格先 `judge --rework` 打回） |
+| 4 | `deed review` | `review.brief`：发清单与角色包，记两条路径、两个 sha256 |
+| 5 | `deed review --verdict` | `review.log`：结论只回答交出去的那两份；pass 直接封段，fail 点名退回 |
+| 6 | `deed judge --overturn` | `review.overturn`：人推翻一条结论（例外，签收之前） |
 | 7 | `deed sign` | `sign`：收口这一期 |
 
 ## 每一步谁动手
@@ -92,9 +93,9 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 2. 有待裁 → **用户**裁定
 3. 一个段都没开 → agent 开段（写第一条任务）
 4. 有没做完的任务 → agent 继续
-5. 该审没审 → 审查者出结论
-6. 可以判 → **用户**判决
-7. 否则 → **用户**签收
+5. 该审没审 → 审查者出结论（pass 封段，fail 点名退回）
+6. 有人推翻了结论 → 审查者重审
+7. 都封好了 → **用户**签收
 
 ## 它拒绝什么
 
@@ -102,10 +103,9 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 
 | 想做什么 | 会被谁挡住 |
 | --- | --- |
-| 在已封存的段里改任务、补审查、再判 | `fold`（要改就 `judge --rework`） |
-| 回打一个后面还有段的旧段 | `fold`（先收口后面的） |
+| 在已封存的段里改任务、补审查、再判 | `fold`（要改就 `judge --overturn`，且只能在签收之前） |
 | 打回不在这个段里的任务 | `fold`（打回不能跨段） |
-| 审查判了不合格还想判过 | `fold` 与 `judgeBlockers` |
+| 审查判了不合格还想判过 | `fold`（被点名的先重新交付） |
 | 任务 id／待裁 id 撞名 | `fold`（T 与 A 共用命名空间） |
 | 没交付记录就交付 | `task done` |
 | 签收时还有没结清的、还有待裁 | `fold` 与 `signBlockers` |
@@ -114,9 +114,9 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 | `--digest` 指到工作区外面、或指一个目录 | `task done`（只认工作区里的普通文件） |
 | 改门槛却不说为什么 | `init`（`--why` 必填，改动进账本） |
 | 手改 `.deed/config.json` 而不收进账本 | `deed verify`（「门槛对不上」，exit 1；规则根本不读那个文件） |
-| 任务书被改过、丢了、或账本没记它的指纹 | `deed verify`（重算 sha256；exit 1，修法是打回后重审或另出一份） |
-| 没出任务书就落结论 | `review`（结论只能回答交出去过的那一份） |
-| `.deed/review/` 里躺着一份账本没记过的清单 | `deed verify`（「任务书没人认领」；手写的读它不算数） |
+| 清单或角色包被改过、丢了、或账本没记它的指纹 | `deed verify`（重算 sha256；exit 1，修法是另出一份再审） |
+| 没发过材料就落结论 | `review`（结论只能回答交出去过的那两份） |
+| `.deed/review/` 里躺着一份账本没记过的清单 | `deed verify`（「没人认领」；手写的读它不算数） |
 | 交付者自己判这一段 | `fold`（同一个人不能判自己交付的段；不同 `--by` 放行） |
 | 判决／签收从管道里跑却不写 `--by` | `judge`／`sign`（账本不替任何动作填名字） |
 | 账本比手上的 deed 新（读不懂的事件类型） | `doctor`／`state`／`verify`／面板（说清写者版本，别挪走：升级就能读） |
@@ -177,7 +177,7 @@ deed serve       # http://127.0.0.1:7317，本机只读；账本一变页面自�
 ```
 core/             纯函数层：事件形状、重放、规则、指纹
 lib/              适配层：账本文件与锁、时间格式、宿主规则文件、版本、心跳
-cli/              命令面：每个动作先折后写、审查任务书、账本与工作区的核对
+cli/              命令面：每个动作先折后写、审查清单与角色包、账本与工作区的核对
 board/            本机只读面板：账本 → 一页 HTML（纯函数）+ 服务与 SSE
 test/             每条都起真进程；support/lib.mjs 造临时工作区
 docs/             DESIGN（行为权威）、INSTALL、架构图、research，索引见 docs/README.md
