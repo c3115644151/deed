@@ -183,8 +183,6 @@ export function judgeBlockers(config, session, segment = openSegment(session)) {
   return blockers;
 }
 
-export const canJudge = (config, session, segment) => judgeBlockers(config, session, segment).length === 0;
-
 // Signing is a session-level judgement, so it looks at the whole session, not
 // just the segment that happens to be open.
 export function signBlockers(doc, session, config = null) {
@@ -212,8 +210,6 @@ export function signBlockers(doc, session, config = null) {
   }
   return blockers;
 }
-
-export const canSign = (doc, session) => signBlockers(doc, session).length === 0;
 
 // What is owed but not blocking: the point is that a person sees the debt, not
 // that the system decides for them what to do with it.

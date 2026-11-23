@@ -2,8 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
-  canJudge,
-  canSign,
+  judgeBlockers,
   needsReview,
   nextAction,
   reading,
@@ -59,16 +58,18 @@ test("a segment that needs review cannot be judged before the verdict lands", ()
   const doc = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "missing");
-  assert.equal(canJudge(config, session, session.segments[0]), false);
+  assert.deepEqual(judgeBlockers(config, session, session.segments[0]), [
+    "这一段要审，结论还没落盘：deed review --segment S01.1 出任务书",
+  ]);
   const reviewed = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"), verdict(4, "pass")]);
-  assert.equal(canJudge(config, reviewed.sessions[0], reviewed.sessions[0].segments[0]), true);
+  assert.deepEqual(judgeBlockers(config, reviewed.sessions[0], reviewed.sessions[0].segments[0]), []);
 });
 
 test("a failing review keeps the segment shut until something changes", () => {
   const doc = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
-  assert.equal(canJudge(config, session, session.segments[0]), false);
+  assert.deepEqual(judgeBlockers(config, session, session.segments[0]), ["审查结论是不合格，得补完再判"]);
 });
 
 // A reviewer who looks and says no is not overruled by a glob.
@@ -76,7 +77,7 @@ test("a failing verdict counts even where review was not required", () => {
   const doc = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
-  assert.equal(canJudge(config, session, session.segments[0]), false);
+  assert.equal(judgeBlockers(config, session, session.segments[0]).includes("审查结论是不合格，得补完再判"), true);
 });
 
 test("a reworked delivery has no standing verdict left", () => {
@@ -95,9 +96,9 @@ test("signing waits for the judgement and for every open question", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1")]);
   assert.deepEqual(signBlockers(delivered, delivered.sessions[0]), ["当前段还没判决"]);
   const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4), ask(5)]);
-  assert.equal(canSign(asked, asked.sessions[0]), false);
+  assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）"]);
   const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
-  assert.equal(canSign(clean, clean.sessions[0]), true);
+  assert.deepEqual(signBlockers(clean, clean.sessions[0], config), []);
 });
 
 test("the next step names one actor and one action", () => {
