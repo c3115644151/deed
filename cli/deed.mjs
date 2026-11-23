@@ -111,6 +111,9 @@ function transact(flags, build, commit) {
     // w 记的是写这一行的程序版本，不是事件含义的版本（那是 v）。它让"读到不认得的
     // 类型"以后能有一个可查的答案：账本比程序新，还是这一行本来就有问题。
     stamped.w = currentVersion() || undefined;
+    // 没有门槛的账本谁也没法判：还没接过的目录只能由 init 先落基线。
+    if (!doc.config && stamped.k !== "config.change")
+      fail("这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
     const after = fold([...events, stamped]);
     append(ROOT, stamped);
     if (commit) commit(stamped);
@@ -224,6 +227,14 @@ function printState() {
   const { doc, events } = load();
   const config = doc.config;
   const open = currentSession(doc);
+  // 没接过 deed 的目录不能看起来"一切正常"：状态里每个字都得有账本撑着。
+  if (!config) {
+    console.log("");
+    console.log("这个目录还没接 deed · 先 deed init（把门槛基线记进账本）");
+    console.log("  账本 " + (events.length ? events.length + " 条，但没有门槛：判据无从谈起" : "还没有"));
+    console.log("");
+    return;
+  }
   console.log("");
   console.log("状态 · " + ({ idle: "没有在推进的会话", discuss: "讨论", execute: "执行", accept: "验收" }[reading(doc)]));
   if (!open) {
@@ -664,6 +675,11 @@ const commands = {
   verify() {
     guard(() => {
       const { doc } = load();
+      if (!doc.config) {
+        console.log("这个目录还没接 deed：deed init 之后才有账本和证据可查");
+        process.exitCode = 1;
+        return;
+      }
       const { stale, outside } = auditEvidence(ROOT, doc);
       const bare = bareEvidence(doc);
       const briefs = auditBriefs(ROOT, doc);
@@ -834,6 +850,7 @@ const commands = {
 const HELP = [
   "deed · 一个工作区的事实账本",
   "",
+  "deed --version                   打印这个程序自己的版本",
   "deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区",
   "deed init [--said \"…\"] [--review \"src/**,…\"] [--exempt \"docs/**\"] [--port 7317]",
   "deed tick --who user|agent --said \"…\" [--did \"…\"] [--session S01]",
@@ -862,6 +879,14 @@ if (!verb || verb === "help" || verb === "--help") {
   console.log(HELP);
   process.exit(0);
 }
+// Asked before the verb table: this is the program talking about itself, and a
+// missing answer is the first thing a fresh install trips over.
+if (verb === "--version" || verb === "-v" || verb === "version") {
+  console.log(currentVersion());
+  process.exit(0);
+}
+// An unknown verb is refused, not thrown: fail() raises, and the raise would
+// reach the terminal as a stack trace with nobody left to swallow it.
 const command = commands[verb];
-if (!command) fail("没有这个动作：" + verb + "（deed help 看全部）");
-guard(() => command(rest));
+if (!command) reject("没有这个动作：" + verb + "（deed help 看全部）");
+else guard(() => command(rest));

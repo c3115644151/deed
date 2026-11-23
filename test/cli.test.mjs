@@ -461,6 +461,7 @@ test("naming a segment the ledger does not have lists the ones it does", () => {
 
 test("a workspace that never had a session says that, not that the last one closed", () => {
   const cwd = workspace("virgin");
+  assert.equal(deed(cwd, "init").status, 0, "接过 deed、但还一轮都没记");
   const run = deed(cwd, "state");
   assert.equal(run.status, 0);
   assert.match(run.stdout, /还没有会话/);
@@ -775,4 +776,36 @@ test("every line records the deed that wrote it", () => {
   const written = readEvents(cwd).map((one) => one.w);
   assert.ok(written.length >= 5);
   assert.ok(written.every((one) => /^\d+\.\d+\.\d+$/.test(one)), "没有写者版本的账本，以后说不清是账本新还是这一行坏了");
+});
+test("an unknown verb is refused in one line, not a stack trace", () => {
+  const cwd = workspace("unknown-verb");
+  const run = deed(cwd, "watch");
+  assert.equal(run.status, 1);
+  assert.equal(run.stderr.trim(), "deed: 没有这个动作：watch（deed help 看全部）");
+  assert.equal(/at ModuleJob|Refused/.test(run.stdout + run.stderr), false, "拒绝不该带调用栈");
+});
+
+test("--version answers with the version this program ships as", () => {
+  const cwd = workspace("version");
+  const shipped = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", "package.json"), "utf8")).version;
+  const run = deed(cwd, "--version");
+  assert.equal(run.status, 0);
+  assert.equal(run.stdout.trim(), shipped);
+});
+
+test("a directory with no ledger cannot be written into, or read as if it were fine", () => {
+  const cwd = workspace("unbound");
+  const tick = deed(cwd, "tick", "--who", "user", "--said", "我先说一句");
+  assert.equal(tick.status, 1);
+  assert.equal(tick.stderr.trim(), "deed: 这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
+  assert.deepEqual(kinds(cwd), [], "被拒的那一轮一个字也不该落盘");
+
+  const state = deed(cwd, "state");
+  assert.equal(state.status, 0);
+  assert.equal(state.stdout.includes("这个目录还没接 deed · 先 deed init"), true);
+  assert.equal(/下一步/.test(state.stdout), false, "没有门槛时不该给下一步");
+
+  const verify = deed(cwd, "verify");
+  assert.equal(verify.status, 1);
+  assert.equal(verify.stdout.trim(), "这个目录还没接 deed：deed init 之后才有账本和证据可查");
 });
