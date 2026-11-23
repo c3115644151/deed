@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
+  needsWhole,
   needsReview,
   nextAction,
   reading,
@@ -155,10 +156,21 @@ test("a period with more than one segment needs a conclusion on the period itsel
 });
 
 // 一段的一期不审两遍：那一段的结论已经回答了这一期。
+// 下一步也得照这个读——段封了就该签收，不能再要一句目的、再要一次整期审。
 test("one segment's verdict answers for the period, so no second pass is asked for", () => {
   const doc = fold([turn(1), goal(2), add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5)]);
   assert.equal(wholeState(doc.sessions[0]), "pass");
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), []);
+  assert.equal(nextAction(doc, config).what, "签收");
+  // 没有目的也一样：一段的一期不拿目的当尺子，写完目的也不该冒出一次重审。
+  const bare = fold([turn(1), add(2, "T1", ["core/a.mjs"]), done(3, "T1"), sealed(4)]);
+  assert.equal(needsWhole(config, bare.sessions[0]), false);
+  assert.equal(nextAction(bare, config).what, "签收");
+  const aimed = fold([
+    turn(1), add(2, "T1", ["core/a.mjs"]), done(3, "T1"), sealed(4), goal(5),
+  ]);
+  assert.equal(wholeState(aimed.sessions[0]), "pass", "改目的不是改这一期做过的事");
+  assert.equal(nextAction(aimed, config).what, "签收");
 });
 
 test("the next step names one actor and one action", () => {

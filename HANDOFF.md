@@ -1,42 +1,40 @@
 # HANDOFF
 
-## 现在到哪一步（2026-11-23 17:20）
+## 现在到哪一步（2026-11-23 17:44）
 
 装在本机，这个仓库自己也用自己的账本（`.deed/` 随仓库提交）：命令 `deed` 在 PATH 上，
-规则块粘在 `AGENTS.md` 末尾。会话 S01 的第 1 段现在 19 条任务，第 26 轮刚记过。
-第八轮审查（`reviewer:s1-r8`，16:24）判不合格，点了 T14；它点的两条（旧账本没点名的结论还在说假话、
-已发出去的材料下一步仍叫再发一份）已经治本修好，同时把 DESIGN §12.1 目的与 §12.6 整体审落了地。
-**T14、T17、T18、T19、T20 都已交付，材料还没发**——这一期接下来是发整期材料、由审查者落一句落在整期上的结论。
+规则块粘在 `AGENTS.md` 末尾。会话 S01 的第 1 段现在 20 条任务，第 27 轮刚记过。
+第九轮审查（`reviewer:s1-r9`，17:30）判不合格，只点了 T19：**一段的一期过了段审，下一步还要写目的、再整期审**。
+那条已经治本修好（`needsWhole` 里那道段数门、`wholeState` 先读那段结论、目的不进一段一期的尺子，
+`review --all` 在只有一段的期上被拒），T19 已重新交付——**材料还没发**，这一期接下来是发清单、由审查者落结论。
 A1（三种状态各一屏）、A2（这一期怎么收）、A3（单段也走整体审）都已裁过；没有待裁项。
 远端 `github.com/c3115644151/deed`（public，MIT），**没有 tag**。
 
 段和整期各有一句话：`--verdict pass` 当场封段；一期不止一段时，最后还要一句 `deed review --all`。
-一段的一期不审两遍——那一段的结论就是整期的结论。人只剩两件事：`judge --overturn R1 --why "…"` 推翻一份结论、
-`deed sign --words "原话" --by "…"` 签收。门槛说不用审的段用 `deed seal` 封，签收时列成「没经过审查」。
+一段的一期不审两遍——那一段的结论就是整期的结论，下一步直接是签收，也不为它写目的。人只剩两件事：
+`judge --overturn R1 --why "…"` 推翻一份结论、`deed sign --words "原话" --by "…"` 签收。
+门槛说不用审的段用 `deed seal` 封，签收时列成「没经过审查」。
 
-## 最后一次验证（2026-11-23 17:15，本机）
+## 最后一次验证（2026-11-23 17:38，本机）
 
-- `npm test` → **122/122**，67.6 s（fold 19 · rules 11 · cli 72 · board 9 · version 5 · docs 2 · heartbeat 2 · version 3）。
-- `node --check` 七个改动文件全过；`deed verify` exit 0「交付记录有效」；`deed doctor` 干净。
-- 面板在 `http://127.0.0.1:7317` 真开过（1376×811 与 496×762，`scrollWidth === clientWidth`，
-  三个页签各自从同一份账本渲染；截图 `.shots/panel-v6-exec.png`、`.shots/panel-v6-accept.png`、`.shots/panel-v6-narrow.png`）。
-- 演示账本 `examples/rebuild.mjs` 重跑 → 33 条事件、`verify` 有效、`doctor` 干净。
-- 架构图这一轮没动（它的三列三格讲的就是三种状态，和新行为不冲突）。
+- `npm test` → **123/123**，81.5 s（fold 19 · rules 12 · cli 73 · board 9 · version 5 · docs 2 · heartbeat 2 · version 3）。
+- `node --test test/fold.test.mjs test/rules.test.mjs` 32/32；`node --test test/cli.test.mjs` 73/73；
+  `node --test test/docs.test.mjs board/board.test.mjs` 11/11。
+- `deed verify` / `deed doctor` 待重跑（这一轮改的是规则与命令面，交付记录已随 T19 重交刷新）。
+- 面板在 `http://127.0.0.1:7317`（重启后要重看一次验收屏：只有一段的期上不该有「整期审」那一行打叉）。
 
-## 这一轮：一期有一句目的，多段的一期多一句落在整期上的结论（DESIGN §12.1、§12.6）
+## 这一轮：一段的一期不审两遍（r9 点出的 T19）
 
-- 新事件 `goal.set`（事件含义第 **5** 版，`package.json` 跟着升到 0.4.0）：`deed goal "这一期要做成什么" --by "谁"`
-  记一句，可以改，旧的那句留在历史里。三个读者：`deed state` 的会话行、面板验收屏、整期审的清单开头。
-- `deed review --all`：段都封之后发一份整期材料（目的原文 + 每段的任务、标准、交付记录、sha256、段结论）
-  加一份角色包，各记一个 sha256。`--verdict pass` 同时封掉还没封的段，签收才可行；`--verdict fail --rework T1,T2 --why "…"`
-  可以点名任何一段的任务——**被点名的那一段跟着打开**，否则那一条连重新交付都做不了。
-- 整期结论也会过期：这一期最后一次改动（任何一段的任务、交付、撤回，或者目的那句改了）晚于它就不算数。
-- 一段的一期不审两遍：`signBlockers` 与 `nextAction` 都按段数分叉——一段的一期，那一段的结论就是整期的结论。
-- T14 那两条：`nextAction` 的 fail 分支先看有没有发出去还没回答的材料（有就给「落结论」，不再叫发第二份）；
-  在案的不合格没点名时只说 `judge --overturn`，不再谎称「被点名的已经重新交付」。
-- 文档：DESIGN §4 规则 8／§5 生命周期／§6「这一段是不是整期说的那一句」／§7 动作表（`deed goal`、`review --all`）／
-  §8 事件类型与第 5 版；§12.1、12.6 标成「已实现」；§12.3／12.5／12.7 的指向修到真正写着那段话的节（r8 点的第三处）。
-- 粘块跟着改了两行（目的、`review --all`），`README.md` 与 `AGENTS.md` 逐字同步；测试 122 条。
+- `needsWhole(config, session)` 自己带那道段数门：一期不到两段就是 `false`。之前门槛只写在 `signBlockers` 里，
+  下一步（`nextAction`）漏了——于是同一屏上 `state` 说「签收 可行」，而「下一步」叫你去写目的、再整期审，
+  写完目的又冒出「重审整期」。一处判断长在两个地方，就会在两个地方说两种话。
+- `wholeState` 先读那一段的结论，再问目的：一段的一期没有整期材料，那句目的不进任何人的尺子。
+- `periodChange` 只在多段的一期把 `goal.set` 算成整期改动：一段的一期改目的，不让段结论过期。
+- `deed review --all` 在只有一段的期上被拒，指回 `deed review --segment S0x.1`；`--all` 与 `--segment` 同时给也被拒
+  （一次只审一个对象）。
+- 补了挡这条缝的用例：`test/rules.test.mjs`「one segment's verdict answers for the period」现在断言 `nextAction.what === "签收"`
+  （无目的、有目的各一次，且写完目的仍是签收）；`test/cli.test.mjs` 新用例 `single-whole` 实测两条拒绝、一条不写、
+  段放行后 `state` 的下一步是签收。
 
 ## 上一轮：面板按三种状态重做（深色，一眼看出状态在动）
 

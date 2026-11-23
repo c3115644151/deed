@@ -630,8 +630,13 @@ const commands = {
       const { doc } = load();
       const one = targetSession(doc, flags);
       // 整体审：对象是这一期，不是某一段。材料覆盖它全部的任务，pass 时把还没封的段
-      // 一起封（单段的一期就是这种情形），fail 时点名的条目可以跨段。
+      // 一起封，fail 时点名的条目可以跨段。一段的一期不审两遍：它的段审就是整期审。
       if (flags.all) {
+        if (flags.segment) fail("--all 说的是这一期，--segment 说的是某一段：一次只审一个对象");
+        if (one.segments.length === 1)
+          fail(
+            "这一期只有一段：" + one.segments[0].id + " 的审查就是这一期的审查（deed review --segment " + one.segments[0].id + "）",
+          );
         const goal = goalOf(one);
         if (!flags.verdict) {
           if (!goal) fail('这一期还没写目的：先说清这一期要做成什么（deed goal "…"），整体审才有尺子');

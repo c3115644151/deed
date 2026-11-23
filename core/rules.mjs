@@ -142,8 +142,10 @@ export const sessionReview = (session) => {
   return live[live.length - 1] ?? null;
 };
 
-// 整期最后一次改动：任何一条任务的交付、撤回、增改，加上那句目的。
+// 整期最后一次改动：任何一条任务的交付、撤回、增改。
 // 整体审的结论早于它，回答的就是旧的一期。
+// 那句目的只在多段的一期算改动：一段的一期没有整期材料，目的不进任何人的尺子，
+// 拿它去让段结论过期等于凭空要一次重审。
 export const periodChange = (session) => {
   if (!session) return null;
   const times = [
@@ -152,7 +154,7 @@ export const periodChange = (session) => {
       ...one.evidence.map((proof) => proof.at),
       ...(one.undone ?? []).map((gone) => gone.at),
     ]),
-    session.goal?.at ?? null,
+    session.segments.length > 1 ? (session.goal?.at ?? null) : null,
   ]
     .filter(Boolean)
     .sort();
@@ -160,24 +162,27 @@ export const periodChange = (session) => {
 };
 
 // 整期审的状态：没写目的 / 没审过 / 结论过期 / pass / fail。
+// 一段的一期先读那一段的结论：同一批活不审两遍，也就不拿目的当尺子。
 export function wholeState(session) {
-  if (!goalOf(session)) return "nogoal";
   const changed = periodChange(session);
-  const review = sessionReview(session);
-  if (review) return changed && review.at < changed ? "stale" : review.verdict;
-  // 一段的一期：那一段的结论就是这一期的结论——同一批活不审两遍。
   if (session && session.segments.length === 1) {
     const only = reviewOf(session, session.segments[0]);
     if (!only) return "missing";
     return changed && only.at < changed ? "stale" : only.verdict;
   }
-  return "missing";
+  if (!goalOf(session)) return "nogoal";
+  const review = sessionReview(session);
+  if (!review) return "missing";
+  return changed && review.at < changed ? "stale" : review.verdict;
 }
 
-// 这一期需不需要一次整体审：只要有一段按门槛要审，签收前就得有一份整期结论。
-// 全都免审的期不需要——没人需要看的东西不必再造一份材料。
-export const needsWhole = (config, session) =>
-  config ? session.segments.some((one) => needsReview(config, session, one)) : Boolean(session?.segments.length);
+// 这一期需不需要一次单独的整体审：一段的一期不需要——它的段审就是整期审。
+// 多段的一期，只要有一段按门槛要审，签收前就得再有一份落在整期上的结论。
+// 全都免审的多段期也不要：没人需要看的东西不必再造一份材料。
+export const needsWhole = (config, session) => {
+  if (!session || session.segments.length < 2) return false;
+  return config ? session.segments.some((one) => needsReview(config, session, one)) : true;
+};
 
 export const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
@@ -238,10 +243,9 @@ export function signBlockers(doc, session, config = null) {
     );
   }
   // 整期审：签收签的是这一期，最后一句结论该落在它身上。段都封了还没有整体审，
-  // 或者整体审的结论早于最后一次改动，都挡签收。
-  // 一段的一期不另算：那一段的结论就是整期的结论（wholeState 已经这么读），
-  // 同一批活不审两遍，也就不再要一句额外的目的。
-  if (session.segments.length > 1 && needsWhole(config, session)) {
+  // 或者整体审的结论早于最后一次改动，都挡签收。一段的一期不走这里——needsWhole
+  // 已经把那道门关上：那一段的结论就是整期的结论。
+  if (needsWhole(config, session)) {
     const whole = wholeState(session);
     if (whole === "nogoal") blockers.push("还没有写清这一期要做成什么（deed goal \"…\"）");
     else if (whole === "missing") blockers.push(`${session.id} 还没有整体审通过（deed review --all）`);

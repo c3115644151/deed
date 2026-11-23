@@ -178,6 +178,30 @@ test("a whole review can send back work from a segment it already sealed", () =>
   assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "补了并发记录", "--digest", proof(cwd)).status, 0, "打开了才交得进去");
 });
 
+// 一段的一期不审两遍：段放行就是这一期的结局，下一步直接是签收；
+// --all 指的是这一期，只有一段的期上它走错对象，被拒并指回段审。
+test("a period with one segment has one verdict, and --all does not ask for a second", () => {
+  const cwd = workspace("single-whole");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  const alone = deed(cwd, "review", "--all");
+  assert.equal(alone.status, 1, "这一期只有一段：它的审查就是整期的审查");
+  assert.match(alone.stderr, /只有一段/);
+  const both = deed(cwd, "review", "--all", "--segment", "S01.1");
+  assert.equal(both.status, 1, "一次只审一个对象");
+  assert.match(both.stderr, /一次只审一个对象/);
+  assert.equal(readEvents(cwd).filter((one) => one.k === "review.brief").length, 0, "被拒的一个字都不写");
+  deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
+  const state = deed(cwd, "state");
+  assert.equal(state.status, 0);
+  assert.match(state.stdout, /下一步 · user · 签收/, "段放行之后只剩一句话");
+  assert.doesNotMatch(state.stdout, /deed review --all/, "不能又叫一份整期材料");
+  assert.doesNotMatch(state.stdout, /deed goal/, "一段的一期不要额外的目的");
+  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 0);
+});
+
 test("handing the brief out is a fact, and a verdict answers that document", () => {
   const cwd = workspace("brief");
   deed(cwd, "init", "--said", "开始");
