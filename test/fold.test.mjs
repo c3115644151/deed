@@ -184,3 +184,18 @@ test("a standing fail outranks a later pass until the work it named is delivered
   assert.equal(doc.sessions[0].segments[0].verdict, "pass");
   assert.equal(doc.sessions[0].segments[0].closedAt, T(7));
 });
+test("a rework takes back the paths the delivered work touched, not just the claim", () => {
+  const touched = (n, id, changed) => ({
+    v: 3, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", changed, bytes: { [changed[0]]: 40 },
+  });
+  const before = fold([turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"])]);
+  assert.deepEqual(before.sessions[0].tasks[0].changed, [".gitignore", "notes.md"]);
+  const after = fold([
+    turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"]),
+    { v: 3, at: T(4), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b.md", why: "不够", rework: ["T1"] },
+    touched(5, "T1", ["notes.md"]),
+  ]);
+  const task = after.sessions[0].tasks[0];
+  assert.deepEqual(task.changed, ["notes.md"], "退回的那条交付碰过的路径不再算这一段的性质");
+  assert.deepEqual(Object.keys(task.sizes), ["notes.md"]);
+});

@@ -90,6 +90,21 @@ function segmentOf(session, at) {
   return segment;
 }
 
+// 任务碰过哪些路径、各多大，只由还在的交付说得算。交付退回（撤回，或者审查者点名
+// 重做把那条交付清掉）之后，它碰过的字节就不再是这段工作的性质；所以每动一次交付
+// 就重算一遍，不靠逐条加减——加减漏一处，门槛就会拿一批已经不存在的工作去判要不要审。
+const rederive = (task) => {
+  const paths = [];
+  const sizes = {};
+  for (const proof of task.evidence) {
+    for (const one of proof.changed ?? []) if (!paths.includes(one)) paths.push(one);
+    Object.assign(sizes, proof.sizes ?? {});
+  }
+  task.changed = paths;
+  task.sizes = sizes;
+  return task;
+};
+
 const taskOf = (session, id) => {
   const task = session.tasks.find((one) => one.id === id);
   if (!task) noway(`这个会话里没有任务：${id}`);
@@ -187,6 +202,8 @@ export function fold(events) {
           path: files[0]?.path ?? null,
           files,
           changed: ev.changed ?? [],
+          // 交付那一刻称的各路径大小，随这条交付走：交付退回，它称过的数也一起退。
+          sizes: ev.bytes ?? {},
           // 一批 submit 落了好几条交付时，工作区只量了一次差：改动的归属是整批，
           // 不是其中某一条。账本把这件事写下来，读的人就不会以为每条各钉了各的。
           batch: ev.batch
@@ -198,9 +215,8 @@ export function fold(events) {
         // What the delivery actually moved in the workspace, computed before the
         // event landed. The review threshold reads this, not the task's own story
         // about which paths it touched.
-        task.changed.push(...(ev.changed ?? []));
         // 每个路径多大，是交付那一刻称的；规则拿它判"这次改动小到不用审"。
-        task.sizes = { ...(task.sizes ?? {}), ...(ev.bytes ?? {}) };
+        rederive(task);
         break;
       }
       // 交付说错了话，只能收回，不能改写：撤回是一条新事实，最后那条交付
@@ -215,12 +231,8 @@ export function fold(events) {
         task.evidence.pop();
         // 撤回的那条还带着它的批号：剩下同批的那条，数目不能因为撤回而变小。
         task.undone.push({ claim: last.claim, why: ev.why, by: ev.by ?? "agent", at: ev.at, batch: last.batch ?? null });
-        for (const one of last.changed ?? []) {
-          const spot = task.changed.indexOf(one);
-          if (spot >= 0) task.changed.splice(spot, 1);
-          // 撤回的交付不再替这些字节说话：下次交付重新称。
-          if (task.sizes) delete task.sizes[one];
-        }
+        // 撤回的交付不再替这些字节说话：这一段碰过的路径与大小重新由还在的交付算。
+        rederive(task);
         task.status = task.evidence.length > 0 ? "done" : "todo";
         break;
       }
@@ -424,6 +436,9 @@ export function fold(events) {
             task.evidence = [];
             task.deferredWhy = null;
             task.touchedAt = ev.at;
+            // 退回的交付连同它碰过的路径一起退：门槛判的是这一段现在的字节，
+            // 不是那条没人认账的旧交付留下的痕迹。
+            rederive(task);
           }
         }
         break;
@@ -531,6 +546,7 @@ export function fold(events) {
           task.status = "todo";
           task.evidence = [];
           task.deferredWhy = null;
+          rederive(task);
         }
         // The verdict answered the old delivery; after a rework it is not a
         // fact about the new one, so it stays in the ledger but stops counting.
