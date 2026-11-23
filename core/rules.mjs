@@ -180,7 +180,16 @@ export function signBlockers(doc, session, config = null) {
   const blockers = [];
   if (session.segments.length === 0) blockers.push("还没有交付过任何东西");
   const shut = openSegment(session);
-  if (shut) blockers.push(shut.id + " 还没有审查通过（审查者的 pass 就封段）");
+  if (shut) {
+    // 要审的段等审查者的 pass；免审的段等交付的人写清凭什么不审。同一句「还没有审查通过」
+    // 放在免审段上是假话——没人会来审它。
+    const owed = config ? needsReview(config, session, shut) : true;
+    blockers.push(
+      owed
+        ? shut.id + " 还没有审查通过（审查者的 pass 就封段）"
+        : shut.id + " 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
+    );
+  }
   // Work owed outside the open segment is what a segment-level view cannot see;
   // inside it, the segment's own blockers already say it.
   const open = openSegment(session);
@@ -325,7 +334,7 @@ export function nextAction(doc, config) {
         who: "agent",
         what: "清结论",
         text,
-        command: `deed judge --overturn ${review.id} --why "…"`,
+        command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
       };
     }
     return {
@@ -341,7 +350,7 @@ export function nextAction(doc, config) {
     who: "agent",
     what: "封存",
     text: `${segment.id} · ${count.total} 条都交付了，门槛说这一段不用审（改动只落在免审路径，没人需要审）`,
-    command: `deed seal --segment ${segment.id} --why "门槛说这一段不用审：改动只落在免审路径"`,
+    command: `deed seal --segment ${segment.id} --why "凭什么不用审" --by "…"`,
   };
 }
 

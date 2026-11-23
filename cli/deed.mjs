@@ -1003,7 +1003,7 @@ const commands = {
 };
 
 const HELP = [
-  "deed · 一个工作区的事实账本",
+  "deed · 一个工作区的放行协议",
   "",
   "deed --version                   打印这个程序自己的版本",
   "deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区",

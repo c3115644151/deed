@@ -156,6 +156,18 @@ test("signing refuses to close a period with work still owed", () => {
   assert.throws(() => fold([...asked, sign(6)]), /待裁项/);
 });
 
+// 更早的账本里那些没点名的结论一样挡着 pass：判据是在案那条说了什么，
+// 不是它当时是第几版。否则同一条历史结论会因为"新来的那行是第 4 版"而变得可以被覆盖。
+test("a standing fail written before verdicts named anything still blocks a later pass", () => {
+  const old = { v: 2, at: T(5), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b.md", findings: ["x"] };
+  const pass4 = { v: 4, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b2.md" };
+  const ledger = [turn(1), add(2, "T1"), done(3, "T1"), old];
+  assert.throws(() => fold([...ledger, pass4]), /没有可结清的东西/u);
+  // 出路只有一条：人推翻那条结论，然后重新审。
+  const overturned = { v: 4, at: T(6), k: "review.overturn", s: null, review: "R1", why: "看错了", by: "user" };
+  assert.equal(fold([...ledger, overturned, { ...pass4, at: T(7) }]).sessions[0].segments[0].verdict, "pass");
+});
+
 // 一条不合格不会被后一条 pass 悄悄顶掉：它点名的条目得先重新交付。
 // 判没判过看的是在案那条记录说了什么——不是新来的那条带着几版的版本号（每行都是最新版）。
 test("a standing fail outranks a later pass until the work it named is delivered again", () => {

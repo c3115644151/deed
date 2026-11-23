@@ -281,27 +281,26 @@ export function fold(events) {
         // A fail is a decision about this delivery. It is not a draft that a
         // later pass may quietly overwrite: the work it named has to be
         // delivered again first.
-        // 判没判过看的是**在案那条**记录说了什么，不是新记录带的版本号：第 3 版起
-        // fail 自己点名、自己把活放回桌面，所以查的是被点名的那几条有没有重新交付，
-        // 而不是"进来的这条是不是第 3 版之后写的"——那样闸门永远不会响（每行都是最新版）。
-        const meaning = ev.v ?? 1;
+        // 判没判过看的是**在案那条**记录说了什么，不看任何一条记录带的版本号：
+        // 账本只追加，谁写的、哪一版写的，都不该让一条落过的结论变得可以被覆盖。
+        // 旧账本里的 fail 没点名任何条目，也就没有可结清的东西——那种结论只能由人推翻。
         if (latest && latest.verdict === "fail" && ev.verdict === "pass") {
           const named = latest.rework ?? [];
           const stuck = named
             .map((id) => taskOf(session, id))
             .filter((task) => task.status !== "done" && task.status !== "accepted")
             .map((task) => task.id);
-          if (named.length === 0) {
-            // 旧账本里的 fail 不带点名，命令面也不再产生它：只能由人推翻。
-            if (meaning < 3)
-              noway(
-                `段 ${segment.id} 在案的结论是不合格（${latest.by}）：要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
-              );
-          } else if (stuck.length > 0)
+          if (named.length === 0)
+            noway(
+              `段 ${segment.id} 在案的结论是不合格（${latest.by}）：它没点名要重做的条目，没有可结清的东西——要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
+            );
+          if (stuck.length > 0)
             noway(
               `段 ${segment.id} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"）`,
             );
         }
+        // 这条新记录自己带的是哪一版的含义：第 3 版起 pass 自己封段、fail 必须点名。
+        const meaning = ev.v ?? 1;
         // 点名要重做的条目：记录落盘之前先确认它们都在这一段里，否则一条
         // 打回会写到别的段的任务上，而账本只说"已打回"。
         const rework = ev.rework ?? [];

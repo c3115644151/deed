@@ -93,9 +93,35 @@ test("a reworked delivery has no standing verdict left", () => {
   assert.equal(reviewState(config, session, session.segments[0]), "missing", "要重新审,不能沿用旧结论");
 });
 
+// 免审的段没人会来审，所以它等的是封存，不是"审查通过"——同一句话放在这里就是假话。
+test("a segment the gate says not to review waits to be sealed, not to be reviewed", () => {
+  const doc = fold([
+    turn(1),
+    add(2, "T1", ["docs/a.md"]),
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+  ]);
+  assert.deepEqual(signBlockers(doc, doc.sessions[0], config), [
+    "S01.1 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
+  ]);
+});
+
+// 它给的命令得真能敲通：从管道里跑没人能替你填名字，--by 必须写在命令里。
+test("the step it names is a command that carries its own name", () => {
+  const doc = fold([
+    turn(1),
+    add(2, "T1", ["docs/a.md"]),
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [] },
+  ]);
+  const step = nextAction(doc, config);
+  assert.equal(step.what, "封存");
+  assert.match(step.command, /--by /u);
+});
+
 test("signing waits for the judgement and for every open question", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1")]);
-  assert.deepEqual(signBlockers(delivered, delivered.sessions[0]), ["S01.1 还没有审查通过（审查者的 pass 就封段）"]);
+  assert.deepEqual(signBlockers(delivered, delivered.sessions[0], config), [
+    "S01.1 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
+  ]);
   const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4), ask(5)]);
   assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）"]);
   const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
