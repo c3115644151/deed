@@ -1,18 +1,18 @@
 # HANDOFF
 
-## 现在到哪一步（2026-11-23 11:35）
+## 现在到哪一步（2026-11-23 13:38）
 
 装在**这台机器上**，并且这个仓库**自己用自己的账本**（`.deed/` 随仓库提交）：命令 `deed` 在 PATH 上，
-规则块粘在 `AGENTS.md` 末尾。会话 S01 的第 1 段现在 8 条任务（7 条已交付、1 条弃掉），
-第三轮审查（`reviewer:s1-r3`，10:14）的 **pass 已经过期**——这一轮加了 T8，段又动了，要重审；
+规则块粘在 `AGENTS.md` 末尾。会话 S01 的第 1 段现在 13 条任务（12 条已交付、1 条弃掉），
+第三轮审查（`reviewer:s1-r3`，10:14）的 **pass 已经过期**——段一直在动，要重审；
 判决与签收还在等你。同时压着两条待裁：A1（面板拿什么当内容骨架）、A2（这一期怎么收）。
 远端 `github.com/c3115644151/deed`（public，MIT），main 一直在往前走，**没有 tag**。
 
-## 最后一次验证（2026-11-23 11:30，本机）
+## 最后一次验证（2026-11-23 13:37，本机）
 
-- `npm test` → **105/105**（fold 17 · rules 9 · cli 62 · board 9 · version 4 · docs 2 · heartbeat 2 · version 3），59.5 s。
-- `deed verify` → exit 0，「交付记录有效」；「早先的交付 7 条 · 已被后来的交付覆盖」——历史，不是坏账。
-- `deed doctor` → 「账本干净 · 49 条事件都能重放」；心跳仍是「未接」（这台机器没有认得的宿主钩子）。
+- `npm test` → **109/109**（fold 17 · rules 9 · cli 66 · board 9 · version 4 · docs 2 · heartbeat 2 · version 3）。
+- `deed verify` → exit 0，「交付记录有效」；「早先的交付 19 条 · 已被后来的交付覆盖」——历史，不是坏账。
+- `deed doctor` → 「账本干净 · 74 条事件都能重放」；心跳仍是「未接」（这台机器没有认得的宿主钩子）。
 - 架构图：源 `docs/deed-architecture.candidate.json`（6 603 字节，sha256 `51ac47bb…`）→ 成品
   `docs/deed-architecture.html`（850 535 字节，sha256 `77e3779e…`），四门 validate / deliver / check / browser-check
   全 pass、诊断 0；`docs/architecture.png` 同版重拍。
@@ -20,7 +20,19 @@
   `.deed/log/` 里——账本只追加，不改写历史，这是机制本身，不是漏改。
 - 面板：`deed serve`（7317）GET `/` 200，页面跟着账本刷新，`/events` 是 `text/event-stream`。
 
-## 这一轮：换词，也把定义收到一处
+## 这一轮：一条交付钉几份内容，最后钉的那条负责
+
+`--digest` 现在可以写几遍，一次交付把动过的每个文件都钉住（`evidence.files: [{path, digest}]`，
+旧账本里的单 `path`/`digest` 照读）：清单、面板、`verify` 都按多份显示与逐份核对。
+
+判据也改了：同一条路径上更晚的交付出现后，早先那条**算覆盖、不算过期**——最后钉它的人负责今天的字节。
+改之前，凡是动过 `docs/DESIGN.md` 的任务，所有盯过这个文件的旧记录全部变成过期，我重交过 T8 两次、T10 一次，
+交的其实是同一份东西。这不是严谨，是把人逼去写假证据。
+
+新用例两条：`a file pinned again by a later delivery is covered, not stale`、
+`one delivery pins every file it says it produced`。
+
+## 上一轮：换词，也把定义收到一处
 
 用户的两条要求（11:04、11:15）：不要生造词，把系统里全部概念拿出来，把和概念不敏感的词换掉，从此修正。
 钩子（hook）是通行概念，保留。
