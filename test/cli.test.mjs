@@ -1002,3 +1002,39 @@ test("the word --help inside evidence is evidence", () => {
   assert.match(done.stdout, /交付 · T1/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 1);
 });
+
+test("a flag given twice is refused instead of quietly keeping the last one", () => {
+  const cwd = workspace("repeat-flag");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  const twice = deed(cwd, "task", "done", "T1", "--evidence", "第一条", "--evidence", "第二条");
+  assert.equal(twice.status, 1, "同一个参数写两遍要问清楚，不能只留最后一条");
+  assert.match(twice.stderr, /--evidence 只收一个值/);
+  assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 0, "被拒的命令一条都不写");
+});
+
+test("a review may carry more than one finding, and all of them land", () => {
+  const cwd = workspace("many-findings");
+  const pin = proof(cwd);
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "改文件", "--criteria", "改完", "--files", "core/a.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "改完", "--digest", pin);
+  deed(cwd, "review", "--segment", "S01.1");
+  const one = deed(
+    cwd,
+    "review",
+    "--segment",
+    "S01.1",
+    "--by",
+    "reviewer",
+    "--verdict",
+    "fail",
+    "--finding",
+    "第一条",
+    "--finding",
+    "第二条",
+  );
+  assert.equal(one.status, 0, one.stdout + one.stderr);
+  const log = readEvents(cwd).filter((event) => event.k === "review.log").pop();
+  assert.deepEqual(log.findings, ["第一条", "第二条"], "写好的一条都不能丢");
+});

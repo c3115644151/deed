@@ -64,9 +64,19 @@ const stamp = () => new Date().toISOString();
 // "true" would turn evidence into a word nobody can check later.
 const BOOLEAN_FLAGS = new Set(["pass", "force", "print-agents"]);
 
+// Two things a flag can mean when it is given twice: "all of these" or "the
+// caller is confused". Only one flag means the first; for the rest, quietly
+// keeping the last value throws away what someone typed.
+const REPEATABLE = new Set(["finding"]);
+
 function parse(argv) {
-  const flags = {};
+  const given = new Map();
   const words = [];
+  const put = (key, value) => {
+    const seen = given.get(key);
+    if (seen === undefined) given.set(key, [value]);
+    else seen.push(value);
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (!token.startsWith("--")) {
@@ -76,22 +86,31 @@ function parse(argv) {
     const body = token.slice(2);
     const equals = body.indexOf("=");
     if (equals > 0) {
-      flags[body.slice(0, equals)] = body.slice(equals + 1);
+      put(body.slice(0, equals), body.slice(equals + 1));
       continue;
     }
     if (BOOLEAN_FLAGS.has(body)) {
-      flags[body] = true;
+      put(body, true);
       continue;
     }
     const next = argv[i + 1];
     if (next === undefined) {
-      flags[body] = true;
+      put(body, true);
       continue;
     }
     if (next.startsWith("--"))
       throw new Error("--" + body + " 的值不能以 -- 开头：值就是那一串的话，写成 --" + body + '="…"');
-    flags[body] = next;
+    put(body, next);
     i += 1;
+  }
+  const flags = {};
+  for (const [key, values] of given) {
+    if (values.length === 1) flags[key] = values[0];
+    else if (REPEATABLE.has(key)) flags[key] = values;
+    else
+      throw new Error(
+        "--" + key + " 只收一个值，这条命令里写了 " + values.length + " 遍：把要一起说的写成一条（--" + key + '="…"）',
+      );
   }
   return { flags, words };
 }
@@ -900,7 +919,7 @@ const HELP = [
   "deed ask \"<问题>\" --reading \"我理解成…\" --why \"…\"",
   "deed ask resolve|withdraw <A1> [--decision \"…\"] [--why \"…\"]",
   "deed review [--segment S01.1]            出任务书（记一条 review.brief），打印路径",
-  "deed review --segment S01.1 --by \"谁\" --verdict pass|fail [--finding \"…\"]",
+  "deed review --segment S01.1 --by \"谁\" --verdict pass|fail [--finding \"…\" --finding \"…\"]",
   "deed judge --pass [--segment S01.1]",
   "deed judge --rework T1,T2 --why \"…\" --by \"…\" [--segment S01.1]",
   "deed sign --words \"<用户原话>\" [--title \"<这一期的名字>\"]",
