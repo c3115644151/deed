@@ -77,4 +77,9 @@
   标准：封存那一刻的决定留在账本上，后来把门槛写细不回头改写它——needsReview 对已封存的免审段返回 false，needsWhole、signBlockers、面板标签三处跟着一致；有测试钉住这条
   交付：core/rules.mjs 的 needsReview 开头先看这一段是不是 segment.seal 封的（sealedBy 有值且 closedAt 非空），是就返回 false——规则只管还开着的段；needsWhole、signBlockers 的未钉检查、reviewState 都从它出，三处一起对齐；docs/DESIGN.md §6 与 §12.4 各写一句为什么。测试：test/rules.test.mjs 新增「a segment sealed before the gate got stricter is not pulled back into review」（两段都用只带 --digest、不称字节的老形状交付封成免审 → needsReview false、reviewState exempt、needsWhole false、签收无债、下一步签收）。跑的是这一份字节：node --test 153/153（rules 18/18）。变异核对：把那行守卫改成 false && …，那条用例红、其余 17 条不动。
 
+## 段 S02.6
+- [x] T43 整期审的判法说出本意，账本层的边界写清楚
+  标准：needsWhole 不靠重算已封存段的规模来决定「这一期要不要整期审」——审过的段算数、deed seal 的段不算；docs/DESIGN.md 那两处话与代码一致，并写明账本层为什么不重查门槛；HANDOFF 的「没做的」列出这两条边界与理由
+  交付：core/rules.mjs 的 needsWhole 改成 read(one) || owed(one)（read = 这一段有审查者的 pass，owed = 不是免审且门槛要审），不再拿已封存段的字节重量重算；docs/DESIGN.md §12.4 那段改成「规模规则只管还开着的段」并补一句「要不要整期审只看有没有人看过它」，§6 的规模那条跟着改，§8 新增「账本层不重查门槛」一段（fold 只拒自相矛盾的事件，该审的段封不了由 sealBlockers 挡，拿今天的门槛核历史行会把合法历史判成坏账）；HANDOFF 新增这一轮一节、「没做的」列上这两条边界与其理由、下一步改到 S02.6 与 deed review --all。测试：test/rules.test.mjs 新增「a segment a reviewer read counts for the whole review, whatever its deliveries weigh later」（一段很小被 pass 封住、一段 deed seal 封住 → 前段 needsReview false 而整期审仍要有结论）。跑的是这一份字节：node --test 154/154（rules 19/19）、node --test test/docs.test.mjs 4/4（它在改完 HANDOFF 之后跑的）。变异核对：把 read 那行改成 false && …，rules 立刻 2 条红（17 过 2 败），还原 19/19。
+
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

@@ -240,11 +240,16 @@ export function wholeState(session) {
 }
 
 // 这一期需不需要一次单独的整体审：一段的一期不需要——它的段审就是整期审。
-// 多段的一期，只要有一段按门槛要审，签收前就得再有一份落在整期上的结论。
-// 全都免审的多段期也不要：没人需要看的东西不必再造一份材料。
+// 多段的一期，只要有一段是审查者看过的（或者还开着、按门槛要审），签收前就得
+// 再有一份落在整期上的结论；全都由 deed seal 封的多段期不要——没人需要看的东西
+// 不必再造一份材料。判断只看两件事：这一段有没有结论、还开着的段门槛怎么判。
+// 不拿已封存段的后来字节重量去重算：那会把「审过了」重新变成「该审而没审」，
+// 也会让封过的免审段翻回要审（上一轮修的就是这一条）。
 export const needsWhole = (config, session) => {
   if (!session || session.segments.length < 2) return false;
-  return config ? session.segments.some((one) => needsReview(config, session, one)) : true;
+  const read = (one) => one.verdict === "pass";
+  const owed = (one) => one.verdict !== "exempt" && (config ? needsReview(config, session, one) : true);
+  return session.segments.some((one) => read(one) || owed(one));
 };
 
 export const staleReview = (session, segment) => {

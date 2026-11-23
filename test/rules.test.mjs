@@ -291,5 +291,23 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   assert.equal(reviewState(config, session, first), "exempt");
   assert.equal(needsWhole(config, session), false, "没人审过的期不必再补一份整期结论");
   assert.deepEqual(signBlockers(doc, session, config), []);
+
+// 整期审的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。
+// 少了这一条，段一旦被 pass 封住，它后来算不算「小改动」就会决定这一期还要不要整期审——
+// 而真正该问的是有没有人看过。
+test("a segment a reviewer read counts for the whole review, whatever its deliveries weigh later", () => {
+  const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
+  const light = (n, id, path) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent",
+    digest: "a".repeat(64), digestPath: path, changed: [path], bytes: { [path]: 100 } });
+  const doc = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["docs/a.md"]), light(4, "T1", "docs/a.md"), sealed(5, "S01.1"),
+    add(6, "T2", ["docs/b.md"]), light(7, "T2", "docs/b.md"), seal(8, "S01.2"),
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(needsReview(config, session, session.segments[0]), false, "这一段的字节数出来确实很小");
+  assert.equal(needsWhole(config, session), true, "可它被人看过：整期审还得有一句结论");
+  assert.equal(signBlockers(doc, session, config).some((one) => one.includes("整体审")), true);
+});
   assert.equal(nextAction(doc, config).what, "签收");
 });
