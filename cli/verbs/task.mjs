@@ -5,6 +5,9 @@ import { ROOT, parse, transact, nextId, fail, guard, undoesOf, split, list } fro
 
 export default function task(argv) {
     const [verb, ...rest] = argv;
+    // 开关写在子命令的位置上（task --digset a.md）也先让开关表认一遍：
+    // 那时报"子命令不存在"是答非所问，错的是那个开关的字，不是这个动词的语法。
+    if (verb && verb.startsWith("-") && verb !== "--help" && verb !== "-h") parse(argv, "task");
     const { flags, words } = parse(rest, "task");
     const id = words[0] ?? flags.id;
     guard(() => {

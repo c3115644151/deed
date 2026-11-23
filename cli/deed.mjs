@@ -56,7 +56,10 @@ if (verb === "--version" || verb === "-v" || verb === "version") {
 if (!panelOff() && verb !== "serve" && verb !== "panel") {
   try {
     const one = await ensurePanel(ROOT);
-    if (one && one.started) console.log("面板 · http://127.0.0.1:" + one.port);
+    if (one && one.started) {
+      if (one.fellBack) console.log("deed: 端口 " + one.asked + " 被占着；面板改开在 " + one.port);
+      console.log("面板 · http://127.0.0.1:" + one.port);
+    }
   } catch {
     // 面板起不来不该让命令失败：账本的事比页面重要。
   }

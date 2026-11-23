@@ -44,7 +44,8 @@ const waitFor = async (root, ms) => {
 };
 
 export async function startPanel(root) {
-  const child = spawn(process.execPath, [entry, "serve", "--port", String(portOf(root))], {
+  const asked = portOf(root);
+  const child = spawn(process.execPath, [entry, "serve", "--port", String(asked)], {
     cwd: root,
     detached: true,
     stdio: "ignore",
@@ -52,7 +53,10 @@ export async function startPanel(root) {
   });
   child.unref();
   const one = await waitFor(root, 3000);
-  return one ? { running: true, port: one.port, pid: one.pid, started: true } : { running: false };
+  if (!one) return { running: false };
+  // 面板是在一个不接管道的子进程里起的，它自己那句"端口被占着"只会掉进虚空：
+  // 端口退到哪儿这件事必须由拉它起来的这一头说，否则用户只看到一条无声换掉的地址。
+  return { running: true, port: one.port, pid: one.pid, started: true, asked, fellBack: one.port !== asked };
 }
 
 // 每条命令都过的这一句：在就不动（一次 socket 探测），不在就起，起不来就算了。

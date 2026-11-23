@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import net from "node:net";
 import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
@@ -1158,38 +1159,47 @@ test("a panel comes up with the first command, and the next one leaves it alone"
   }
 });
 
-// 地址要能收藏：面板守在工作区门槛里写的那个端口，重启还是同一个号。
-test("a panel keeps the port its workspace declared, across restarts", () => {
+// 地址要能收藏：面板守在工作区门槛里写的那个端口；那个号被别人占着时，
+// 它退到系统给的号，并且"哪个被占、改开在哪"这句话必须由拉它起来的那一头说出来——
+// 子进程不接管道，它自己那句只会掉进虚空。
+test("a panel says when the declared port was taken, and goes back to it when the port is free", async () => {
   const cwd = workspace("panel-port");
   const env = { ...process.env };
   delete env.DEED_NO_PANEL;
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
   const record = () => JSON.parse(fs.readFileSync(panelRecord(cwd), "utf8"));
   const url = (out) => Number(out.match(/127\.0\.0\.1:(\d+)/)[1]);
+  const held = net.createServer(() => {});
+  const listen = () => new Promise((ok) => held.listen(7433, "127.0.0.1", ok));
+  const free = () => new Promise((ok) => held.close(() => ok()));
   try {
     assert.equal(run("init", "--said", "起点", "--port", "7433").status, 0);
-    const first = run("tick", "--who", "user", "--said", "看看面板");
-    assert.equal(first.status, 0, first.stderr);
-    const started = url(first.stdout);
-    const heard = record();
-    assert.equal(heard.port, started, "记号里记的就是它实际在听的那个号");
-    assert.match(String(heard.build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
-    // 7433 空着就该用它；被别人先占了才退到别的号，那时输出里会说。
-    assert.equal(started === 7433 || first.stdout.includes("被占着"), true, first.stdout);
+    await listen();
+    const taken = run("tick", "--who", "user", "--said", "看看面板");
+    assert.equal(taken.status, 0, taken.stderr);
+    const fell = url(taken.stdout);
+    assert.notEqual(fell, 7433, "7433 被占着，面板只能退到别的号");
+    assert.match(taken.stdout, /端口 7433 被占着；面板改开在 \d+/, "退到哪儿要说出来，不是无声换掉一条地址");
+    assert.equal(record().port, fell, "记号里记的就是它实际在听的那个号");
+    assert.match(String(record().build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
+    // 号让出来了：再起就回到门槛里写的那个地址——地址是用来收藏的，不是每次随机。
+    assert.equal(run("panel", "--stop").status, 0);
+    await free();
+    const again = run("state");
+    assert.equal(again.status, 0, again.stderr);
+    assert.equal(url(again.stdout), 7433, "号空出来之后回到声明的那个地址");
     // 面板代码换过（记号里的指纹对不上）：下一条命令自己把旧的换掉，
-    // 不必有人记得"改完要重启"——否则改了样式，看到的还是旧渲染。
+    // 不必有人记得"改完要重启"——换过之后地址不变。
+    const heard = record();
     fs.writeFileSync(panelRecord(cwd), JSON.stringify({ pid: heard.pid, port: heard.port, build: "0000000000000000" }));
     const swapped = run("state");
     assert.equal(swapped.status, 0, swapped.stderr);
-    const fresh = record();
-    assert.notEqual(fresh.pid, heard.pid, "旧进程被换掉了");
-    assert.equal(fresh.port, started, "换掉的进程守的还是同一个号");
-    assert.equal(run("panel", "--stop").status, 0);
-    const again = run("state");
-    assert.equal(again.status, 0, again.stderr);
-    assert.equal(url(again.stdout), started, "停掉再起，还是同一个地址");
+    const now = record();
+    assert.notEqual(now.pid, heard.pid, "旧进程被换掉了");
+    assert.equal(now.port, 7433, "换掉的进程守的还是同一个号");
   } finally {
     run("panel", "--stop");
+    if (held.listening) await free();
   }
 });
 
@@ -1916,4 +1926,19 @@ test("the second and third brief of one segment say how many there have been", (
   const third = deed(cwd, "review", "--segment", "S01.1");
   assert.match(third.stdout, /S01\.1 的第 3 份/);
   assert.match(third.stdout, /先看上一份的审查者点了哪几条/);
+});
+
+// 开关写错一个字：要认出来、说出写错的是哪个、猜最近的那个；一路静默吞掉是最坏的一种。
+test("a flag one letter off is refused, and the nearest name is guessed", () => {
+  const cwd = workspace("spec-guess");
+  deed(cwd, "init", "--said", "起点");
+  deed(cwd, "task", "add", "一件事", "--criteria", "做完");
+  const behind = deed(cwd, "task", "done", "T1", "--evidence", "跑了", "--digset", "proof.txt");
+  assert.equal(behind.status, 1, behind.stdout);
+  assert.match(behind.stderr, /不认 --digset/);
+  assert.match(behind.stderr, /--digest/);
+  // 开关写在子命令的位置上：先说开关错在哪，不拿"子命令不存在"糊过去。
+  const upfront = deed(cwd, "task", "--digset", "proof.txt");
+  assert.equal(upfront.status, 1, upfront.stdout);
+  assert.match(upfront.stderr, /--digest/);
 });
