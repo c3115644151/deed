@@ -8,7 +8,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { BLOCK } from "../cli/words.mjs";
+import { BLOCK } from "../lib/words.mjs";
 
 const ROOT = path.join(import.meta.dirname, "..");
 

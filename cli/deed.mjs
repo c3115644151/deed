@@ -11,9 +11,10 @@ import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { digest } from "../core/digest.mjs";
 import { fold } from "../core/fold.mjs";
 import { UnknownKindError, validateEvent } from "../core/events.mjs";
-import { currentVersion, unknownKindNotice } from "./version.mjs";
+import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import {
   countIn,
   currentSession,
@@ -42,16 +43,19 @@ import {
   readEvents,
   withLock,
   writeConfig,
+  rel,
   writeSnapshot,
-} from "./store.mjs";
+} from "../lib/store.mjs";
 import { start } from "../board/serve.mjs";
-import { BLOCK as AGENTS_BLOCK, wordsNotice } from "./words.mjs";
-import { hookNotice, silenceNotice } from "./heartbeat.mjs";
+import { auditBriefs, auditEvidence, bareEvidence, briefTrouble, staleEvidence } from "./audit.mjs";
+import { planBrief, writeBrief } from "./brief.mjs";
+import { fileStamp, stamp0 } from "../lib/format.mjs";
+import { BLOCK as AGENTS_BLOCK, wordsNotice } from "../lib/words.mjs";
+import { hookNotice, silenceNotice } from "../lib/heartbeat.mjs";
 
 const ROOT = process.cwd();
 const sameJson = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const stamp = () => new Date().toISOString();
-const sha = (buffer) => crypto.createHash("sha256").update(buffer).digest("hex");
 
 // Flags that carry no value. Everything else must be followed by one: a value
 // that starts with -- is almost always a forgotten quote, and silently storing
@@ -177,113 +181,7 @@ const guard = (fn) => {
   }
 };
 
-// The ledger keeps UTC; everything a person reads is local time on this machine.
-// The ledger is shared and read on other machines: paths go in with forward
-// slashes, never with the separator of the machine that happened to write them.
-const rel = (p) => path.relative(ROOT, p).split(path.sep).join("/");
-
-const stamp0 = (at) => {
-  if (!at) return "—";
-  const date = new Date(at);
-  if (Number.isNaN(date.getTime())) return at;
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
-const fileStamp = (at) => stamp0(at).replace(/[-: ]/g, "");
 const period = (doc) => "第 " + doc.sessions.length + " 期";
-
-// Three things can be wrong with evidence, and they are not the same problem:
-// the file changed (stale), the path leaves the workspace (a ledger that only
-// makes sense on one machine), or nothing was pinned at all (nothing to check).
-function auditEvidence(doc, sessionId) {
-  const stale = [];
-  const outside = [];
-  for (const one of doc.sessions) {
-    if (sessionId && one.id !== sessionId) continue;
-    for (const task of one.tasks)
-      for (const proof of task.evidence) {
-        if (!proof.digest || !proof.path) continue;
-        const file = path.resolve(ROOT, proof.path);
-        const inside = path.relative(ROOT, file);
-        if (inside.startsWith("..") || path.isAbsolute(inside)) {
-          outside.push({ id: task.id, path: proof.path });
-          continue;
-        }
-        const actual = fs.existsSync(file) ? sha(fs.readFileSync(file)) : null;
-        if (actual !== proof.digest) stale.push({ id: task.id, path: proof.path, digest: proof.digest });
-      }
-  }
-  return { stale, outside };
-}
-
-const staleEvidence = (doc, sessionId) => auditEvidence(doc, sessionId).stale;
-
-function bareEvidence(doc) {
-  const bare = [];
-  for (const one of doc.sessions)
-    for (const task of one.tasks)
-      if (task.evidence.length > 0 && !task.evidence.some((proof) => proof.digest && proof.path)) bare.push({ id: task.id });
-  return bare;
-}
-
-// The brief is outside the ledger, so the ledger keeps its path and sha256.
-// Five ways that pair stops meaning anything: the document was edited after it
-// was handed out, it was removed, it was never handed out at all (a verdict
-// naming a document with no review.brief behind it), a file in the review
-// folder that no event mentions, or a legacy line that recorded no digest.
-// Each one leaves a conclusion that points at bytes nobody can vouch for.
-function auditBriefs(doc, sessionId) {
-  const edited = [];
-  const gone = [];
-  const orphan = [];
-  const unpinned = [];
-  const outside = [];
-  const claimed = new Set();
-  for (const one of doc.sessions) {
-    if (sessionId && one.id !== sessionId) continue;
-    for (const hand of one.briefs) {
-      claimed.add(hand.brief);
-      const file = path.resolve(ROOT, hand.brief);
-      const inside = path.relative(ROOT, file);
-      if (inside.startsWith("..") || path.isAbsolute(inside)) {
-        outside.push({ segment: hand.segment, brief: hand.brief });
-        continue;
-      }
-      if (!hand.briefDigest) {
-        unpinned.push({ segment: hand.segment, brief: hand.brief });
-        continue;
-      }
-      if (!fs.existsSync(file)) {
-        gone.push({ segment: hand.segment, brief: hand.brief });
-        continue;
-      }
-      const actual = sha(fs.readFileSync(file));
-      if (actual !== hand.briefDigest) edited.push({ segment: hand.segment, brief: hand.brief, digest: hand.briefDigest, actual });
-    }
-    for (const review of one.reviews) {
-      claimed.add(review.brief);
-      const handed = one.briefs.some((hand) => hand.brief === review.brief && hand.briefDigest === review.briefDigest);
-      if (!handed && review.briefDigest) orphan.push({ segment: review.segment, brief: review.brief });
-      if (!review.briefDigest) unpinned.push({ segment: review.segment, brief: review.brief });
-    }
-  }
-  // Files left in the review folder that no line points at: a hand-written
-  // brief, or one written before handing out became a fact.
-  const stray = [];
-  const dir = paths(ROOT).review;
-  if (fs.existsSync(dir)) {
-    for (const name of fs.readdirSync(dir).sort()) {
-      if (!name.endsWith(".md")) continue;
-      const brief = rel(path.join(dir, name));
-      if (!claimed.has(brief)) stray.push({ brief });
-    }
-  }
-  return { edited, gone, orphan, unpinned, outside, stray };
-}
-
-const briefTrouble = (audit) =>
-  audit.edited.length + audit.gone.length + audit.orphan.length + audit.unpinned.length + audit.outside.length + audit.stray.length;
 
 function split(value) {
   if (value === undefined || value === null || value === true) return [];
@@ -365,7 +263,7 @@ function printState() {
     console.log("  签收 " + (blockers.length === 0 ? "可行" : "差：" + blockers.join("；")));
     const watch = pressure(open);
     if (watch && watch.tasks > 3) console.log("  提示 · 这一段已经 " + watch.tasks + " 条，还压着 " + watch.undecided + " 条待判");
-    const stale = staleEvidence(doc, open.id);
+    const stale = staleEvidence(ROOT, doc, open.id);
     if (stale.length > 0) console.log("  证据过期 · " + stale.map((one) => one.id).join("、") + "（钉住的文件变了，deed verify 看细节）");
   }
   for (const one of doc.sessions)
@@ -393,45 +291,6 @@ function printState() {
 // The brief is the reviewer input: one file per verdict, never overwritten.
 // The bytes are decided here, written only once the event is on disk -- a
 // verdict that fold refuses must not leave a brief nobody will ever read.
-function planBrief(open, segment, at) {
-  const p = ensureDirs(ROOT);
-  const tasks = tasksIn(open, segment);
-  const text = [
-    "# 审查任务书 · " + segment.id,
-    "",
-    "会话 " + open.id + " · 段 " + segment.id + " · " + tasks.length + " 条 · 生成于 " + stamp0(at),
-    "",
-    "## 要审的承诺",
-    "",
-    ...tasks.flatMap((task) => [
-      "### " + task.id + " · " + task.title,
-      "",
-      "- 做完的标准：" + task.criteria,
-      "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
-      "- 状态：" + task.status,
-      ...task.evidence.map((proof) => "- 证据：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）"),
-      "",
-    ]),
-    "## 怎么审",
-    "",
-    "1. 对每条标准，看证据够不够证明它达成；没证据就是没达成。",
-    "2. 只看这一段的任务，不替它补未来的事。",
-    "3. 结论落盘：deed review --segment " + segment.id + " --by \"<你是谁>\" --verdict pass|fail --finding \"<不合格的那几条>\"",
-    "",
-    "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
-    "",
-  ].join("\n");
-  let file = path.join(p.review, segment.id + "-" + fileStamp(at) + ".md");
-  for (let n = 2; fs.existsSync(file); n += 1)
-    file = path.join(p.review, segment.id + "-" + fileStamp(at) + "-" + n + ".md");
-  return { file, text, digest: sha(text) };
-}
-
-function writeBrief(plan, brief) {
-  fs.writeFileSync(plan.file, plan.text, "utf8");
-  return brief;
-}
-
 // 接过之后能立刻做完的几件事。一次说全，省得 agent 再翻文档去猜；
 // 每一件都是可选的：没人做，账本照样能往下走。
 function optionalBlock(config) {
@@ -555,8 +414,8 @@ const commands = {
       if (verb === "done") {
         if (!id) fail("task done 要点名任务");
         if (!flags.evidence) fail("task done 必须带证据：--evidence \"命令与结果\"");
-        let digest;
-        let digestPath;
+        let pinned;
+        let pinnedPath;
         if (flags.digest) {
           const file = path.resolve(ROOT, String(flags.digest));
           const inside = path.relative(ROOT, file);
@@ -569,8 +428,8 @@ const commands = {
             fail("--digest 指的文件不在：" + flags.digest);
           }
           if (!stat.isFile()) fail("--digest 要指一个文件，不是目录：" + flags.digest + "（例如 docs/a.md）");
-          digest = sha(fs.readFileSync(file));
-          digestPath = rel(file);
+          pinned = digest(fs.readFileSync(file));
+          pinnedPath = rel(ROOT, file);
         }
         // Snapshot before taking the lock: hashing the tree is the slow part of a
         // delivery, and holding the lock across it would make every other writer
@@ -588,14 +447,14 @@ const commands = {
               id,
               evidence: flags.evidence,
               by: flags.by ?? "agent",
-              digest,
-              digestPath,
+              digest: pinned,
+              digestPath: pinnedPath,
               changed: taken.changed,
             };
           },
           () => writeSnapshot(ROOT, snapshotFiles),
         );
-        console.log("交付 · " + id + " · 证据：" + flags.evidence + (digest ? " · 钉在 " + digest.slice(0, 12) : ""));
+        console.log("交付 · " + id + " · 证据：" + flags.evidence + (pinned ? " · 钉在 " + pinned.slice(0, 12) : ""));
         if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（门槛按它判，不只按声明的 --files）");
         return;
       }
@@ -668,7 +527,7 @@ const commands = {
           // 交出去的那份只要没被动过，就在等结论；被改过或删了就另出一份——
           // 手上那份已经不是账本里记的那一份，谁读它都不算数。
           const file = path.resolve(ROOT, handed.brief);
-          const intact = fs.existsSync(file) && sha(fs.readFileSync(file)) === handed.briefDigest;
+          const intact = fs.existsSync(file) && digest(fs.readFileSync(file)) === handed.briefDigest;
           if (intact) {
             console.log("审查任务书 · " + handed.brief + "（这一段已经出过，等结论落盘）");
             console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
@@ -676,8 +535,8 @@ const commands = {
           }
           console.log("上一份任务书(" + handed.brief + ")改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
         }
-        const plan = planBrief(one, seg, stamp());
-        const brief = rel(plan.file);
+        const plan = planBrief(ROOT, one, seg, stamp());
+        const brief = rel(ROOT, plan.file);
         transact(flags, () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, briefDigest: plan.digest }), () => writeBrief(plan, brief));
         console.log("审查任务书 · " + brief);
         console.log("  交给审查者；结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
@@ -693,7 +552,7 @@ const commands = {
       if (!handed) fail("这一段还没有任务书：先 deed review --segment " + seg.id + " 出任务书，再把结论落回来");
       const file = path.resolve(ROOT, handed.brief);
       if (!fs.existsSync(file)) fail("任务书不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
-      if (sha(fs.readFileSync(file)) !== handed.briefDigest)
+      if (digest(fs.readFileSync(file)) !== handed.briefDigest)
         fail("任务书被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
       const findings = list(flags.finding);
       transact(flags, () => ({
@@ -734,7 +593,7 @@ const commands = {
         );
       if (flags.pass) {
         const inSegment = new Set(tasksIn(one, seg).map((t) => t.id));
-        const audit = auditEvidence(doc, one.id);
+        const audit = auditEvidence(ROOT, doc, one.id);
         const stale = audit.stale.filter((s) => inSegment.has(s.id));
         const outside = audit.outside.filter((s) => inSegment.has(s.id));
         if (outside.length > 0)
@@ -805,9 +664,9 @@ const commands = {
   verify() {
     guard(() => {
       const { doc } = load();
-      const { stale, outside } = auditEvidence(doc);
+      const { stale, outside } = auditEvidence(ROOT, doc);
       const bare = bareEvidence(doc);
-      const briefs = auditBriefs(doc);
+      const briefs = auditBriefs(ROOT, doc);
       const looseBriefs = briefTrouble(briefs);
       for (const one of bare) console.log("没钉内容 · " + one.id + "（--evidence 里没有 --digest：说得出做了什么，查不了）");
       for (const one of briefs.unpinned) console.log("任务书没指纹 · " + one.segment + " · " + one.brief + "（账本没记 sha256：改没改过查不出来）");
@@ -893,9 +752,9 @@ const commands = {
       if (!bad) {
         console.log("账本干净 · " + events.length + " 条事件都能折叠");
         const { doc } = load();
-        const stale = staleEvidence(doc);
+        const stale = staleEvidence(ROOT, doc);
         if (stale.length > 0) console.log("  证据过期 " + stale.length + " 处（不算坏账）：" + stale.map((s) => s.id).join("、"));
-        const briefs = auditBriefs(doc);
+        const briefs = auditBriefs(ROOT, doc);
         const loose = briefTrouble(briefs);
         const words = wordsNotice(ROOT);
         if (words) console.log("  接入 · " + words);
@@ -973,7 +832,7 @@ const commands = {
 };
 
 const HELP = [
-  "deed · 工作区里的议事与执行机制",
+  "deed · 一个工作区的事实账本",
   "",
   "deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区",
   "deed init [--said \"…\"] [--review \"src/**,…\"] [--exempt \"docs/**\"] [--port 7317]",

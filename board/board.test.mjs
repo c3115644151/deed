@@ -4,7 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fold } from "../core/fold.mjs";
-import { append } from "../cli/store.mjs";
+import { append } from "../lib/store.mjs";
 import { renderBoard } from "../board/render.mjs";
 import { start } from "../board/serve.mjs";
 import { workspace } from "../support/lib.mjs";

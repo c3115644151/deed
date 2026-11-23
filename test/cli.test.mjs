@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { workspace } from "../support/lib.mjs";
-import { readEvents } from "../cli/store.mjs";
+import { readEvents } from "../lib/store.mjs";
 import { validateEvent } from "../core/events.mjs";
 
 const CLI = path.join(import.meta.dirname, "..", "cli", "deed.mjs");

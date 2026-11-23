@@ -8,9 +8,9 @@ import path from "node:path";
 import { UnknownKindError } from "../core/events.mjs";
 import { fold } from "../core/fold.mjs";
 import { pressure, reading, countIn, currentSession, openSegment, nextAction, pendingAsks, signBlockers } from "../core/rules.mjs";
-import { readEvents } from "../cli/store.mjs";
-import { currentVersion, unknownKindNotice } from "../cli/version.mjs";
-import { wordsNotice } from "../cli/words.mjs";
+import { readEvents } from "../lib/store.mjs";
+import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
+import { wordsNotice } from "../lib/words.mjs";
 import { renderBoard, when } from "./render.mjs";
 
 function snapshot(root) {

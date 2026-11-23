@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { workspace } from "../support/lib.mjs";
-import { hookNotice, silenceNotice } from "../cli/heartbeat.mjs";
+import { hookNotice, silenceNotice } from "../lib/heartbeat.mjs";
 
 // Stamps read like the CLI's, so the message under a test is the message a
 // person sees.

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareVersions, currentVersion, unknownKindNotice } from "../cli/version.mjs";
+import { compareVersions, currentVersion, unknownKindNotice } from "../lib/version.mjs";
 
 test("versions compare by three numbers, and only by them", () => {
   assert.equal(compareVersions("0.2.0", "0.1.9"), 1);
