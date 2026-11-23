@@ -12,7 +12,7 @@ import { readEvents } from "../lib/store.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { wordsNotice } from "../lib/words.mjs";
 import { renderBoard, when } from "./render.mjs";
-import { clearPanel, recordPanel } from "../lib/panel.mjs";
+import { buildNow, clearPanel, recordPanel } from "../lib/panel.mjs";
 
 function snapshot(root) {
   // A panel that vanishes because one ledger line is malformed is worse than a
@@ -173,10 +173,15 @@ export function handler(root, onRequest = () => {}) {
 export function start(root, port) {
   let lastRequest = Date.now();
   const server = http.createServer(handler(root, () => { lastRequest = Date.now(); }));
+  // 端口被别的程序先占了也照开：面板的意义是"随时能看"，不是为了守着一个号而死掉。
+  // 退到系统给的号，并在页面上说清它开在哪——下一次命令读到记号，就知道别的地方还有它。
+  let listening = null;
   server.on("error", (error) => {
-    if (error.code === "EADDRINUSE") {
-      console.error(`deed: 端口 ${port} 被占用；换一个：deed serve --port ${port + 1}`);
-      process.exit(1);
+    if (error.code === "EADDRINUSE" && listening === null) {
+      console.error(`deed: 端口 ${port} 被占着；面板改开在系统给的空闲端口（下面一行是新的 URL）`);
+      listening = 0;
+      server.listen(0, "127.0.0.1", ready);
+      return;
     }
     throw error;
   });
@@ -192,13 +197,17 @@ export function start(root, port) {
     clearInterval(clock);
     clearPanel(root, process.pid);
   });
-  server.listen(port, "127.0.0.1", () => {
+  const ready = () => {
     const actual = server.address().port;
     // 记号写给下一條命令读：它要凭这个知道页面已经在，不再拉第二个。
-    recordPanel(root, { pid: process.pid, port: actual });
+    // 记号里带上模块指纹：改了面板代码之后，下一条命令据此把旧的换掉，
+    // 不必有人记得"改完要重启"。
+    recordPanel(root, { pid: process.pid, port: actual, build: buildNow() });
     lastRequest = Date.now();
     console.log(`契约页 http://127.0.0.1:${actual}`);
     console.log("  只读：命令由人执行，页面只呈现当前事实");
-  });
+  };
+  listening = port;
+  server.listen(port, "127.0.0.1", ready);
   return server;
 }

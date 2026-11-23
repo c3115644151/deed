@@ -8,6 +8,7 @@ import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
+import { panelRecord } from "../lib/panel.mjs";
 
 const CLI = path.join(import.meta.dirname, "..", "cli", "deed.mjs");
 // 面板默认关掉：每条命令都去拉一个后台服务，测试就成了端口和进程的集合。
@@ -1152,6 +1153,41 @@ test("a panel comes up with the first command, and the next one leaves it alone"
     assert.match(stop.stdout, /面板已停/);
     const after = run("state");
     assert.match(after.stdout, /面板 · http:\/\/127\.0\.0\.1:\d+/, "停掉之后下一条命令又把它拉起来");
+  } finally {
+    run("panel", "--stop");
+  }
+});
+
+// 地址要能收藏：面板守在工作区门槛里写的那个端口，重启还是同一个号。
+test("a panel keeps the port its workspace declared, across restarts", () => {
+  const cwd = workspace("panel-port");
+  const env = { ...process.env };
+  delete env.DEED_NO_PANEL;
+  const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
+  const record = () => JSON.parse(fs.readFileSync(panelRecord(cwd), "utf8"));
+  const url = (out) => Number(out.match(/127\.0\.0\.1:(\d+)/)[1]);
+  try {
+    assert.equal(run("init", "--said", "起点", "--port", "7433").status, 0);
+    const first = run("tick", "--who", "user", "--said", "看看面板");
+    assert.equal(first.status, 0, first.stderr);
+    const started = url(first.stdout);
+    const heard = record();
+    assert.equal(heard.port, started, "记号里记的就是它实际在听的那个号");
+    assert.match(String(heard.build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
+    // 7433 空着就该用它；被别人先占了才退到别的号，那时输出里会说。
+    assert.equal(started === 7433 || first.stdout.includes("被占着"), true, first.stdout);
+    // 面板代码换过（记号里的指纹对不上）：下一条命令自己把旧的换掉，
+    // 不必有人记得"改完要重启"——否则改了样式，看到的还是旧渲染。
+    fs.writeFileSync(panelRecord(cwd), JSON.stringify({ pid: heard.pid, port: heard.port, build: "0000000000000000" }));
+    const swapped = run("state");
+    assert.equal(swapped.status, 0, swapped.stderr);
+    const fresh = record();
+    assert.notEqual(fresh.pid, heard.pid, "旧进程被换掉了");
+    assert.equal(fresh.port, started, "换掉的进程守的还是同一个号");
+    assert.equal(run("panel", "--stop").status, 0);
+    const again = run("state");
+    assert.equal(again.status, 0, again.stderr);
+    assert.equal(url(again.stdout), started, "停掉再起，还是同一个地址");
   } finally {
     run("panel", "--stop");
   }

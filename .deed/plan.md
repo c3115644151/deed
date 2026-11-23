@@ -183,5 +183,8 @@
 - [x] T69 删掉迁移壳、按名字落账、把自造词换掉
   标准：judge 只剩 --overturn，--pass/--rework 不认；ask resolve/withdraw 走 signer；仓库与文档里不再有「材料」这个绰号（「过程材料」除外）
   交付：node --test 170/170；deed judge --pass → exit 1（judge 不认 --pass）；deed ask resolve … 从管道里跑缺 --by 被拒；全仓 grep「材料」只剩「过程材料」三处（AGENTS、docs/README、docs/research）
+- [x] T70 面板守住工作区写的端口，代码换过就自己换进程，不必有人记得重启
+  标准：端口取自门槛（默认 7317）；被占时退回系统给的号并说清；记号里带面板代码的指纹，对不上就换进程；地址在重启前后一致
+  交付：node --test test/cli.test.mjs 98/98（新增条：端口取自门槛、停掉再起同一地址、指纹对不上就换进程且端口不变）；node --test board/board.test.mjs 9/9
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->
