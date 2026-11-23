@@ -111,7 +111,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 | 没交付记录就交付 | `task done` |
 | 签收时还有没结清的、还有待裁 | `fold` 与 `signBlockers` |
 | 记下的文件已经变了 | `deed verify`（重算 sha256），要审的段判决前也查 |
-| 交付记录只说了做了什么，没记任何文件 | `judgeBlockers`（要审的段判不动；`deed verify` 单列报出来） |
+| 交付记录只说了做了什么，没记任何文件 | `deed verify`（单列一档，不混在过期里）；`deed sign`（签收前必须记下一个文件） |
 | `--digest` 指到工作区外面、或指一个目录 | `task done`（只认工作区里的普通文件） |
 | 改门槛却不说为什么 | `init`（`--why` 必填，改动进账本） |
 | 手改 `.deed/config.json` 而不收进账本 | `deed verify`（「门槛对不上」，exit 1；规则根本不读那个文件） |

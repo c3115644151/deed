@@ -155,3 +155,20 @@ test("signing refuses to close a period with work still owed", () => {
   ];
   assert.throws(() => fold([...asked, sign(6)]), /待裁项/);
 });
+
+// 一条不合格不会被后一条 pass 悄悄顶掉：它点名的条目得先重新交付。
+// 判没判过看的是在案那条记录说了什么——不是新来的那条带着几版的版本号（每行都是最新版）。
+test("a standing fail outranks a later pass until the work it named is delivered again", () => {
+  const fail = { v: 3, at: T(5), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b.md", findings: ["x"], rework: ["T1"], why: "没跑" };
+  const pass = { v: 3, at: T(7), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b2.md" };
+  const before = [turn(1), add(2, "T1"), done(3, "T1"), fail];
+  // 没重新交付之前连结论都落不了：先交付，才轮得到"能不能判"。
+  assert.throws(() => fold([...before, { ...pass, at: T(6) }]), /还有没交付的/u);
+  // 放弃了被点名的那条也不算结清：活没人做过，结论就还没到。
+  const dropped = { v: 3, at: T(6), k: "task.drop", s: null, id: "T1", why: "不做了" };
+  assert.throws(() => fold([...before, dropped, pass]), /还没结清/u);
+  const again = { v: 3, at: T(6), k: "task.done", s: null, id: "T1", evidence: "again", by: "agent" };
+  const doc = fold([...before, again, pass]);
+  assert.equal(doc.sessions[0].segments[0].verdict, "pass");
+  assert.equal(doc.sessions[0].segments[0].closedAt, T(7));
+});

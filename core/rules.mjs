@@ -173,33 +173,6 @@ export const voidedReview = (session, segment) => {
   return ever.length > 0 && ever.every((one) => one.voidedAt !== null);
 };
 
-export function judgeBlockers(config, session, segment = openSegment(session)) {
-  if (!session) return ["现在没有在推进的会话"];
-  if (!segment) return ["现在没有待判的段"];
-  const blockers = [];
-  if (segment.closedAt !== null) blockers.push(`段 ${segment.id} 已经封存`);
-  const count = countIn(session, segment);
-  if (count.todo > 0) blockers.push(`还有 ${count.todo} 条没做完`);
-  const state = reviewState(config, session, segment);
-  if (state === "fail") blockers.push("审查结论是不合格，得补完再判");
-  if (state === "stale")
-    blockers.push("审查结论早于最后一次交付：它回答的是旧内容，重新审一次（deed review --segment " + segment.id + "）");
-  if (voidedReview(session, segment))
-    blockers.push("审查结论已经被打回作废：重新审一次再判（deed review --segment " + segment.id + "）");
-  else if (state === "missing")
-    blockers.push("这一段要审，结论还没落盘：" + ("deed review --segment " + segment.id) + " 出清单");
-  if (needsReview(config, session, segment)) {
-    const bare = unpinned(session, segment);
-    if (bare.length > 0)
-      blockers.push(
-        "这些交付没记下任何文件，不算数：" +
-          bare.map((one) => one.id).join("、") +
-          "（deed task done " + bare[0].id + ' --evidence "…" --digest <工作区里的文件>）',
-      );
-  }
-  return blockers;
-}
-
 // Signing is a session-level judgement, so it looks at the whole session, not
 // just the segment that happens to be open.
 export function signBlockers(doc, session, config = null) {
@@ -332,15 +305,34 @@ export function nextAction(doc, config) {
     };
   }
   if (state === "fail") {
-    // 旧账本里的不合格没有点名，得有人打回一次；第 3 版起 fail 自己把条目放回桌面，
-    // 于是这里几乎不会被走到——走到就说明这一段的活还在别人手里。
+    // 走到这里说明这一段没有被点名的未做条目：要么点名的被放弃了，要么已经重新交付。
+    // 前者只能由人推翻那条结论（命令面不再产生 judge --rework），后者另出一份清单再审。
     const review = reviewOf(session, segment);
     const findings = review?.findings?.length ?? 0;
+    const named = (review?.rework ?? [])
+      .map((id) => session.tasks.find((one) => one.id === id))
+      .filter(Boolean);
+    const stuck = named.filter((one) => one.status !== "done" && one.status !== "accepted");
+    if (stuck.length > 0) {
+      // 被点名的条目要么还能重新交付，要么已经被放弃——后者在这份账本里没有回头路，
+      // 说了"重新交付"只会让人白跑一趟。
+      const gone = stuck.filter((one) => one.status === "dropped" || one.status === "deferred");
+      const text =
+        gone.length > 0
+          ? `${segment.id} 的不合格（${review.by}）压着已经${gone[0].status === "deferred" ? "延后" : "放弃"}的 ${gone.map((one) => one.id).join("、")}：这条结论只能由人推翻，或者开新一期重做`
+          : `${segment.id} 的不合格（${review.by}）还压着：${stuck.map((one) => one.id).join("、")} 没有重新交付${findings > 0 ? `（${findings} 条发现）` : ""}——重新交付，或者由人推翻那条结论`;
+      return {
+        who: "agent",
+        what: "清结论",
+        text,
+        command: `deed judge --overturn ${review.id} --why "…"`,
+      };
+    }
     return {
-      who: "agent",
-      what: "读结论",
-      text: `${segment.id} 的审查结论是不合格${findings > 0 ? `（${findings} 条发现）` : ""}：读结论，看哪几条没达成`,
-      command: `deed review --segment ${segment.id} --by "你是谁" --verdict fail --rework T1,T2 --why "…"`,
+      who: "reviewer",
+      what: "重审",
+      text: `${segment.id} 的不合格（${review.by}）还在案，被点名的已经重新交付：另出一份清单再审`,
+      command: `deed review --segment ${segment.id}`,
     };
   }
   // 走到这里只剩一种：门槛说这一段不用审，而它还没封。免审就是不用审，所以不再
@@ -348,7 +340,7 @@ export function nextAction(doc, config) {
   return {
     who: "agent",
     what: "封存",
-    text: `${segment.id} · ${count.total} 条都交付了，门槛说这一段不用审（改动都在免审路径、规模也不大）`,
+    text: `${segment.id} · ${count.total} 条都交付了，门槛说这一段不用审（改动只落在免审路径，没人需要审）`,
     command: `deed seal --segment ${segment.id} --why "门槛说这一段不用审：改动只落在免审路径"`,
   };
 }

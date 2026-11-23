@@ -246,7 +246,7 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const segment = segmentById(session, ev.segment);
         if (sealed(segment))
-          noway(`段 ${segment.id} 已经封存：要再审先打回（judge --rework --why "…"）`);
+          noway(`段 ${segment.id} 已经封存：要再审先由人推翻那份结论（deed judge --overturn <R> --why "…"）`);
         session.briefs.push({
           segment: segment.id,
           brief: ev.brief,
@@ -279,13 +279,29 @@ export function fold(events) {
         const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
         const latest = live[live.length - 1] ?? null;
         // A fail is a decision about this delivery. It is not a draft that a
-        // later pass may quietly overwrite: overturning it is a rework, which
-        // puts the work back on the table first.
-        // 第 3 版把"打回"并进了不合格那条记录：fail 自己点名、自己把活放回桌面，
-        // 所以它之后出现的 pass 是重新审过的。旧账本里的 fail 不带点名，仍旧要人来打回。
+        // later pass may quietly overwrite: the work it named has to be
+        // delivered again first.
+        // 判没判过看的是**在案那条**记录说了什么，不是新记录带的版本号：第 3 版起
+        // fail 自己点名、自己把活放回桌面，所以查的是被点名的那几条有没有重新交付，
+        // 而不是"进来的这条是不是第 3 版之后写的"——那样闸门永远不会响（每行都是最新版）。
         const meaning = ev.v ?? 1;
-        if (latest && latest.verdict === "fail" && ev.verdict === "pass" && meaning < 3)
-          noway(`段 ${segment.id} 在案的结论是不合格（${latest.by}）：要改判先打回（judge --rework），再重新审`);
+        if (latest && latest.verdict === "fail" && ev.verdict === "pass") {
+          const named = latest.rework ?? [];
+          const stuck = named
+            .map((id) => taskOf(session, id))
+            .filter((task) => task.status !== "done" && task.status !== "accepted")
+            .map((task) => task.id);
+          if (named.length === 0) {
+            // 旧账本里的 fail 不带点名，命令面也不再产生它：只能由人推翻。
+            if (meaning < 3)
+              noway(
+                `段 ${segment.id} 在案的结论是不合格（${latest.by}）：要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
+              );
+          } else if (stuck.length > 0)
+            noway(
+              `段 ${segment.id} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"）`,
+            );
+        }
         // 点名要重做的条目：记录落盘之前先确认它们都在这一段里，否则一条
         // 打回会写到别的段的任务上，而账本只说"已打回"。
         const rework = ev.rework ?? [];

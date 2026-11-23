@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
-  judgeBlockers,
   needsReview,
   nextAction,
   reading,
   reviewOf,
   reviewState,
+  sealBlockers,
   signBlockers,
 } from "../core/rules.mjs";
 
@@ -54,22 +54,23 @@ test("paths are normalised before they are matched, and an escaping path is neve
   assert.equal(of(["C:/Users/x/core/fold.mjs"]), true);
 });
 
-test("a segment that needs review cannot be judged before the verdict lands", () => {
+test("a segment that needs review cannot be sealed before the verdict lands", () => {
   const doc = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "missing");
-  assert.deepEqual(judgeBlockers(config, session, session.segments[0]), [
-    "这一段要审，结论还没落盘：deed review --segment S01.1 出清单",
+  assert.deepEqual(sealBlockers(config, session, session.segments[0]), [
+    "这一段按门槛要审：结局得由审查者的结论落（deed review --segment S01.1）",
   ]);
-  const reviewed = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"), verdict(4, "pass")]);
-  assert.deepEqual(judgeBlockers(config, reviewed.sessions[0], reviewed.sessions[0].segments[0]), []);
+  // 免审段才封得动；要审的那段被封，就是没人看过它却算过了。
+  const exempt = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1")]);
+  assert.deepEqual(sealBlockers(config, exempt.sessions[0], exempt.sessions[0].segments[0]), []);
 });
 
 test("a failing review keeps the segment shut until something changes", () => {
   const doc = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
-  assert.deepEqual(judgeBlockers(config, session, session.segments[0]), ["审查结论是不合格，得补完再判"]);
+  assert.equal(sealBlockers(config, session, session.segments[0]).includes("这一段已经有审查结论：结局由那份结论定（deed judge --overturn 只用来推翻它）"), true);
 });
 
 // A reviewer who looks and says no is not overruled by a glob.
@@ -77,7 +78,7 @@ test("a failing verdict counts even where review was not required", () => {
   const doc = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
-  assert.equal(judgeBlockers(config, session, session.segments[0]).includes("审查结论是不合格，得补完再判"), true);
+  assert.equal(sealBlockers(config, session, session.segments[0]).some((one) => one.includes("deed judge --overturn")), true);
 });
 
 test("a reworked delivery has no standing verdict left", () => {

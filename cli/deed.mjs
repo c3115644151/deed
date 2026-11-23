@@ -19,7 +19,6 @@ import {
   countIn,
   currentSession,
   debt,
-  judgeBlockers,
   lastBrief,
   lastDelivery,
   lastSegmentChange,
@@ -285,7 +284,9 @@ function printState() {
     } else {
       const count = countIn(open, shown);
       console.log(
-        "  段 " + shown.id + " · 开于 " + stamp0(shown.openedAt) + " · " + count.total + " 条（未做 " + count.todo + " · 已交付 " + (count.done + count.accepted) + "）· " + (shown.closedAt ? "判过 · " + stamp0(shown.closedAt) : REVIEW_LABEL[reviewState(config, open, shown)]),
+        "  段 " + shown.id + " · 开于 " + stamp0(shown.openedAt) + " · " + count.total + " 条（未做 " + count.todo + " · 已交付 " + (count.done + count.accepted) + "）· " + (shown.closedAt
+          ? (shown.verdict === "exempt" ? "免审 · " : "判过 · ") + stamp0(shown.closedAt)
+          : REVIEW_LABEL[reviewState(config, open, shown)]),
       );
       for (const task of tasksIn(open, shown)) {
         const mark = { todo: "○", done: "●", accepted: "✓", deferred: "…", dropped: "×" }[task.status];
