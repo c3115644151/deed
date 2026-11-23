@@ -626,13 +626,14 @@ const commands = {
         let moved = scanned.changed;
         let snapshotFiles = scanned.now;
         // 规模是规则看得见的一半：碰了几个文件数得出来，几个字节得在交付那一刻称。
-        // 删掉的文件记 0——它今天占的字节就是零，不是"没称过"。
+        // 删掉的文件不记 0：它原来多大没人称得出，而把"说不清多大"记成零字节，
+        // 等于让删掉三十 KB 也按小改动免审。留空，规则那边按要审算。
         const sizes = {};
         for (const one of moved) {
           try {
             sizes[one] = fs.statSync(path.join(ROOT, one)).size;
           } catch {
-            sizes[one] = 0;
+            continue;
           }
         }
         // 手工 --digest 常常指一份这次没动过、但这条任务得担着的文件：它不在工作区差里，
@@ -1025,7 +1026,8 @@ const commands = {
         try {
           sizes[one] = fs.statSync(path.join(ROOT, one)).size;
         } catch {
-          sizes[one] = 0;
+          // 删掉的路径不记 0：说不清多大就别装作是零，规则按要审算。
+          continue;
         }
       }
       const pins = [];

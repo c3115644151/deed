@@ -121,13 +121,28 @@
   交付：test/rules.test.mjs 的 seal 用例补上显式断言：assert.equal(first.sealedBy, "agent") 与 assert.notEqual(first.closedAt, null)，不再只靠 needsReview 的豁免断言转述；旁边那句注释也从「这种半个封存只有手改账本造得出来」改成说清真来路（整期审的 fail 分支留着 sealedBy、把 closedAt 清成 null）。跑的是这一份字节：node --test 157/157、node --test test/rules.test.mjs 21/21。变异核对：守卫改成只看 sealedBy → 2 条红（seal 用例外加新用例），只看 closedAt → 1 条红，整条删 → 1 条红。
 
 ## 段 S02.11
-- [ ] T54 面板跟着命令自己起，不占终端，30 分钟没人连就退
+- [x] T54 面板跟着命令自己起，不占终端，30 分钟没人连就退
   标准：任意一条 deed 命令执行前探测面板，不在就用后台进程拉起并把 URL 打印在那一行；下一条命令不再重复起；30 分钟没有请求自己退出；DEED_NO_PANEL=1 时一条都不起；deed panel 看状态、--stop 立即停；它不写账本。测试要真起一次、再确认第二次不起，并把这两种行为各用一条用例管住（去掉自动起那几行要红）。
-- [ ] T55 只删不钉的交付不被 submit 误拒
+  交付：node --test 134/134（这一份字节）；变异：关掉 dispatcher 里的 ensurePanel 那一行，panel 用例红一条。实测：init 后第一条 tick 打印「面板 · http://127.0.0.1:2770」，第二条 state 不再打印，deed panel 报出端口与 pid，--stop 停掉后 state 又起 2990。
+- [x] T55 只删不钉的交付不被 submit 误拒
   标准：工作区差里有删除、没有可钉的现存文件时，deed submit 照常落交付（files 为空、changed 记下那条路径），不再报「没有量到任何改动」；确实什么都没动时仍然拒。测试：只删一份文件的场景 submit exit 0 且 changed 里有它；空场景仍被拒且零写入。
-- [ ] T56 空交付在 verify 里看得见，即使后来被覆盖或撤回
+  交付：node --test 134/134；变异：submit 的拒绝条件退回只看 pins，删除用例红一条（报「没有量到任何改动」）。实测：只删 gone.md 的那一批 submit exit 0，事件里 files 为空、changed 有 gone.md。
+- [x] T56 空交付在 verify 里看得见，即使后来被覆盖或撤回
   标准：deed verify 报出每一条指不到任何内容的交付（files 与 changed 都空）与每一条没记下被撤内容的撤回，即使它已不是现行交付、或已被重交盖住；文案说清「后来重交过，不挡放行」，不改变退出码。test/cli.test.mjs 有两条来路各一条断言。
-- [ ] T57 撤回记下被撤那条记了哪份字节
+  交付：node --test 134/134；变异：bareHistory 里撤回那条来路清空，bare-history 用例红一条。实测：verify exit 0 并打出「空交付 · T1 · … 那时没记下文件 … 不挡放行」与「空交付 · T2 · … 撤回时没记下内容 …」。
+- [x] T57 撤回记下被撤那条记了哪份字节
   标准：task.undo 落到账本的那条带上 undoes（被撤那条的 files 或 digest/path），撤回行在审查清单里显示「它当时记下的是 <路径> <sha 前 12 位>」；没记下内容时显示「它当时没有记下任何内容」。测试断言账本里 undoes 的 path 与清单里的那句话。
+  交付：reviewer:s2-r21 判未达成，理由是主路线而不是动词路线：清单里把勾去掉 + 理由，submit 落的 task.undo 原始行没有 undoes。现在两条入口共用一个 undoesOf（cli/deed.mjs），落账那一行自己带着被撤的 path 与 sha256；core/events.mjs 的形状校验与 core/fold.mjs 的优先读各有用例（原先两处变异全绿）。node --test 137/137（cli 67、fold 23）；变异三处：删 submit 的 undoes 字段 / 关掉形状校验 / 去掉优先读，各自红一条且原样还原。
+
+## 段 S02.12
+- [x] T58 27 条被覆盖掉的用例回到文件里，跑得通
+  标准：test/cli.test.mjs 里 8b3e6dc 有过的 27 条用例都在，逐条通过；用例数从 65 回到 94 以上。
+  交付：从 8b3e6dc 取出 test/cli.test.mjs 的 27 块原样贴回，node --test test/cli.test.mjs 94/94（65 → 94），再补两条删除用例 → 96/96；跑的是这一份字节：node --test 166/166。
+- [x] T59 删掉的文件不算小改动，只删东西的交付也不再欠「记下一个文件」
+  标准：交付那一刻不给删掉的路径记 0 字节（bytes 里没有它），门槛对动过却称不出的路径判要审；只删东西的交付在签收清单上不欠「记下文件」。task done 与 submit 两条入口都有用例，删掉守卫就红。
+  交付：cli/deed.mjs 两条交付入口（task done 与 submit）都不再给删掉的路径记 0 字节；core/rules.mjs 的 needsReview 增一条「动过却称不出的路径 → 要审」；unpinned 改成看现行交付，只删东西的交付不再算悬空（签收差里不再出现「记下一个文件」）。跑的是这一份字节：node --test 166/166（test/cli.test.mjs 96/96）。变异五处各自红并原样还原：done 记 0 / submit 记 0 / 守卫拿掉 / unpinned 退回 digest+path / pointsAtNothing 忽略 changed。
+- [x] T60 「什么也没指着」只有一处定义，audit 与规则共用
+  标准：core/rules.mjs 导出 pointsAtNothing，cli/audit.mjs 不再自带一份；删掉一个文件算「指着它动过的那条路径」，不算空交付。改动被用例管住（把它改回只看 files/digest 要红）。
+  交付：core/rules.mjs 导出 pointsAtNothing（files 空、且没有 digest+path、且 changed 空），unpinned 用它判现行交付；cli/audit.mjs 删掉自带的那份、改为 import。跑的是这一份字节：node --test 166/166；变异：把 pointsAtNothing 的 changed 那半去掉，删除用例红一条（还原后 96/96）。
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

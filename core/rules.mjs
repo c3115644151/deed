@@ -136,6 +136,11 @@ export function needsReview(config, session, segment) {
     // 只声明过、这次没交付到的不算——路径本身已经把话说了。
     const pinned = [...new Set((task.evidence ?? []).flatMap((proof) => (proof.files ?? []).map((one) => one.path)))];
     if (pinned.some((file) => !Number.isFinite(task.sizes?.[file]))) return true;
+    // 交付真的碰过、却没有重量的路径：删掉的东西原来多大，交付那一刻已经称不出来了。
+    // 按 0 字节算等于说"删掉三十 KB 不算大"，所以按要审算。只声明、没碰过的不算——
+    // 那类路径门槛管不着，它连一个字节都没动。
+    const unweighed = (task.changed ?? []).filter((file) => !Number.isFinite(task.sizes?.[file]));
+    if (unweighed.length > 0) return true;
     if (size.files > limits.files) return true;
     if (size.bytes > limits.bytes) return true;
     if (size.dirs > limits.dirs) return true;
@@ -268,12 +273,22 @@ export function reviewState(config, session, segment) {
   return review?.verdict === "pass" ? "pass" : "missing";
 }
 
-// Proof that is only text proves nothing later: a pinned proof names a file and
-// the digest it had. Inside a reviewed segment, every delivery needs one.
+// 一条交付什么也没指着，有两种样子：既没记下文件，也没动过任何路径。
+// 删掉一个文件也算动了——路径走了，没有字节可钉，那不是"没指着"，是它指的那条路径本来就没有字节。
+// 这个判断只在这里写一遍：签收、下一步、verify 报的空交付都从它出。
+export const pointsAtNothing = (proof) =>
+  (proof.files ?? []).length === 0 &&
+  !(proof.digest && proof.path) &&
+  (proof.changed ?? []).length === 0;
+
+// 复核得靠内容：要审的段里，每条现行交付都得指着点什么。
 export const unpinned = (session, segment) =>
   tasksIn(session, segment)
     .filter((one) => one.status === "done" || one.status === "accepted")
-    .filter((one) => !one.evidence.some((proof) => proof.digest && proof.path));
+    .filter((one) => {
+      const claim = one.evidence[one.evidence.length - 1];
+      return Boolean(claim) && pointsAtNothing(claim);
+    });
 
 // A period reads as: nothing said yet (idle), scope being talked through
 // (discuss, no segment yet), work in flight (execute), everything judged and

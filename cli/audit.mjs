@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { digest } from "../core/digest.mjs";
 import { paths, rel } from "../lib/store.mjs";
+import { pointsAtNothing } from "../core/rules.mjs";
 
 // 核对"账本说的"与"工作区现在的"：这是唯一一条从账本往磁盘看的通道。
 // 工作区当参数传进来，模块自己不认 cwd——同一段判断在哪跑都读同一份。
@@ -56,10 +57,7 @@ export function auditEvidence(root, doc, sessionId) {
 
 export const staleEvidence = (root, doc, sessionId) => auditEvidence(root, doc, sessionId).stale;
 
-// 一条交付「什么也没指着」有两种样子：没记下任何文件（--evidence 里没有 --digest），
-// 或者记下的路径这一批根本不存在（删文件也是改动，但没有字节可钉）。
-// 后者说得通：路径走了，改动的痕迹留在 changed 上。
-const pointsAtNothing = (proof) => filesOf(proof).length === 0 && (proof.changed ?? []).length === 0;
+// 什么也没指着，由 core 那边的 pointsAtNothing 定义一次：这里只借用。
 
 // 现行的那一条要挡门：它现在就是这条任务对外的说法。
 export function bareEvidence(doc) {

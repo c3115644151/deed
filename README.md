@@ -27,7 +27,7 @@ Node ≥ 22，纯 ESM，零依赖，还没有 npm 包（名字没定）。
 git clone <this> deed && cd deed
 node cli/deed.mjs help      # 就地可用
 npm link                    # 之后在任意目录敲 deed
-npm test                    # 137 条，一分多钟（每条都起真进程）
+npm test                    # 166 条，一分多钟（每条都起真进程）
 ```
 
 vendor、本地 tarball、升级与卸载见 [`docs/INSTALL.md`](docs/INSTALL.md)。
