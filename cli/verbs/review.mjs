@@ -72,7 +72,9 @@ export default function review(argv) {
             }),
             () => writeBrief(plan, brief),
           );
-          console.log("整期清单 · " + brief + "（审什么）");
+          const nth = one.briefs.filter((b) => b.scope === "session").length + 1;
+          console.log("整期清单 · " + brief + "（审什么）· 这一期的第 " + nth + " 份");
+          if (nth >= 3) console.log("  提示 · 这一期已经出过 " + (nth - 1) + " 份整期清单：先看上一份的审查者点了哪几段，别从头再写一份");
           console.log("  角色包 · " + guide + "（怎么审）· 两份一起交给审查者");
           console.log('  结论用 deed review --all --by "…" --verdict pass|fail');
           return;
@@ -183,7 +185,12 @@ export default function review(argv) {
           () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, briefDigest: plan.digest, guide, guideDigest: plan.guideDigest }),
           () => writeBrief(plan, brief),
         );
-        console.log("审查清单 · " + brief + "（审什么）");
+        // 账本里已有几份，加上手上这份：一次审只回答一份清单。
+        const nth = one.briefs.filter((b) => (b.segment ?? null) === seg.id).length + 1;
+        console.log("审查清单 · " + brief + "（审什么）· " + seg.id + " 的第 " + nth + " 份");
+        // 第三份起提一句：同一段反复出清单，通常是上一份没看清哪里不够，而不是这一段真的又变了。
+        // 只提示不拦——拦下来会让人去编理由，而不是去读上一份。
+        if (nth >= 3) console.log("  提示 · 这一段已经出过 " + (nth - 1) + " 份清单：先看上一份的审查者点了哪几条，别从头再写一份");
         console.log("  角色包 · " + guide + "（怎么审）· 两份一起交给审查者");
         console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
         return;

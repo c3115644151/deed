@@ -225,3 +225,39 @@ test("a broken ledger makes the panel say so instead of vanishing", async () => 
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("a segment that took more than one brief says so on its head", () => {
+  const brief = (n) => ({ v: 1, at: T(n), k: "review.brief", s: null, segment: "S01.1", brief: "b" + n + ".md", briefDigest: "a".repeat(64) });
+  const busy = fold([
+    ...configEvents,
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做重放" },
+    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["core/x.mjs"] },
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test 1/1", by: "agent" },
+    brief(4),
+    brief(5),
+  ]);
+  const html = renderBoard(busy, config, { zone, events: 6 });
+  assert.match(html, /<span class="scost"[^>]*>清单 2</, "出过两份清单就写在段头上");
+  assert.match(html, /\.scost \{/, "那一枚有它自己的样式");
+});
+
+test("a port somebody else already holds does not take the panel down with it", async () => {
+  // 面板的意义是"随时能看"：号被占了就换一个号继续开，并在页面上说清它开在哪。
+  const other = http.createServer((req, res) => res.end("not deed"));
+  await new Promise((resolve) => other.listen(0, "127.0.0.1", resolve));
+  const taken = other.address().port;
+  const root = workspace("port-taken");
+  fs.mkdirSync(path.join(root, ".deed"), { recursive: true });
+  const server = start(root, taken);
+  const actual = await new Promise((resolve) => {
+    const see = () => (server.address()?.port ? resolve(server.address().port) : setTimeout(see, 10));
+    see();
+  });
+  try {
+    assert.notEqual(actual, taken, "占了就换一个");
+    assert.ok(actual > 0);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => other.close(resolve));
+  }
+});

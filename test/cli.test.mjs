@@ -1899,3 +1899,21 @@ test("a fresh workspace reviews everything until it declares its own paths", () 
   assert.equal(sealed.status, 0, sealed.stderr);
   assert.match(sealed.stdout, /封存/, "工作区自己声明之后才算免审");
 });
+
+test("the second and third brief of one segment say how many there have been", () => {
+  const cwd = workspace("brief-nth");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "a.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test 1/1", "--digest", proof(cwd));
+  assert.match(deed(cwd, "review", "--segment", "S01.1").stdout, /S01\.1 的第 1 份/);
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test 2/2", "--digest", proof(cwd));
+  const second = deed(cwd, "review", "--segment", "S01.1");
+  assert.match(second.stdout, /S01\.1 的第 2 份/);
+  assert.doesNotMatch(second.stdout, /先看上一份/, "第二份还用不着提醒");
+  // 慢要看得见：这一段出过几份清单，state 直接摆出来，不挡任何一步。
+  assert.match(deed(cwd, "state").stdout, /花了 · 2 份清单/);
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test 3/3", "--digest", proof(cwd));
+  const third = deed(cwd, "review", "--segment", "S01.1");
+  assert.match(third.stdout, /S01\.1 的第 3 份/);
+  assert.match(third.stdout, /先看上一份的审查者点了哪几条/);
+});

@@ -175,11 +175,12 @@ export function start(root, port) {
   const server = http.createServer(handler(root, () => { lastRequest = Date.now(); }));
   // 端口被别的程序先占了也照开：面板的意义是"随时能看"，不是为了守着一个号而死掉。
   // 退到系统给的号，并在页面上说清它开在哪——下一次命令读到记号，就知道别的地方还有它。
-  let listening = null;
+  // 只退一次：退到空闲端口之后再撞 EADDRINUSE 就是别的问题，那时该炸就炸。
+  let fellBack = false;
   server.on("error", (error) => {
-    if (error.code === "EADDRINUSE" && listening === null) {
+    if (error.code === "EADDRINUSE" && !fellBack) {
+      fellBack = true;
       console.error(`deed: 端口 ${port} 被占着；面板改开在系统给的空闲端口（下面一行是新的 URL）`);
-      listening = 0;
       server.listen(0, "127.0.0.1", ready);
       return;
     }
@@ -207,7 +208,6 @@ export function start(root, port) {
     console.log(`契约页 http://127.0.0.1:${actual}`);
     console.log("  只读：命令由人执行，页面只呈现当前事实");
   };
-  listening = port;
   server.listen(port, "127.0.0.1", ready);
   return server;
 }

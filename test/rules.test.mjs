@@ -8,6 +8,7 @@ import {
   reading,
   reviewOf,
   reviewState,
+  costOf,
   freshWholeBrief,
   pointsAtNothing,
   sealBlockers,
@@ -385,4 +386,24 @@ test("a whole-period failure stays open until the segment it named is reviewed a
   const doc = fold(base);
   assert.equal(doc.sessions[0].segments[0].closedAt, null, "被点名的段重开了");
   assert.throws(() => fold([...base, whole(10, "pass")]), /还没结清|没有可结清的东西/, "那一段没重新判过，这一期不能就这么过去");
+});
+
+test("a segment says what it cost: briefs handed out, deliveries taken back, minutes it stayed open", () => {
+  const briefN = (n) => ({ v: 1, at: T(n), k: "review.brief", s: null, segment: "S01.1", brief: "b" + n + ".md", briefDigest: "a".repeat(64) });
+  const undo = (n, id) => ({ v: 1, at: T(n), k: "task.undo", s: null, id, why: "说错了话", by: "agent" });
+  const doc = fold([
+    turn(1),
+    add(2, "T1"),
+    add(3, "T2"),
+    done(4, "T1"),
+    briefN(5),
+    briefN(6),
+    undo(7, "T1"),
+    done(8, "T1"),
+    done(9, "T2"),
+    sealed(10),
+  ]);
+  const session = doc.sessions[0];
+  // 这些数只回答"为什么慢"：从账本算，不读时钟，也不参与任何门。
+  assert.deepEqual(costOf(session, session.segments[0]), { tasks: 2, briefs: 2, undos: 1, minutes: 8 });
 });

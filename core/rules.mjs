@@ -373,6 +373,17 @@ export const debt = (session) => ({
   dropped: session.tasks.filter((one) => one.status === "dropped").map((one) => one.id),
 });
 
+// 一段花了多少：几条任务、出过几份清单、重交了几次、开了多久才封。
+// 数全在账本里（封段时刻减开段时刻，不读时钟），只回答「为什么这么慢」，
+// 不参与任何门——慢不挡放行，看不见才没法谈省。
+export const costOf = (session, segment) => {
+  const tasks = session.tasks.filter((one) => one.segment === segment.id);
+  const briefs = session.briefs.filter((one) => (one.segment ?? null) === segment.id);
+  const undos = tasks.reduce((sum, one) => sum + (one.undone ?? []).length, 0);
+  const closed = segment.openedAt && segment.closedAt ? Date.parse(segment.closedAt) - Date.parse(segment.openedAt) : null;
+  return { tasks: tasks.length, briefs: briefs.length, undos, minutes: closed === null ? null : Math.round(closed / 60000) };
+};
+
 export const pressure = (session) => {
   const segment = openSegment(session);
   if (!segment) return null;
