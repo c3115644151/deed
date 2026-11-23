@@ -53,9 +53,28 @@
 ## 段 S02.3
 - [x] T36 HANDOFF 的现状段与下一步跟着账本走
   标准：HANDOFF 第 8 行的段内容与实际条目一致（S02.2 是 T24..T35，已由 reviewer:s2-r7 于 11-23 21:18 判过）；下一步段只写还没发生的事——T34 已交付、材料已发，不得再列为待办；材料指针仍是「看 .deed/review 下最新的那一份」，不写死文件名
-  交付：三轮审挑出的都在这一份上：①r7 的结论改成「11 条达成、T31 放弃不计」；②第 8 行与下一步第 1 条不再说 S02.3 免审——这批字节碰了 core/fold.mjs，门槛判要审、结局由审查者的结论接掉在案的不合格；③验证行改成 149/149（这份字节的数），下一步第 1 条的「整期材料还没出」改成「还没重出」，不再与同一句「上一份整期结论是不合格」打架。核：npm test 149/149、test/fold 20/20、docs 4/4 跑在这一份字节上
+  交付：第 8 行的段内容改成在案结论 R10 · reviewer:s2-r11 · 21:55 退回 T36（R9 已被它作废、T37 通过），并写明两条一起重新交付、等新材料的结论；S02.2 那半仍是 T24..T35、r7 21:18 判过。验证行改 150/150（86 条 CLI + 其余 64），跑的是这一份字节：npm test 150/150（fold 21）、docs 4/4。下一步段只写还没发生的事：材料指针仍是「.deed/review 下最新的那一份」。
 - [x] T37 退回一条交付时，它碰过的路径也跟着退回
   标准：重放里 rework 把一条交付退回未做时，那条交付记下的 changed 路径不再留在任务上（退回之后这一段碰过的路径只由还在的交付算出来）；新账本与旧事件重放两条路都成立；有测试钉住「退回之后同一个免审批次不再被判要审」
-  交付：core/fold.mjs 新增 rederive(task)：任务碰过哪些路径、各多大一律由还在的交付重算，交付落地 / 撤回 / 审查者退回 / judge.rework 四处都调它；每条交付自带那一刻称的 sizes。test/fold.test.mjs 那条用例现在 import needsReview 并断言门槛读数：同一夹具退回前 true（碰过 .gitignore）、退回后只剩 *.md 时 false——上一轮它只断言了 changed 与 sizes，门槛没被任何一行观察。核：node --test test/fold.test.mjs 20/20、npm test 149/149 跑在这一份字节上
+  交付：rederive 现在把交付记下的 files 也算碰过：touched = [...(proof.changed ?? []), ...(proof.files ?? []).map(one => one.path)]，手工 --digest 的交付（changed 为空）因此不再让门槛失明。test/fold.test.mjs 三条断言：退回当场 task.changed 为空且 sizes 归零；退回后再交只剩新路径；只带 --digest 的交付照样判要审。test/rules.test.mjs 的免审夹具改成交付钉住自己那条 exempt 路径（原来钉 core/fold.mjs，属于夹具与场景不符）。跑的是这一份字节：node --test test/rules.test.mjs test/fold.test.mjs = 38/38；npm test 150/150（fold 21 · rules 17）。
+
+## 段 S02.4
+- [x] T38 退一条交付的后路都有断言：撤回与推翻结论后点名重做，两处也会让路径归零
+  标准：把 core/fold.mjs 的 task.undo 分支或 judge.rework 分支里的 rederive 删掉，test/fold.test.mjs 立刻红；不改变现有行为
+  交付：test/fold.test.mjs 新增一条用例：撤回之后 task.changed/sizes 归零、人点名重做之后同样归零。变异核对：把 core/fold.mjs 的 task.undo 分支里的 rederive 删掉，用例在撤回那一半红；把 judge.rework 分支里的删掉，在重做那一半红；现有行为不变。这条字节上 node --test test/fold.test.mjs test/rules.test.mjs test/cli.test.mjs = 126/126，npm test 152/152。
+- [x] T39 HANDOFF 第 8 行把 r11 指出的处数说对
+  标准：第 8 行写的处数与账本 R10 的 findings 条数一致（是三处，不是两处），读者照它找不会少一处
+  交付：第 8 行改成「`reviewer:s2-r11` 21:55 退回 T36 时指出三处…」，与账本 R10 的三条 findings 逐条对上（第 8 行的在案结论过时、门槛看不见只带 --digest 的交付、调用点数目写成三处）；同句补上 S02.3 已由 reviewer:s2-r12 22:11 放行封段、S02.4 三条等结论。验证行改 152/152（86 条 CLI + 其余 66），跑的是这一份字节：npm test 152/152。
+- [x] T40 称不出规模的交付默认按要审
+  标准：交付记了路径却没称字节时，门槛判这一段要审而不是按 0 字节放行；有测试钉住这条默认值
+  交付：core/rules.mjs：needsReview 增一条——交付自己记下的文件没称过字节就是「说不清多大」，按要审算（只声明过、这次没交付到的路径不算）；sizeOf 另报 unknown。cli/deed.mjs：task done 记 --digest 时当场称每一份（pinSizes → bytes），那几份常常这次没动过、不在工作区差里。docs/DESIGN.md §6/§12.4 与 §12.3 同步。测试：test/rules.test.mjs 旧「没称过不算大」改成「没称过不算小」并断 true，免审夹具的交付带上字节；test/cli.test.mjs 新增「重钉一份这次没动的文件也当场称」。跑的是这一份字节：node --test test/cli.test.mjs test/rules.test.mjs test/fold.test.mjs = 126/126；npm test 152/152。
+
+## 段 S02.5
+- [x] T41 HANDOFF 里的数与首句跟着这一份字节走
+  标准：验证块里的条数与拆分在交付的这份字节上跑出来就是它写的数（CLI 与其余分开写清）；状态段首句与同段后半句不矛盾，说的是账本此刻的样子
+  交付：HANDOFF.md 验证块改成 153/153、87 条来自 CLI 端到端、其余 66 条，cli 87/87；状态段首句改成「五段里四段已判过」，四段各自写了谁在哪一刻放行，并补上 S02.4 的四条发现与 S02.5 在做；下一步段重写（先出 S02.5 清单、再 deed review --all、然后停等签收）。跑的是这一份字节：node --test（全量）153/153、node --test test/cli.test.mjs 87/87、node --test test/docs.test.mjs 4/4。
+- [x] T42 用 deed seal 封过的段，不再被后来的规模规则追溯判要审
+  标准：封存那一刻的决定留在账本上，后来把门槛写细不回头改写它——needsReview 对已封存的免审段返回 false，needsWhole、signBlockers、面板标签三处跟着一致；有测试钉住这条
+  交付：core/rules.mjs 的 needsReview 开头先看这一段是不是 segment.seal 封的（sealedBy 有值且 closedAt 非空），是就返回 false——规则只管还开着的段；needsWhole、signBlockers 的未钉检查、reviewState 都从它出，三处一起对齐；docs/DESIGN.md §6 与 §12.4 各写一句为什么。测试：test/rules.test.mjs 新增「a segment sealed before the gate got stricter is not pulled back into review」（两段都用只带 --digest、不称字节的老形状交付封成免审 → needsReview false、reviewState exempt、needsWhole false、签收无债、下一步签收）。跑的是这一份字节：node --test 153/153（rules 18/18）。变异核对：把那行守卫改成 false && …，那条用例红、其余 17 条不动。
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

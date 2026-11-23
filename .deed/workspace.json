@@ -2,7 +2,7 @@
  ".gitattributes": "b218e15ac52869e51d9b4eabf647853462d494f10e51cb1e97a271eb24616dda",
  ".gitignore": "699d22b5e19f87e5d25a4c2719ff63842e55ba04ac0ebac0cca40a4568e2f311",
  "AGENTS.md": "de66d034c4ad4247fa0eed251ab61530a0d5d1545c36b2605d084cea1d6c3438",
- "HANDOFF.md": "18ce1d42e47d82c04b79b0b48cc5a6c91717d758f46ee18f62e38a302bbf2309",
+ "HANDOFF.md": "904eb68e5eb5dd59bd026ce939786f065e833c22ec1915a0ab7468b5d82a8687",
  "LICENSE": "c7f69f6dd51007fedbcd00a446d4994e7d4dfa919f26cbd57082c1544d432399",
  "README.md": "6154ec1296a1fec064e30ae6341ae26f3ffac2bbac1d89fb163dd3516829b08b",
  "board/board.test.mjs": "bf5e682561e3732644962df86fed4b4d9f2e0e9f3c07a3769f088fe2b9b0f326",
@@ -15,8 +15,8 @@
  "core/digest.mjs": "7be393423ab6a946e6089dc00ba40d0c71a04c6c2bfe00b6219cf86691907685",
  "core/events.mjs": "063a08912e6b55cd245291e434c20bc6a7d8dce1a4cc15514ea7abda66c79094",
  "core/fold.mjs": "1a7e738e69b7d266ff147850ecabf78c9673361607a8ab3fcaf5726dd323f19d",
- "core/rules.mjs": "ce2d37eb58ebb8c469e5f38d5c2075f1ab52d451a45fe6b457d0a7b6f2b4d105",
- "docs/DESIGN.md": "bf767d8a7e0e1fc30c34f2005d4b9ce704d1e0f624bf8a4c9136a8990ff983e7",
+ "core/rules.mjs": "b84c4f0636058d36ed2cfe701ae7735ec93135133ca1dd6e41913e7d04412d95",
+ "docs/DESIGN.md": "a7b7812d4bbafe4a1e9ab6dfec5d36773aef75f8e3109c79d8587bdbf6dc2b6a",
  "docs/INSTALL.md": "1ceb5fccd8a39360c74b2a813beafa6ed72bd415710700ae42593ccac412fc63",
  "docs/README.md": "1820ff207e87f47ab0ea312929b98801d4614070535e33db959d47d97dc1030d",
  "docs/architecture.png": "23a7af6f745c3145c5581f2bf60da99a48c94e61c221fbd49076448a5ab7763a",
@@ -37,6 +37,6 @@
  "test/fold.test.mjs": "5bbe225f7d94b03ad247c4157d9dac95dd4e64c04f144f79315dbd41677dc843",
  "test/heartbeat.test.mjs": "d1fc0e0c83799664abedad6f6f27ed9a1bbaf7e647be449ad07a2754c6b032c4",
  "test/plan.test.mjs": "072cafd2893526e2b7edfb70704b6425cf446479122d88d355f28c85f4693f3f",
- "test/rules.test.mjs": "60b842074ae00b0ce307eb6fa46815d791f8f127b1178bdda21476b9fbe27542",
+ "test/rules.test.mjs": "247245172d923a81fdffbfdae18f04d9755db102be745b46e5846b99d515cc6e",
  "test/version.test.mjs": "4171555d438c11d7f4035cbfb9bde49ce18fd78a55bbc0d0c58a2c6b8ac13d28"
 }

@@ -268,3 +268,28 @@ test("a delivery that never weighed its files is not treated as a small one", ()
   ]).sessions[0];
   assert.equal(needsReview(config, session, session.segments[0]), true, "称不出规模，就别指望它按 0 字节放行");
 });
+// 门槛后来写细了，不回头改写已经封过的段：封存那一刻的决定留在账本上。
+// 少了这一条，一次收紧就能把「全部免审」的期重新算成欠一份整期结论，
+// 而签收清单里同时写着「没经过审查」——两句话互相打脸。
+test("a segment sealed before the gate got stricter is not pulled back into review", () => {
+  const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
+  const weighed = (n, id, path) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent",
+    digest: "a".repeat(64), digestPath: path, changed: [] });
+  const doc = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["docs/a.md"]),
+    weighed(4, "T1", "docs/a.md"),
+    seal(5, "S01.1"),
+    add(6, "T2", ["docs/b.md"]),
+    weighed(7, "T2", "docs/b.md"),
+    seal(8, "S01.2"),
+  ]);
+  const session = doc.sessions[0];
+  const [first, second] = session.segments;
+  assert.equal(needsReview(config, session, first), false, "封过就不重算：账本上那句「不用审」还算数");
+  assert.equal(needsReview(config, session, second), false);
+  assert.equal(reviewState(config, session, first), "exempt");
+  assert.equal(needsWhole(config, session), false, "没人审过的期不必再补一份整期结论");
+  assert.deepEqual(signBlockers(doc, session, config), []);
+  assert.equal(nextAction(doc, config).what, "签收");
+});
