@@ -60,7 +60,7 @@ test("an entry not yet done moves to the next segment, and that segment takes wh
     carry(6, "T2"), carry(7, "T3"), add(8, "T4"),
   ]);
   const [session] = doc.sessions;
-  assert.equal(session.segments.length, 2, "一批搬运只开一段：十条未做的条目不该开出十个段");
+  assert.equal(session.segments.length, 2, "一批挪动只开一段：十条未做的条目不该开出十个段");
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
   assert.equal(session.tasks.find((one) => one.id === "T3").segment, "S01.2");
   assert.equal(session.tasks.find((one) => one.id === "T4").segment, "S01.2", "新写的条目也跟着最新那一段走");

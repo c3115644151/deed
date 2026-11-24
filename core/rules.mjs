@@ -395,7 +395,9 @@ export const debt = (session) => ({
   dropped: session.tasks.filter((one) => one.status === "dropped").map((one) => one.id),
 });
 
-// 轮次是你和用户之间的一轮对话：数出来的只有人开口的那些。
+// 轮次是你和用户之间的一轮对话：数出来的只有人开口的那些。两道关，位置不同：
+// 重放按事件含义第 12 版把 agent 自记的轮次丢掉（新账本里根本进不来），
+// 这里挡的是那之前的旧行——它们照原样读得出来，计数时不算。
 export const userTurns = (session) => session.turns.filter((one) => one.who === "user");
 
 // 一段花了多少：几条任务、出过几份清单、重交了几次、开了多久才封。

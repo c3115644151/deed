@@ -160,7 +160,7 @@ export function lateWork(root, doc) {
     return one.status === 0 ? one.stdout.trim() : null;
   };
   // 只在 git 工作区里比。mtime 只在能被 git 解释的工作树里代表「写下来的时刻」：
-  // 从别处拷来的、解压出来的、检出出来的目录，mtime 是搬运的时刻，比任务被记下
+  // 从别处拷来的、解压出来的、检出出来的目录，mtime 是文件被挪进来的时刻，比任务被记下
   // 的时刻早晚都没有意义。没有 git 就整段不报，也不报错。
   if (git(["rev-parse", "--is-inside-work-tree"]) !== "true") return [];
   const seen = new Map();

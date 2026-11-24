@@ -1234,15 +1234,15 @@ test("a panel says when the declared port was taken, and goes back to it when th
     const restarted = run("state");
     assert.equal(restarted.status, 0, restarted.stderr);
     assert.equal(url(restarted.stdout), fell, "重新起来还是那一格");
-    // 号让出来了：下一条命令要把它搬回审查设置里写的那个地址——地址是用来收藏的。
-    // 这里不先停下旧面板：活着的那个停在退回的号上，得由"号空出来了"这件事把它搬回去，
+    // 号让出来了：下一条命令要把它挪回审查设置里写的那个地址——地址是用来收藏的。
+    // 这里不先停下旧面板：活着的那个停在退回的号上，得由"号空出来了"这件事把它挪回去，
     // 否则它一辈子守着那个意外落点，声明过的地址就再也没人用过。
     await free();
     const again = run("state");
     assert.equal(again.status, 0, again.stderr);
     assert.equal(url(again.stdout), base, "号空出来之后回到声明的那个地址");
-    assert.equal(record().port, base, "记号里也跟着搬回去了");
-    assert.notEqual(record().pid, fell, "搬回去的是另一个进程，不是一个改过口的进程");
+    assert.equal(record().port, base, "记号里也跟着挪回去了");
+    assert.notEqual(record().pid, fell, "挪回去的是另一个进程，不是一个改过口的进程");
     // 面板代码换过（记号里的指纹对不上）：下一条命令自己把旧的换掉，
     // 不必有人记得"改完要重启"——换过之后地址不变。
     const heard = record();
@@ -1580,8 +1580,8 @@ test("a delivery weighs what it moved, and a big change asks for a review", () =
   assert.ok(fs.statSync(path.join(cwd, "docs", "a.md")).size === 1);
   // 一份 30KB 的文档照样只是文档，但它不再是"小改动"。
   fs.writeFileSync(path.join(cwd, "docs", "b.md"), "x".repeat(30000));
-  deed(cwd, "task", "add", "搬一份大文档", "--criteria", "在那儿", "--files", "docs/b.md");
-  deed(cwd, "task", "done", "T2", "--evidence", "搬进 docs/b.md", "--digest", "proof.txt");
+  deed(cwd, "task", "add", "拷一份大文档", "--criteria", "在那儿", "--files", "docs/b.md");
+  deed(cwd, "task", "done", "T2", "--evidence", "拷进 docs/b.md", "--digest", "proof.txt");
   const state = deed(cwd, "state");
   assert.match(state.stdout, /T2|要审/, "大改动让这一段要审");
 });
@@ -1920,7 +1920,7 @@ test("the draft keeps judged entries ticked", () => {
 test("doctor says when a promise came after the work", () => {
   const cwd = workspace("promise-late");
   deed(cwd, "init", "--said", "开始");
-  // 这条检查只在 git 工作区里比：没有 git 的目录里 mtime 是搬运的时刻，不作数。
+  // 这条检查只在 git 工作区里比：没有 git 的目录里 mtime 是文件被挪进来的时刻，不作数。
   spawnSync("git", ["init"], { cwd, encoding: "utf8" });
   fs.writeFileSync(path.join(cwd, "docs.txt"), "x", "utf8");
   const old = new Date(Date.now() - 3600 * 1000);
@@ -2116,10 +2116,10 @@ test("an entry still to be done is carried to the next segment from the plan", (
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /改到下一段 · T2 · S01\.2/);
   const session = fold(readEvents(cwd)).sessions[0];
-  assert.equal(session.segments.length, 2, "搬一格就是开下一段");
+  assert.equal(session.segments.length, 2, "改到下一段就是开下一段");
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
 
-  // 交付过的条目搬不动：那等于把一条交付换个段说话，账本里没有这件事的位置。
+  // 交付过的条目改不了段：那等于把一条交付换个段说话，账本里没有这件事的位置。
   // 这一条要按清单自己画出来的形状写——交过的条目画的是 [x] + 交付：，
   // 按勾判会让这一行被当成"没有要落的改动"吞掉，用户只得到一句和 改到下一段： 无关的话。
   deed(cwd, "plan", "--force");
