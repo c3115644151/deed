@@ -9,7 +9,7 @@ import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
-import { panelRecord } from "../lib/panel.mjs";
+import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
 
 const CLI = path.join(import.meta.dirname, "..", "cli", "deed.mjs");
 // 面板默认关掉：每条命令都去拉一个后台服务，测试就成了端口和进程的集合。
@@ -2111,4 +2111,20 @@ test("a sealed segment with no reason written says what it is, without empty bra
   assert.match(text, /免审封存 · agent/, "这一行照旧要露面");
   // 理由缺的是 undefined 而不是空串：两种形状都不许露出来，否则守卫被删掉也没人知道
   assert.doesNotMatch(text, /（）|undefined/u, "没有理由就不该有括号，也不该露出 undefined");
+});
+
+test("a panel is replaced when any module it loaded changes, not only its own files", () => {
+  // 进程把模块装进内存：改了 core/fold.mjs 之后，旧进程手里的还是旧判断，
+  // 页面上会印一段命令行根本不认的段号。指纹要盖住它加载过的每一份。
+  const pkg = path.join(import.meta.dirname, "..");
+  const listed = watchedFiles();
+  for (const one of ["board/render.mjs", "board/serve.mjs", "core/fold.mjs", "core/rules.mjs", "lib/store.mjs"]) {
+    assert.ok(listed.includes(one), "指纹要盖住 " + one);
+  }
+  const stale = createHash("sha256");
+  for (const one of ["board/render.mjs", "board/serve.mjs", "lib/panel.mjs"]) {
+    stale.update(one + "\n");
+    stale.update(fs.readFileSync(path.join(pkg, one)));
+  }
+  assert.notEqual(buildNow(), stale.digest("hex").slice(0, 16), "只盖面板自己那三份，等于改了 core 也不换进程");
 });
