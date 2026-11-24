@@ -58,24 +58,24 @@ export default function submit(argv) {
               specs.push({ k: "task.drop", s: one.id, id: item.id, why: item.why });
               continue;
             }
-            // 这一段送审之后不再收活：没做的条目写一行 搬： 就落到下一段。
+            // 这一段送审之后不再收活：没做的条目写一行 改到下一段： 就落到下一段。
             // 这里不能看清单画的那个勾：清单给自己交过的条目画的就是 [x]，按勾判会让
-            // 这一行被当成"没变化"静默吞掉——用户写了 搬：，得到的却是一句"没有要落的改动"。
-            // 搬只对还没动手的条目成立。
+            // 这一行被当成"没变化"静默吞掉——用户写了 改到下一段：，得到的却是一句"没有要落的改动"。
+            // 改到下一段只对还没动手的条目成立。
             if (item.carry) {
               if (task.status !== "todo")
                 fail(
                   item.id +
                     " 已经交过（" +
                     task.status +
-                    "）：交付过的条目不能搬到下一段——要重做就在这一段重交，要换说法就新开一条",
+                    "）：交付过的条目不能改到下一段——要重做就在这一段重交，要换说法就新开一条",
                 );
               specs.push({ k: "task.carry", s: one.id, id: item.id });
               continue;
             }
             if (item.box === "x") {
               // 判过（accepted）的条目在清单里也是勾着的：它已经交过、也有人判过，
-              // 再交一次既没有意义，也会撞上「封了的段不能再改」。
+              // 再交一次既没有意义，也会撞上「已关闭的段不能再改」。
               if (task.status === "done" || task.status === "accepted") continue;
               if (task.status === "dropped") fail(item.id + " 已经放弃过：要接着做就新开一条");
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
@@ -117,7 +117,7 @@ export default function submit(argv) {
             }
           }
           // 一批交付不止一条时，工作区只量了一次差：谁改了什么分不出来。
-          // 给它们同一个批号，账本上写着「这几条共用一份差」，而不是谎称各钉各的。
+          // 给它们同一个批号，账本上写着「这几条共用一份差」，而不是谎称各记各的。
           const dones = specs.filter((spec) => spec.k === "task.done");
           if (dones.length > 1) for (const spec of dones) spec.batch = true;
           const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
@@ -148,9 +148,9 @@ export default function submit(argv) {
         if (ev.k === "task.defer") console.log("延后 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.drop") console.log("放弃 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.carry")
-          console.log("搬到下一段 · " + ev.id + " · " + (after.tasks.find((t) => t.id === ev.id)?.segment ?? ""));
+          console.log("改到下一段 · " + ev.id + " · " + (after.tasks.find((t) => t.id === ev.id)?.segment ?? ""));
       }
-      console.log("落账 " + evs.length + " 条 · 清单 " + rel(ROOT, file));
+      console.log("记账 " + evs.length + " 条 · 清单 " + rel(ROOT, file));
       const step = nextAction(doc, doc.config);
       console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
       console.log("  " + step.command);

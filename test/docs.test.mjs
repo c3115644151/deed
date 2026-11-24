@@ -30,7 +30,7 @@ test("AGENTS.md carries the same block, so the paste does not drift on one side"
 // The lexicon is one table in DESIGN 1.1. A word that stops being used there but
 // stays in prose teaches the next reader two vocabularies; this test is what
 // keeps "we renamed it" true after the grep that found it is forgotten.
-const RETIRED = ["承诺", "判据", "折叠", "任务书", "白纸", "物料", "三态", "读数", "钉住", "证据", "事实账本", "出纸"];
+const RETIRED = ["承诺", "判据", "折叠", "任务书", "白纸", "物料", "三态", "读数", "钉住", "证据", "事实账本", "出纸", "门槛", "收口", "欠账", "落账", "钉子", "封段"];
 const SKIP_DIRS = new Set(["node_modules", ".git", ".deed", ".deed-test", ".tmp", ".shots", ".archify", ".idea", ".vscode", "examples"]);
 
 function prose(root, found = []) {

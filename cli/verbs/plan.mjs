@@ -6,7 +6,7 @@ import { ROOT, parse, load, targetSession, fail, guard } from "../session.mjs";
 
 export default function plan(argv) {
 
-  // 清单：人和 agent 改同一份文件，submit 一次落账。命令面因此只剩一个入口，
+  // 清单：人和 agent 改同一份文件，submit 一次记账。命令面因此只剩一个入口，
   // 而「改了什么」由工作区快照自己称——清单上不写路径，也不写 sha256。
     const { flags } = parse(argv, "plan");
     guard(() => {

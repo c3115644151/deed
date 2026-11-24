@@ -284,7 +284,14 @@
 - [x] T109 面板的指纹盖住它加载过的全部模块：改了 core/ 也要换进程
   标准：buildNow 走 board/、core/、lib/ 三个目录里的每一份 .mjs（不列名单，新加的模块自动进去）；改 core/fold.mjs 之后下一条命令会把旧面板换掉；有用例断言 core/fold.mjs 在名单里，且指纹不等于只盖面板自己那三份的值
   交付：node --test 194/194（跑在交付的这份字节上，DEED_NO_PANEL=1）；buildNow 现在盖住 board/、core/、lib/ 三个目录共 13 份 .mjs，实录：改了 core/fold.mjs 之后账本重放是 19 段，而旧面板进程（build 指向前一份）仍在按老 fold 渲染出第二十段，7317 与 7318 两个端口的页面都还印着 S02.20；换成新进程之后页面只剩 S02.1…S02.19 十九个段头，S02.20 只还在两条文字里（一轮的 said 与 T95 的交付记录）；变异核对：把 TREES 缩回 ["board"]，test/cli.test.mjs 那条用例红（107 条过 1 条败）
-- [ ] T110 清单里写着哪一节，不等于新条目落进那一段
+- [x] T110 清单里写着哪一节，不等于新条目落进那一段
   标准：一段在等结论时草稿末尾多印一节「下一段」，写在那里的 ? 落进下一段；submit 领号那一行印出它落进哪个段；这两种印法各有用例，把 stub 那半删掉就红
+  交付：node --test 195/195（跑在这份字节上，DEED_NO_PANEL=1）；变异两条都红：把 plan.mjs 里那半句改成 else if (false) → test/plan.test.mjs 6 过 1 败；让 submit 不再印段号 → test/cli.test.mjs 107 过 1 败；临时工作区的实录（.tmp/prep-demo2）：T1 送审之后 deed plan --force 的草稿末尾多出一行「## 下一段（S01.1 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）」；在那节下面写 - ? 下一件事 再 submit，打的是「写进清单 · T2 · S01.2 · 下一件事」，草稿随即分成 ## 段 S01.1 与 ## 段 S01.2 两节；这一条的代码先于条目落账（先做后记，doctor 会如实报）：我是在回答「预备段怎么写入」时先看到了缺口才动的手
+- [x] T111 系统里的词换成正式名，不留比喻
+  标准：全仓不再有「搬／门槛／落账／收口／欠账／封段／钉子」这类要靠联想的词（test/docs.test.mjs 的禁词表收下它们并真的守得住）；同一个动作在文档、帮助与代码里说的是同一句话；把其中任何一个写回去会让 test/docs.test.mjs 红；`node --test` 全量在这个字节上绿
+  交付：node --test 195/195（跑在这一份字节上，DEED_NO_PANEL=1：test/cli.test.mjs 108、test/fold.test.mjs 29、test/rules.test.mjs 25、board/board.test.mjs 13、test/plan.test.mjs 7、test/version.test.mjs 6、test/docs.test.mjs 5、test/heartbeat.test.mjs 2）；git grep 那六个旧叫法只剩 test/docs.test.mjs 的 RETIRED 一行；node examples/rebuild.mjs exit 0、示例工作区 33 条事件；变异核对：把旧说法写回 HANDOFF.md → test/docs.test.mjs 红并点名那一行（写这一节时被它拦过一次）；换成正名之后 README 的规则块、AGENTS 尾段、deed state 的打印、面板用的是同一批词
+- [x] T112 verify 的覆盖行不再往一屏里倒号
+  标准：被覆盖的交付超过十条时只说条数与分属几条任务，十及以内照旧点名；短与长各有用例；把判据改回一律点名，长的那条用例会红
+  交付：node --test 196/196（跑在这一份字节上，DEED_NO_PANEL=1；test/cli.test.mjs 109/109）；变异核对：把 covered.length <= 10 改成 <= 100000 → 只跑那条用例 1 个测试 0 过 1 败，原件随即还原后再跑全量 196/196；实录 deed verify 打「早先的交付 717 条（分属 84 条任务） · 已被后来的交付覆盖：记下的内容现在是什么不再核对」，十条及以内照旧点名（短的那半由同一条用例的另一个工作区盯着）
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

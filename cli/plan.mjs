@@ -28,17 +28,17 @@ export const FORMAT = [
   "四件事：勾上 = 交付（必须写 交付：），取消勾选 = 撤回（必须写 理由：），",
   "? = 新条目（submit 时领号），~~ = 放弃（必须写 理由：）；",
   "延后写一行 延后：为什么。路径与 sha256 不用写，submit 自己算。",
-  "这一段已经送审、还在等结论时，没做的条目写一行 搬： 就挪到下一段——",
+  "这一段已经送审、还在等结论时，没做的条目写一行 改到下一段： 它就改到下一段——",
   "它不是放弃，是换个段接着做。",
 ].join("\n");
 
-const FIELD = /^\s*(标准|交付|理由|延后|搬)\s*[：:]\s*(.*)$/u;
+const FIELD = /^\s*(标准|交付|理由|延后|改到下一段)\s*[：:]\s*(.*)$/u;
 const CHECK = /^\s*-\s*\[([ xX])\]\s+(?:(T\d+)\s+)?(.*)$/u;
 const FRESH = /^\s*-\s*\?\s+(.*)$/u;
 const DROPPED = /^\s*~~\s*(T\d+)\s*(.*)$/u;
 const HEADING = /^(#{1,6})\s*(.*)$/u;
 
-const fieldOf = (word) => ({ 标准: "criteria", 交付: "claim", 理由: "why", 延后: "later", 搬: "carry" })[word];
+const fieldOf = (word) => ({ 标准: "criteria", 交付: "claim", 理由: "why", 延后: "later", 改到下一段: "carry" })[word];
 
 // What the file says, in the order it says it. Nothing here decides whether the
 // batch is allowed; that is the command's business, and fold has the last word.
@@ -146,7 +146,7 @@ export function draft(session) {
   // 新条目落到哪一段，不是文件里写着哪一节就算哪一段：一段送审还在等结论时，
   // 它不再收新东西。那一节既然印不出来，就把它印出来，让人知道自己的 ? 会去哪儿。
   const open = session.segments.filter((one) => one.closedAt === null).at(-1) ?? null;
-  if (!open) out.push("## 下一段（这一段的活都收口了：写在这里的 ? 会开下一段）", "");
+  if (!open) out.push("## 下一段（这一段的活都结束了：写在这里的 ? 会开下一段）", "");
   else if (awaitingVerdict(session, open))
     out.push(
       "## 下一段（" + open.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）",

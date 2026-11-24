@@ -28,7 +28,7 @@ const pass = (n, segment = "S01.1") => ({ v: 1, at: T(n), k: "judge.pass", s: nu
 const verdict = (n, v, segment = "S01.1") => ({ v: 1, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: v, brief: "b.md" });
 const ask = (n) => ({ v: 1, at: T(n), k: "ask.raise", s: null, id: "A1", text: "要兼容旧账吗", reading: "不兼容", why: "不确定" });
 const goal = (n, text = "把这一期收干净") => ({ v: 1, at: T(n), k: "goal.set", s: null, text, by: "user" });
-// 现在的结论自己封段（事件含义第 3 版起）；老账本里的结论只算一句判断。
+// 现在的结论自己关闭这一段（事件含义第 3 版起）；老账本里的结论只算一句判断。
 const sealed = (n, segment = "S01.1") => ({ v: 5, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: "pass", brief: "b.md", findings: [] });
 
 test("an empty period reads as discussing, a delivered batch as executing, a judged one as accepting", () => {
@@ -68,7 +68,7 @@ test("a segment that needs review cannot be sealed before the verdict lands", ()
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "missing");
   assert.deepEqual(sealBlockers(config, session, session.segments[0]), [
-    "这一段按门槛要审：结局得由审查者的结论落（deed review --segment S01.1）",
+    "这一段按审查设置要审：结局得由审查者的结论落（deed review --segment S01.1）",
   ]);
   // 免审段才封得动；要审的那段被封，就是没人看过它却算过了。
   const exempt = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
@@ -110,7 +110,7 @@ test("a segment the gate says not to review waits to be sealed, not to be review
     { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [], bytes: { "docs/a.md": 100 } },
   ]);
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), [
-    "S01.1 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
+    "S01.1 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
   ]);
 });
 
@@ -129,7 +129,7 @@ test("the step it names is a command that carries its own name", () => {
 test("signing waits for the judgement and for every open question", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
   assert.deepEqual(signBlockers(delivered, delivered.sessions[0], config), [
-    "S01.1 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
+    "S01.1 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
   ]);
   const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4), ask(5)]);
   assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）"]);
@@ -263,7 +263,7 @@ test("a small change may sit out review; one that is not small may not", () => {
   assert.equal(of(["docs/a.md", "notes/b.md"], { "docs/a.md": 100, "notes/b.md": 100 }), false, "两个顶层目录还在范围内");
 });
 
-// 没称过不等于小：说不清多大的改动，门槛按要审处理。交付那一刻会替它称（工作区差里的、
+// 没称过不等于小：说不清多大的改动，审查设置按要审处理。交付那一刻会替它称（工作区差里的、
 // --digest 指的都称），所以这条只堵老账本和漏称。
 test("a delivery that never weighed its files is not treated as a small one", () => {
   const session = fold([
@@ -272,8 +272,8 @@ test("a delivery that never weighed its files is not treated as a small one", ()
   ]).sessions[0];
   assert.equal(needsReview(config, session, session.segments[0]), true, "称不出规模，就别指望它按 0 字节放行");
 });
-// 门槛后来写细了，不回头改写已经封过的段：封存那一刻的决定留在账本上。
-// 少了这一条，一次收紧就能把「全部免审」的期重新算成欠一份整期结论，
+// 审查设置后来写细了，不回头改写已经封过的段：封存那一刻的决定留在账本上。
+// 少了这一条，一次收紧就能把「全部免审」的期重新算成少一份整期结论，
 // 而签收清单里同时写着「没经过审查」——两句话互相打脸。
 test("a segment sealed before the gate got stricter is not pulled back into review", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
@@ -292,7 +292,7 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   ]);
   const session = doc.sessions[0];
   const [first, second] = session.segments;
-  // 门槛只把 1000 字节当「大」：用例自己说多大的改动算大，不用内核默认的 20000，
+  // 审查设置只把 1000 字节当「大」：用例自己说多大的改动算大，不用内核默认的 20000，
   // 否则哪天默认值调大，这条用例就无声地不再为守卫作证。
   const tight = { ...config, review: { ...config.review, size: { bytes: 1000 } } };
   assert.equal(needsReview(tight, session, first), false, "封过就不重算：账本上那句「不用审」还算数");
@@ -309,7 +309,7 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   assert.equal(nextAction(doc, config).what, "签收");
 });
 
-// 守卫的另一半：被 pass 封的段没有 exemptions——它照常按今天的门槛重算。
+// 守卫的另一半：被 pass 封的段没有 exemptions——它照常按今天的审查设置重算。
 // 少了这一条，把守卫写成「只要 closedAt 不是 null 就豁免」也能全绿，而那会把
 // 审过的段一并免责，与「pass 封的段照样重算」正好相反。
 test("a segment a reviewer passed is still weighed, so the exemption is only for a seal", () => {
@@ -317,15 +317,15 @@ test("a segment a reviewer passed is still weighed, so the exemption is only for
     digest: "a".repeat(64), digestPath: path, changed: [path], bytes: { [path]: 92160 } });
   const session = fold([turn(1), goal(2), add(3, "T1", ["docs/a.md"]), heavy(4, "T1", "docs/a.md"), sealed(5, "S01.1")]).sessions[0];
   const first = session.segments[0];
-  assert.equal(first.sealedBy, null, "封段的是结论，不是 deed seal");
-  assert.equal(needsReview(config, session, first), true, "这一份 92160 字节，今天的门槛会把它送去审");
+  assert.equal(first.sealedBy, null, "关闭这一段的是结论，不是 deed seal");
+  assert.equal(needsReview(config, session, first), true, "这一份 92160 字节，今天的审查设置会把它送去审");
   assert.equal(reviewState(config, session, first), "pass", "可它已经有人看过：结局不因此改变");
   assert.equal(first.sealedBy, null, "半封存不在这条上");
 });
 
 // 半个封存的真实来路：整期审把一条写在 deed seal 封过的段里的任务点回来，段被重新打开——
 // 留着 sealedBy（写过封存的人），closedAt 清成 null。这不是手改账本才出现的形状，
-// 而是 fail 分支每天都会造出来的；对它按门槛重算是本意，所以这条用例要跟着它走。
+// 而是 fail 分支每天都会造出来的；对它按审查设置重算是本意，所以这条用例要跟着它走。
 test("a whole-period rework reopens a sealed segment, and that half-seal is weighed again", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
   const whole = (n) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail",
@@ -339,12 +339,12 @@ test("a whole-period rework reopens a sealed segment, and that half-seal is weig
   const first = session.segments[0];
   assert.equal(first.sealedBy, "agent", "写过封存的人还留在这一格上");
   assert.equal(first.closedAt, null, "可这一段已经被整期审打回、重新打开");
-  assert.equal(needsReview(config, session, first), true, "半个封存不算封过：按今天的门槛重算");
+  assert.equal(needsReview(config, session, first), true, "半个封存不算封过：按今天的审查设置重算");
 });
 
 // 整期审的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。
 // 少了这一条，段一旦被 pass 封住，它后来算不算「小改动」就会决定这一期还要不要整期审——
-// 而真正该问的是有没有人看过。这条用例自己收口，不要借上面那条的夹具，否则一次变异会把两条
+// 而真正该问的是有没有人看过。这条用例自己结束，不要借上面那条的夹具，否则一次变异会把两条
 // 用例一起带红，看不出是哪一条在守。
 test("a segment a reviewer read counts for the whole review, whatever its deliveries weigh later", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
@@ -368,8 +368,8 @@ test("a delivery that points at nothing is told apart from one that points at a 
   assert.equal(pointsAtNothing({}), true, "老形状里什么都没有");
   assert.equal(pointsAtNothing(null), true, "还没有交付：调用点不必先记得判空");
   assert.equal(pointsAtNothing({ changed: ["docs/gone.md"] }), false, "删掉一条路径也算指着它");
-  assert.equal(pointsAtNothing({ digest: "a".repeat(64), path: "docs/a.md" }), false, "钉了内容");
-  assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md", digest: "b".repeat(64) }] }), false, "钉了一组内容");
+  assert.equal(pointsAtNothing({ digest: "a".repeat(64), path: "docs/a.md" }), false, "记下了内容");
+  assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md", digest: "b".repeat(64) }] }), false, "记下了一组内容");
 });
 
 

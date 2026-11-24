@@ -18,7 +18,7 @@ export default function sign(argv) {
         console.log("  没经过审查 · " + unread.map((s) => s.id + "（" + s.sealedWhy + "）").join("、"));
       const owed = debt(one);
       if (owed.deferred.length + owed.dropped.length > 0)
-        console.log("  带着走的欠账 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
+        console.log("  带着走的未结项 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
       console.log("  会话封存，下一轮对话会自己开新期");
     });
 };

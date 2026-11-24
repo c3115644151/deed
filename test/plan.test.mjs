@@ -113,5 +113,5 @@ test("the draft shows where a new entry will land when the open segment is waiti
   assert.doesNotMatch(settled, /## 下一段/, "这一段收得了活，就没有下一段可指");
 
   const shut = draft({ ...base, segments: [{ id: "S01.1", closedAt: "2026-11-24T00:00:00.000Z" }], briefs: [] });
-  assert.match(shut, /## 下一段（这一段的活都收口了：写在这里的 \? 会开下一段）/);
+  assert.match(shut, /## 下一段（这一段的活都结束了：写在这里的 \? 会开下一段）/);
 });

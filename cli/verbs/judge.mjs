@@ -5,7 +5,7 @@ export default function judge(argv) {
     const { flags, words } = parse(argv, "judge");
     guard(() => {
       const { doc } = load();
-      // 一段的结局由审查者的结论定：pass 当场封段，fail 点名退回。judge 只剩
+      // 一段的结局由审查者的结论定：pass 当场关闭这一段，fail 点名退回。judge 只剩
       // "推翻一份结论"这一个动作——人替审查者放行，会让"谁判的"变成两处。
       if (!flags.overturn)
         fail('judge 只认 --overturn <R1> --why "…"（推翻一条结论）；一段的结局由审查者的结论落，人不再签字');

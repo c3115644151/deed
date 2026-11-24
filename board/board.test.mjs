@@ -24,8 +24,8 @@ const events = [
 // The threshold is folded out of the ledger, so a serving fixture states it
 // the same way a real workspace does: as config.change events.
 const configEvents = [
-  { v: 1, at: T(0), k: "config.change", s: null, key: "review", from: null, to: config.review, why: "init 收下的门槛", by: "user" },
-  { v: 1, at: T(0), k: "config.change", s: null, key: "board", from: null, to: config.board, why: "init 收下的门槛", by: "user" },
+  { v: 1, at: T(0), k: "config.change", s: null, key: "review", from: null, to: config.review, why: "init 收下的审查设置", by: "user" },
+  { v: 1, at: T(0), k: "config.change", s: null, key: "board", from: null, to: config.board, why: "init 收下的审查设置", by: "user" },
 ];
 
 const doc = fold(events);

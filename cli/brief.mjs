@@ -53,7 +53,7 @@ function guideText(subject, target, briefName) {
     "",
     "    " + verdict + " --by \"你是谁\" --verdict pass",
     "",
-    "pass 直接封段，不需要第二个人签字。",
+    "pass 直接关闭这一段，不需要第二个人签字。",
     "",
     "有没达成的：",
     "",
@@ -61,7 +61,7 @@ function guideText(subject, target, briefName) {
     "      --why \"一句话总结\" --finding \"…\" --finding \"…\"",
     "",
     target
-      ? "被点名的条目回到未做（交付记录退回），其余保持交付；段不封，补完再交再审。"
+      ? "被点名的条目回到未做（交付记录退回），其余保持交付；这一段不关闭，补完再交再审。"
       : "被点名的段整段重开（段里的条目保持交付，谁也不重新交），那一段重新出清单、由它自己的审查者再审。",
     "",
     "## 你不能",
@@ -78,7 +78,7 @@ function guideText(subject, target, briefName) {
 // 一条任务在清单上的样子：段审和整体审共用，两种清单说的应该是同一件事。
 // 一批 submit 里的几条交付共用一份工作区差，分不出哪条改了哪份。数出来说清楚，
 // 比让读的人自己发现「三份记录一模一样」好。
-// 批号说的是「这一批落账那一刻」；条数由落账时的账本记下。撤回同批的一条之后
+// 批号说的是「这一批记账那一刻」；条数由记账时的账本记下。撤回同批的一条之后
 // 数目还是原来的那个：剩下的条数做分母的话，2 条一批撤回一条就成了「单条的一批」。
 function batchInfo(tasks) {
   const seen = new Map();
@@ -208,7 +208,7 @@ export function planWhole(root, session, at) {
     if (segment.sealedBy)
       return (
         "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " +
-        stamp0(segment.closedAt) + " · " + count + " 条 · 门槛说这一段不用审" +
+        stamp0(segment.closedAt) + " · " + count + " 条 · 审查设置说这一段不用审" +
         (segment.sealedWhy ? "（" + segment.sealedWhy + "）" : "")
       );
     return "- " + segment.id + " · 没有段审 · " + count + " 条";

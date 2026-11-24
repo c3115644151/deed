@@ -107,9 +107,9 @@ export function configDrift(ledger, disk) {
   return found;
 }
 
-// 规模的三条门槛是内核给的默认值，不由工作区声明：改名换目录的项目照样数得清
+// 规模的三条审查设置是内核给的默认值，不由工作区声明：改名换目录的项目照样数得清
 // 这次改了几个文件、多少字节、跨了几个顶层目录。工作区若要在自己这一份里改，
-// 写 review.size（{ files, bytes, dirs }），门槛仍要经 config.change 进账本。
+// 写 review.size（{ files, bytes, dirs }），审查设置仍要经 config.change 进账本。
 const SIZE_DEFAULTS = { files: 5, bytes: 20000, dirs: 2 };
 
 const topDir = (file) => {
@@ -134,8 +134,8 @@ function sizeOf(tasks, sizes = {}) {
 }
 
 export function needsReview(config, session, segment) {
-  // 封存是账本上已经做出的决定：这一段按当时的事实不用审。后来把门槛写细了，
-  // 也不回头改写它——否则一次收紧就能把封过的段重新算成"欠一份结论"，
+  // 封存是账本上已经做出的决定：这一段按当时的事实不用审。后来把审查设置写细了，
+  // 也不回头改写它——否则一次收紧就能把关闭过的段重新算成"少一份结论"，
   // 而签收只能对着旧账本上那句「没经过审查」自相矛盾。
   if (segment?.sealedBy && segment.closedAt) return false;
   const required = config?.review?.required ?? [];
@@ -160,7 +160,7 @@ export function needsReview(config, session, segment) {
     if (pinned.some((file) => !Number.isFinite(task.sizes?.[file]))) return true;
     // 交付真的碰过、却没有重量的路径：删掉的东西原来多大，交付那一刻已经称不出来了。
     // 按 0 字节算等于说"删掉三十 KB 不算大"，所以按要审算。只声明、没碰过的不算——
-    // 那类路径门槛管不着，它连一个字节都没动。
+    // 那类路径审查设置管不着，它连一个字节都没动。
     const unweighed = (task.changed ?? []).filter((file) => !Number.isFinite(task.sizes?.[file]));
     if (unweighed.length > 0) return true;
     if (size.files > limits.files) return true;
@@ -267,9 +267,9 @@ export function wholeState(session) {
 }
 
 // 这一期需不需要一次单独的整体审：一段的一期不需要——它的段审就是整期审。
-// 多段的一期，只要有一段是审查者看过的（或者还开着、按门槛要审），签收前就得
+// 多段的一期，只要有一段是审查者看过的（或者还开着、按审查设置要审），签收前就得
 // 再有一份落在整期上的结论；全都由 deed seal 封的多段期不要——没人需要看的东西
-// 不必再造一份清单。判断只看两件事：这一段有没有结论、还开着的段门槛怎么判。
+// 不必再造一份清单。判断只看两件事：这一段有没有结论、还开着的段审查设置怎么判。
 // 不拿已封存段的后来字节重量去重算：那会把「审过了」重新变成「该审而没审」，
 // 也会让封过的免审段翻回要审（上一轮修的就是这一条）。
 export const needsWhole = (config, session) => {
@@ -296,7 +296,7 @@ export function reviewState(config, session, segment) {
 }
 
 // 一条交付什么也没指着，有两种样子：既没记下文件，也没动过任何路径。
-// 删掉一个文件也算动了——路径走了，没有字节可钉，那不是"没指着"，是它指的那条路径本来就没有字节。
+// 删掉一个文件也算动了——路径走了，没有字节可记，那不是"没指着"，是它指的那条路径本来就没有字节。
 // 这个判断只在这里写一遍：签收、下一步、verify 报的空交付都从它出。
 export const pointsAtNothing = (proof) =>
   !proof ||
@@ -344,8 +344,8 @@ export function signBlockers(doc, session, config = null) {
     const owed = config ? needsReview(config, session, shut) : true;
     blockers.push(
       owed
-        ? shut.id + " 还没有审查通过（审查者的 pass 就封段）"
-        : shut.id + " 还没有封存（门槛说这一段不用审：deed seal 记下凭什么不审）",
+        ? shut.id + " 还没有审查通过（审查者的 pass 就关闭这一段）"
+        : shut.id + " 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
     );
   }
   // 整期审：签收签的是这一期，最后一句结论该落在它身上。段都封了还没有整体审，
@@ -358,7 +358,7 @@ export function signBlockers(doc, session, config = null) {
     else if (whole === "stale") blockers.push(`${session.id} 的整体审结论早于这一期最后一次改动（deed review --all）`);
   }
   // 一整期的结论判了不合格，就是把这一期否掉了：签收前这件事得有人处理。
-  // 免审的期上也一样——一份已经落账的不合格，不能因为「门槛说不用审」就当
+  // 免审的期上也一样——一份已经记账的不合格，不能因为「审查设置说不用审」就当
   // 它没发生；那样面板上会同时出现一张不合格卡和一句「签收可行」。
   const onWhole = sessionReview(session);
   if (onWhole && onWhole.verdict === "fail")
@@ -399,7 +399,7 @@ export const debt = (session) => ({
 export const userTurns = (session) => session.turns.filter((one) => one.who === "user");
 
 // 一段花了多少：几条任务、出过几份清单、重交了几次、开了多久才封。
-// 数全在账本里（封段时刻减开段时刻，不读时钟），只回答「为什么这么慢」，
+// 数全在账本里（关闭时刻减开段时刻，不读时钟），只回答「为什么这么慢」，
 // 不参与任何门——慢不挡放行，看不见才没法谈省。
 export const costOf = (session, segment) => {
   const tasks = session.tasks.filter((one) => one.segment === segment.id);
@@ -480,7 +480,7 @@ export function nextAction(doc, config) {
     return {
       who: "user",
       what: "签收",
-      text: blockers.length === 0 ? `${session.id} 的任务都判过了，等你一句话收口` : blockers.join("；"),
+      text: blockers.length === 0 ? `${session.id} 的任务都判过了，等你一句话结束` : blockers.join("；"),
       command: `deed sign --words "<你的原话>" --title "第 ${doc.sessions.length} 期"`,
     };
   }
@@ -552,7 +552,7 @@ export function nextAction(doc, config) {
     // 放弃是落过的决定，带着理由：它结清的是"这件事改主意不做了"，不是"还没做"。
     const stuck = named.filter((one) => one.status !== "done" && one.status !== "accepted" && one.status !== "dropped");
     if (stuck.length > 0) {
-      // 延后不是放弃：延后的条目还欠着活，说了"重新交付"才算说实话。
+      // 延后不是放弃：延后的条目还没做完，说了"重新交付"才算说实话。
       const gone = stuck.filter((one) => one.status === "deferred");
       const text =
         gone.length > 0
@@ -598,12 +598,12 @@ export function nextAction(doc, config) {
       command: `deed review --segment ${segment.id}`,
     };
   }
-  // 走到这里只剩一种：门槛说这一段不用审，而它还没封。免审就是不用审，所以不再
+  // 走到这里只剩一种：审查设置说这一段不用审，而它还没封。免审就是不用审，所以不再
   // 叫一个人去签发假结论——由交付的人写清凭什么不审，签收时这一段会被列出来。
   return {
     who: "agent",
     what: "封存",
-    text: `${segment.id} · ${count.total} 条都交付了，门槛说这一段不用审（改动只落在免审路径，没人需要审）`,
+    text: `${segment.id} · ${count.total} 条都交付了，审查设置说这一段不用审（改动只落在免审路径，没人需要审）`,
     command: `deed seal --segment ${segment.id} --why "凭什么不用审" --by "…"`,
   };
 }
@@ -621,11 +621,11 @@ export function sealBlockers(config, session, segment = openSegment(session)) {
   if (live.length > 0)
     blockers.push("这一段已经有审查结论：结局由那份结论定（deed judge --overturn 只用来推翻它）");
   if (needsReview(config, session, segment))
-    blockers.push(`这一段按门槛要审：结局得由审查者的结论落（deed review --segment ${segment.id}）`);
+    blockers.push(`这一段按审查设置要审：结局得由审查者的结论落（deed review --segment ${segment.id}）`);
   return blockers;
 }
 
-// 没经过审查就收口的段：签收时要把它们摆出来，别让"免审"变成没人知道。
+// 没经过审查就结束的段：签收时要把它们摆出来，别让"免审"变成没人知道。
 export function exemptSegments(session) {
   if (!session) return [];
   return session.segments.filter((one) => one.verdict === "exempt");

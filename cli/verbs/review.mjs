@@ -32,11 +32,11 @@ export default function review(argv) {
           const pending = one.tasks.filter((task) => task.status === "todo");
           if (pending.length > 0)
             fail("这一期还有没交付的（" + pending.map((task) => task.id).join("、") + "）：整体审的清单等交付完再发");
-          // 门槛说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
+          // 审查设置说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
           // 免得账本上留下一条看着像「这一期被整体审过」的结论。这句话排在检查
           // 之后：还有段没封的期上说「各段都免审」是假话。
           if (!needsWhole(doc.config, one))
-            console.log("这一期的各段都免审（门槛说不用审，段是 deed seal 封的）：不需要整期结论——要出一份也行，签收不看它");
+            console.log("这一期的各段都免审（审查设置说不用审，段是 deed seal 封的）：不需要整期结论——要出一份也行，签收不看它");
           const last = one.briefs.filter((b) => b.scope === "session").at(-1) ?? null;
           const answered = last && one.reviews.some((rv) => rv.scope === "session" && rv.brief === last.brief);
           if (last && !answered) {

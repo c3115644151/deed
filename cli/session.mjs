@@ -82,7 +82,7 @@ export function parse(argv, verb) {
   return { flags, words };
 }
 
-// 接过的目录：门槛落过盘（.deed/config.json）。只看这一个文件，不猜。
+// 接过的目录：审查设置落过盘（.deed/config.json）。只看这一个文件，不猜。
 const bound = (root) => fs.existsSync(path.join(root, ".deed", "config.json"));
 
 export const load = () => {
@@ -94,12 +94,12 @@ export const load = () => {
 // inside the lock instead of guessed from a stale read.
 // commit runs only after the line is on disk: derived state (the workspace
 // snapshot) may not move for an event that was refused before appending.
-// mayBind：唯一允许在没接过的目录里写的东西是"把门槛落进账本"（init 自己）。
+// mayBind：唯一允许在没接过的目录里写的东西是"把审查设置落进账本"（init 自己）。
 export function transact(flags, build, commit, mayBind = false) {
   // 接过的目录才谈得上写：没接过就先拒绝，连 .deed/ 也不该留下——
   // 拿锁会顺手把目录建出来，而被拒的动作不该在工作区里留下任何痕迹。
   if (!mayBind && !bound(ROOT))
-    fail("这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
+    fail("这个目录还没接 deed：先 deed init（没有审查设置的账本，读不出状态，也判不了任何一段）");
   return withLock(ROOT, () => {
     const events = readEvents(ROOT);
     const doc = fold(events);
@@ -108,9 +108,9 @@ export function transact(flags, build, commit, mayBind = false) {
     // w 记的是写这一行的程序版本，不是事件含义的版本（那是 v）。它让"读到不认得的
     // 类型"以后能有一个可查的答案：账本比程序新，还是这一行本来就有问题。
     stamped.w = currentVersion() || undefined;
-    // 没有门槛的账本谁也没法判：还没接过的目录只能由 init 先落基线。
+    // 没有审查设置的账本谁也没法判：还没接过的目录只能由 init 先落基线。
     if (!doc.config && stamped.k !== "config.change")
-      fail("这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
+      fail("这个目录还没接 deed：先 deed init（没有审查设置的账本，读不出状态，也判不了任何一段）");
     const after = fold([...events, stamped]);
     append(ROOT, stamped);
     if (commit) commit(stamped);
@@ -123,7 +123,7 @@ export function transact(flags, build, commit, mayBind = false) {
 // 而对不上的那一刻没人知道哪一条算数。
 export function transactMany(flags, buildAll, commit) {
   if (!bound(ROOT))
-    fail("这个目录还没接 deed：先 deed init（没有门槛的账本，读不出状态，也判不了任何一段）");
+    fail("这个目录还没接 deed：先 deed init（没有审查设置的账本，读不出状态，也判不了任何一段）");
   return withLock(ROOT, () => {
     const events = readEvents(ROOT);
     const doc = fold(events);
@@ -312,8 +312,8 @@ export function printState() {
   // 没接过 deed 的目录不能看起来"一切正常"：状态里每个字都得有账本撑着。
   if (!config) {
     console.log("");
-    console.log("这个目录还没接 deed · 先 deed init（把门槛基线记进账本）");
-    console.log("  账本 " + (events.length ? events.length + " 条，但没有门槛：不知道哪些改动要审" : "还没有"));
+    console.log("这个目录还没接 deed · 先 deed init（把审查设置基线记进账本）");
+    console.log("  账本 " + (events.length ? events.length + " 条，但没有审查设置：不知道哪些改动要审" : "还没有"));
     console.log("");
     return;
   }
@@ -323,7 +323,7 @@ export function printState() {
     console.log(
       doc.sessions.length === 0
         ? "（还没有会话；下一轮对话会开第一期）"
-        : "（上一期已收口；下一轮对话会自己开新期）",
+        : "（上一期已结束；下一轮对话会自己开新期）",
     );
   } else {
     const seg = openSegment(open);
@@ -365,7 +365,7 @@ export function printState() {
     for (const ask of pendingAsks(open)) console.log("  待裁 " + ask.id + " · " + ask.text);
     const owed = debt(open);
     if (owed.deferred.length + owed.dropped.length > 0)
-      console.log("  欠着 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
+      console.log("  还没结 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
     const settled = edges(open);
     for (const one of settled)
       console.log("  " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
@@ -379,14 +379,14 @@ export function printState() {
   for (const one of doc.sessions)
     if (one.closedAt)
       console.log(
-        "  已收口 · " + one.id + " · " + (one.title ?? "未命名") + " · " + (one.closeKind === "signed" ? "签收" : "强制归档") + " · " + stamp0(one.closedAt),
+        "  已结束 · " + one.id + " · " + (one.title ?? "未命名") + " · " + (one.closeKind === "signed" ? "签收" : "强制归档") + " · " + stamp0(one.closedAt),
       );
   for (const change of doc.changes)
-    console.log("  门槛改过 · " + change.key + " · " + stamp0(change.at) + " · " + change.by + " · " + change.why);
+    console.log("  审查设置改过 · " + change.key + " · " + stamp0(change.at) + " · " + change.by + " · " + change.why);
   const drift = configDrift(doc.config, readConfigFile(ROOT));
   if (drift.length > 0)
     console.log(
-      "  门槛 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；deed verify 看细节，改门槛用 deed init --force … --why）",
+      "  审查设置 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；deed verify 看细节，改审查设置用 deed init --force … --why）",
     );
   const step = nextAction(doc, config);
   console.log("");
@@ -410,12 +410,12 @@ export function optionalBlock(config) {
     "   规则     deed init --print-agents  → 原样粘进 AGENTS.md 或 CLAUDE.md（deed 不写那个文件）",
     "   面板     deed serve                → 本机只读 http://127.0.0.1:" + port,
     "   体检     deed doctor               → 账本坏在哪、接入还缺什么",
-    "   门槛     deed gate                 → 看这个工作区的门（没有门时它会说没有，并给一行写法）",
-    "   改门槛   deed init --force --review \"…\" --exempt \"…\" --port " + port + " --why \"为什么改\"",
+    "   审查设置     deed gate                 → 看这个工作区的门（没有门时它会说没有，并给一行写法）",
+    "   改审查设置   deed init --force --review \"…\" --exempt \"…\" --port " + port + " --why \"为什么改\"",
   ];
 }
 
-// 记下的内容变了，那一条交付回答的就不是现在的工作区：封段、落结论都不能装作
+// 记下的内容变了，那一条交付回答的就不是现在的工作区：关闭这一段、落结论都不能装作
 // 没发生过。这里只问账本与磁盘的差，不看谁的判断。
 export const auditSegment = (doc, session, seg) => {
   const inSegment = new Set(tasksIn(session, seg).map((task) => task.id));
@@ -428,7 +428,7 @@ export const auditSegment = (doc, session, seg) => {
   const stale = audit.stale.filter((spot) => inSegment.has(spot.id));
   if (stale.length > 0)
     fail(
-      "这一段有交付记录过期（" + stale.map((spot) => spot.id + " 记下 " + spot.path).join("、") + "），记下的内容已经变了：重新交付再封段",
+      "这一段有交付记录过期（" + stale.map((spot) => spot.id + " 记下 " + spot.path).join("、") + "），记下的内容已经变了：重新交付再关闭这一段",
     );
 };
 

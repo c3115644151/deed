@@ -1,5 +1,5 @@
 // 一个动词认哪些开关，只有这一处说。parse 拿它拒掉拼错的开关，帮助也拿它排版：
-// 少了这份表，--digset 会被当成一句"没给 digest"，交付照落，钉却是空的。
+// 少了这份表，--digset 会被当成一句"没给 digest"，交付照落，记下的内容却是空的。
 //
 // usage 是给人看的那几行，按 HELP 原来的样子抄下来——帮助不再另写一份，从这里出。
 export const SPEC = {
@@ -39,7 +39,7 @@ export const SPEC = {
   },
   submit: {
     flags: ["by", "session"],
-    usage: ['deed submit [--by "谁"]                把清单上的改动一次落账（勾上=交付，取消勾=撤回，~~=不做）'],
+    usage: ['deed submit [--by "谁"]                把清单上的改动一次记账（勾上=交付，取消勾=撤回，~~=不做）'],
   },
   goal: {
     flags: ["text", "why", "session", "by"],
@@ -52,14 +52,14 @@ export const SPEC = {
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
       "deed review --all                      发整期清单（列各段的结论；段都封之后用它，一段的一期由那一段的结论回答）",
-      'deed review --segment S01.1 --by "谁" --verdict pass [--finding "…"]   pass 直接封段',
+      'deed review --segment S01.1 --by "谁" --verdict pass [--finding "…"]   pass 直接关闭这一段',
       'deed review --segment S01.1 --by "谁" --verdict fail --rework T1,T2 --why "…" [--finding "…"]',
       'deed review --all --by "谁" --verdict pass|fail [--rework S0x.N,…] [--why "…"]   结论落在整期（点名的是段）',
     ],
   },
   seal: {
     flags: ["segment", "why", "by", "session"],
-    usage: ['deed seal [--segment S01.1] --why "…"  封一个免审段（门槛说不用审，没人审过）'],
+    usage: ['deed seal [--segment S01.1] --why "…"  封一个免审段（审查设置说不用审，没人审过）'],
   },
   judge: {
     flags: ["overturn", "why", "by"],

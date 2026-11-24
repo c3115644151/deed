@@ -51,7 +51,7 @@ export default function task(argv) {
         let snapshotFiles = scanned.now;
         const sizes = weigh(ROOT, moved);
         // 手工 --digest 常常指一份这次没动过、但这条任务得担着的文件：它不在工作区差里，
-        // 于是没人称过它，门槛只好按要审处理。称它一下，规模这一半才说得清。
+        // 于是没人称过它，审查设置只好按要审处理。称它一下，规模这一半才说得清。
         for (const [file, size] of Object.entries(pinSizes)) if (sizes[file] === undefined) sizes[file] = size;
         transact(
           flags,
@@ -76,7 +76,7 @@ export default function task(argv) {
           "交付 · " + id + " · 交付记录：" + flags.evidence +
             (pins.length === 0 ? "" : " · 记下 " + pins.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")),
         );
-        if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（门槛按它判，不只按声明的 --files）");
+        if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（审查设置按它判，不只按声明的 --files）");
         return;
       }
       // A delivery that said the wrong thing is taken back, not rewritten: the

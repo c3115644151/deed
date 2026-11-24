@@ -17,7 +17,7 @@ deed 只有一个程序和一叠纯文本。装=让 `deed` 这个命令能在任
 
 ```bash
 git clone https://github.com/c3115644151/deed.git
-cd deed && npm test          # 91 条，确认这台机器上跑得动
+cd deed && npm test          # 195 条，确认这台机器上跑得动
 node cli/deed.mjs state      # 就地可用，不装任何东西
 ```
 
@@ -60,9 +60,9 @@ deed init --review "src/**,apps/**" --exempt "docs/**,*.md"
 `deed` 把**当前目录**当工作区（往上找到 git 根或文件系统根为止）。`init` 只做一件事：在这个工作区里建
 
 ```
-.deed/config.json     门槛（要审/免审的路径、门命令、端口）与它们的镜像
+.deed/config.json     审查设置（要审/免审的路径、门命令、端口）与它们的镜像
 .deed/log/2026-11.jsonl   账本，按月份片，只追加
-.deed/plan.md         这一期的清单草稿（deed plan 出，deed submit 落账）
+.deed/plan.md         这一期的清单草稿（deed plan 出，deed submit 记账）
 .deed/review/         审查清单（发出去时才有文件）
 .deed/workspace.json  上一次交付的内容指纹（第一次交付时才有）
 .deed/log/lock        写锁，只在写的那一瞬间存在
@@ -82,14 +82,14 @@ deed init --review "src/**,apps/**" --exempt "docs/**,*.md"
 
 ### 已经接过一次之后
 
-再 `init` 不会覆盖你改过的门槛；改门槛要 `--force` 加 `--why`：
+再 `init` 不会覆盖你改过的审查设置；改审查设置要 `--force` 加 `--why`：
 
 ```bash
 deed init --force --exempt "docs/**,*.md" --why "文档改动不必审"
 ```
 
-为什么必填：**门槛的每一次改动都进账本**，下一个人能看到是谁、什么时候、为什么放宽了审查。
-`.deed/config.json` 只是账本的镜像；手改文件不改任何判断（规则只读账本），`deed verify` 会报「门槛对不上」，
+为什么必填：**审查设置的每一次改动都进账本**，下一个人能看到是谁、什么时候、为什么放宽了审查。
+`.deed/config.json` 只是账本的镜像；手改文件不改任何判断（规则只读账本），`deed verify` 会报「审查设置对不上」，
 `deed init --force --why "…"` 是把它收进账本的唯一方式。
 
 ### 让 agent 知道规矩
@@ -103,8 +103,8 @@ deed init --print-agents
 
 ### 门（可选）
 
-门槛里的 `gates` 是一张「名字 → 命令数组」的表，`deed gate` 按顺序跑、第一条不过就停。
-想用它收口提交，就在 `config.json` 里写，再用 `deed init --force --why "加门"` 记进账本：
+审查设置里的 `gates` 是一张「名字 → 命令数组」的表，`deed gate` 按顺序跑、第一条不过就停。
+想用它结束提交，就在 `config.json` 里写，再用 `deed init --force --why "加门"` 记进账本：
 
 ```json
 { "gates": { "commit": ["npm test"] } }
@@ -130,7 +130,7 @@ npm unlink -g deed        # 或删掉 vendor 的那份目录
 ```
 
 `.deed/` 可以留着：它是这个工作区的历史。真要清掉，先 `deed verify` 确认没有未签收的任务，再整目录删。
-deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来：每条命令执行前探测一次，不在就用后台进程拉起，URL 打在那一行输出里；30 分钟没人连就自己退，`deed panel --stop` 立即停，`DEED_NO_PANEL=1` 一条都不起。它不写账本，也不占终端。门槛里写的那个号被别的程序先占了，它退到系统给的空号，由拉它起来的那条命令说清「哪个号被占着、改开在哪」——那句话不由子进程说，它不接管道，说了也到不了你眼前。要端口固定、前台看日志，仍可 `deed serve --port 7317`。
+deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来：每条命令执行前探测一次，不在就用后台进程拉起，URL 打在那一行输出里；30 分钟没人连就自己退，`deed panel --stop` 立即停，`DEED_NO_PANEL=1` 一条都不起。它不写账本，也不占终端。审查设置里写的那个号被别的程序先占了，它退到系统给的空号，由拉它起来的那条命令说清「哪个号被占着、改开在哪」——那句话不由子进程说，它不接管道，说了也到不了你眼前。要端口固定、前台看日志，仍可 `deed serve --port 7317`。
 
 ## 常见故障
 
@@ -141,7 +141,7 @@ deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
 | `deed verify` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。在清单里重新勾一次再 `deed submit`，或在审查里点名退回 |
 | `deed verify` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |
-| `deed verify` 报「门槛对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
+| `deed verify` 报「审查设置对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
 | `seal`／`judge`／`sign` 报「没有写名字」 | 管道里跑必须写 `--by "谁"`；账本不替任何动作填名字 |
 
 ## 它不碰的东西

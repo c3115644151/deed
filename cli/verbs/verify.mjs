@@ -16,13 +16,18 @@ export default function verify(argv) {
         return;
       }
       const { stale, outside, covered, historic } = auditEvidence(ROOT, doc);
-      if (covered.length > 0)
-        console.log("早先的交付 " + covered.length + " 条 · 已被后来的交付覆盖（" + covered.map((one) => one.id).join("、") + "；钉过的内容现在是什么不再核对）");
+      if (covered.length > 0) {
+        // A covered delivery is history, not news: 700 of them on one line is noise.
+        // Name them while the list is short enough to read.
+        const ids = [...new Set(covered.map((one) => one.id))];
+        const named = covered.length <= 10 ? "（" + covered.map((one) => one.id).join("、") + "）" : "（分属 " + ids.length + " 条任务）";
+        console.log("早先的交付 " + covered.length + " 条" + named + " · 已被后来的交付覆盖：记下的内容现在是什么不再核对");
+      }
       const bare = bareEvidence(doc);
       const past = bareHistory(doc);
       const briefs = auditBriefs(ROOT, doc);
       const looseBriefs = briefTrouble(briefs);
-      for (const one of bare) console.log("没钉内容 · " + one.id + "（--evidence 里没有 --digest：说得出做了什么，查不了）");
+      for (const one of bare) console.log("没记下内容 · " + one.id + "（--evidence 里没有 --digest：说得出做了什么，查不了）");
       for (const one of briefs.unpinned) console.log("清单没指纹 · " + one.segment + " · " + one.brief + "（账本没记 sha256：改没改过查不出来）");
       for (const one of briefs.orphan)
         console.log("清单没人发过 · " + one.segment + " · " + one.brief + "（账本里没有 review.brief：这份结论读的是谁给的？）");
@@ -35,14 +40,14 @@ export default function verify(argv) {
       // disagrees is not a broken ledger -- it is a decision nobody recorded.
       const drift = configDrift(doc.config, readConfigFile(ROOT));
       for (const one of drift)
-        console.log("门槛对不上 · " + one.key + " · 账本里是 " + JSON.stringify(one.ledger) + "，磁盘上写的是 " + JSON.stringify(one.disk));
-      // 封了的段里字节变了：结论已经把它结清，它不挡放行，但得有人能看见。
+        console.log("审查设置对不上 · " + one.key + " · 账本里是 " + JSON.stringify(one.ledger) + "，磁盘上写的是 " + JSON.stringify(one.disk));
+      // 已关闭的段里字节变了：结论已经把它结清，它不挡放行，但得有人能看见。
       if (historic.length > 0) {
         const head = historic.slice(0, 5).map((one) => one.id + " · " + one.path + "（" + one.segment + "）");
         console.log(
-          "封了的段里有 " +
+          "已关闭的段里有 " +
             historic.length +
-            " 条钉子的字节已经变了（不进 exit code）：" +
+            " 条记下的字节已经变了（不进 exit code）：" +
             head.join("、") +
             (historic.length > head.length ? "…" : ""),
         );
@@ -73,7 +78,7 @@ export default function verify(argv) {
         );
       if (drift.length > 0)
         reasons.push(
-          "门槛文件和账本对不上：规则只认账本，这一改没进过账本；要么用 deed init --force --why \"为什么改\" 把磁盘上的值收下，要么把文件改回账本里的值",
+          "审查设置文件和账本对不上：规则只认账本，这一改没进过账本；要么用 deed init --force --why \"为什么改\" 把磁盘上的值收下，要么把文件改回账本里的值",
         );
       if (looseBriefs > 0)
         reasons.push(

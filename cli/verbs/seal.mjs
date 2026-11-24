@@ -3,7 +3,7 @@ import { parse, load, transact, targetSession, fail, guard, signer, auditSegment
 
 export default function seal(argv) {
 
-  // 免审段的结局。门槛说这一段不用审，于是没有审查结论可落——但段仍然要封，
+  // 免审段的结局。审查设置说这一段不用审，于是没有审查结论可落——但段仍然要封，
   // 不然它永远开在 state 里，谁也签不了收。封存要写清凭什么不用审，因为
   // "没人看过"必须留在账本上，不能变成默认的沉默。
     const { flags } = parse(argv, "seal");

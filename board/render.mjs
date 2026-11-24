@@ -103,7 +103,7 @@ function hud(doc, open, state, turns, events) {
     '<span class="sub">pass protocol</span></div>' +
     '<div class="statebox"><span class="k">state</span><b class="v" data-state="' + esc(state) + '">' + esc(state) + "</b></div>" +
     '<div class="reads">' + reads + "</div>" +
-    '<div class="tools"><button type="button" class="tool" data-filter aria-pressed="false">只看欠账</button>' +
+    '<div class="tools"><button type="button" class="tool" data-filter aria-pressed="false">只看未结项</button>' +
     '<button type="button" class="tool" data-theme aria-pressed="false">明</button></div>' +
     "</header>"
   );
@@ -142,7 +142,7 @@ function directive(step, open) {
     '<section class="directive" data-who="' + esc(step.who) + '">' +
     '<div class="dtop"><span class="dlabel">指令 / directive</span>' +
     '<span class="dwho">下一步 · ' + esc(step.who) + "</span>" +
-    '<span class="debt">' + (owed ? "欠 " + owed : "无欠") + "　" + (pending ? "待判 " + pending : "无待判") + "</span></div>" +
+    '<span class="debt">' + (owed ? "还没结 " + owed : "都结了") + "　" + (pending ? "待判 " + pending : "无待判") + "</span></div>" +
     '<p class="dwhat">' + esc(step.what) + (subject ? " · " + esc(subject) : "") + "</p>" +
     (note ? '<p class="dnote">' + esc(note) + "</p>" : "") +
     '<div class="dline">' + cmd(step.command) + "</div>" +
@@ -243,7 +243,7 @@ function taskRow(task, zone) {
     .map((one) => '<li class="undone">撤回了：' + esc(one.why) + "（" + esc(one.by) + " · " + when(one.at, zone) + "）</li>")
     .join("");
   // 「未声明路径」说的是清单上没写，不是这条交付什么也没碰：submit 建的条目没有声明，
-  // 但它落账时量过工作区差，路径在交付记录里。两件事分开说，别让人以为交付是空的。
+  // 但它记账时量过工作区差，路径在交付记录里。两件事分开说，别让人以为交付是空的。
   const files =
     task.files.length > 0
       ? task.files.join("  ")
@@ -452,14 +452,14 @@ function acceptScreen(doc, session, config, zone, on) {
     check(todo === 0, "没有未做的条目", todo ? "还有 " + todo + " 条" : "") +
     check(asks.length === 0, "没有等裁定的问题", asks.length ? "还有 " + asks.length + " 条待裁（" + asks.map((one) => one.id).join("、") + "）" : "") +
     (wholeWord ? check(wholeWord.ok, wholeWord.label, wholeWord.why) : "") +
-    check(blocks.length === 0 && (!session || !!signed || sealed.length === segments.length), "没有挡路的债", blocks.length ? blocks.length + " 条，见下" : "") +
+    check(blocks.length === 0 && (!session || !!signed || sealed.length === segments.length), "没有挡住的项", blocks.length ? blocks.length + " 条，见下" : "") +
     "</ul>" +
     (signed
       ? '<p class="signwords">「' + esc(signed.words) + '」</p><p class="quiet">' + esc(signed.by) + " · " + when(signed.at, zone) + "</p>"
       : blocks.length
         ? '<ul class="blockers">' + blocks.map((one) => "<li>" + esc(one) + "</li>").join("") + "</ul>" +
           '<p class="quiet">先把上面挡路的清掉，再签这一句原话</p>' + cmd('deed sign --words "你的原话"')
-        : '<p class="ok">签收可行 · 债务都清了</p>' + cmd('deed sign --words "你的原话"')) +
+        : '<p class="ok">签收可行 · 该结的都结了</p>' + cmd('deed sign --words "你的原话"')) +
     (unreviewed.length
       ? '<p class="k">没经过审查</p><ul class="exempts">' +
         unreviewed.map((segment) => "<li>" + esc(segment.id) + (segment.sealedWhy ? " · " + esc(segment.sealedWhy) : "") + "</li>").join("") +

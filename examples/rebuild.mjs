@@ -35,8 +35,8 @@ deed("review", "--segment", "S01.1");
 deed("review", "--segment", "S01.1", "--by", "reviewer:independent", "--verdict", "pass");
 deed("sign", "--words", "可以，示例就这样", "--title", "示例账本立起来", "--by", "user");
 
-// 第二期第一段：门与面板各一条，交完由审查者放行封段，下一批任务自然开新段。
-deed("tick", "--who", "user", "--said", "再补一段：让门、打回、欠账各出现一次");
+// 第二期第一段：门与面板各一条，交完由审查者放行关闭这一段，下一批任务自然开新段。
+deed("tick", "--who", "user", "--said", "再补一段：让门、打回、未结项各出现一次");
 deed("task", "add", "让门说出失败在哪", "--criteria", "一条命令就能看到是哪条命令、退出码几", "--files", ".deed/config.json");
 deed("task", "done", "T3", "--evidence", "deed gate 在空 gates 时说「这个工作区没有门」", "--digest", ".deed/config.json");
 deed("task", "add", "让面板跟着账本动", "--criteria", "GET / 与渲染字节一致；SSE 推 change", "--files", ".deed/config.json");
@@ -60,7 +60,7 @@ deed("ask", "resolve", "A1", "--decision", "一起提交，账本随仓库走", 
 deed("task", "add", "给面板加跨会话历史", "--criteria", "能翻看已签收那一期的全部轮次", "--files", ".deed/config.json");
 deed("task", "defer", "T6", "--why", "先把账本这件事稳住，页面等下一轮");
 deed("task", "add", "让陌生人只读六行就能动手", "--criteria", "照 NOTES.md 从 init 走到 sign", "--files", "NOTES.md");
-deed("tick", "--who", "agent", "--said", "打回的那一段补完了，说明也改了", "--did", "判过 S02.1、S02.2，重审后封段");
+deed("tick", "--who", "user", "--said", "打回的那一段补完了，接着往下", "--did", "两段都已判过并关闭，新活开在下一段");
 deed("ask", "这一段要不要现在审？", "--reading", "等 T7 交付再审", "--why", "还差一条没交付");
 
 console.log(deed("state"));

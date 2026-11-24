@@ -8,9 +8,9 @@ import { pointsAtNothing } from "../core/rules.mjs";
 // 工作区当参数传进来，模块自己不认 cwd——同一段判断在哪跑都读同一份。
 
 // 一条交付里记下的 sha256 是"当时那份字节"的一句话。它什么时候失效？
-// 两种：工作区里那条路径现在不是那些字节，而且后来也没人重钉过它；或者路径跑出了工作区。
-// 后来的交付重钉了同一条路径，最后那句话才代表现在的字节——旧的那句是被覆盖，不是过期：
-// 它该不该存在由钉它的那条回答，不归更早的那条追问。
+// 两种：工作区里那条路径现在不是那些字节，而且后来也没人重新记过它；或者路径跑出了工作区。
+// 后来的交付重新记了同一条路径，最后那句话才代表现在的字节——旧的那句是被覆盖，不是过期：
+// 它该不该存在由记下它的那条回答，不归更早的那条追问。
 // 少了这一条，文档被后来的任务改一次，所有盯过它的记录都会变成过期，逼着人重交一遍同一份东西、写一句不实的话。
 const filesOf = (proof) =>
   proof.files ?? (proof.digest && proof.path ? [{ path: proof.path, digest: proof.digest }] : []);
@@ -22,9 +22,9 @@ export function auditEvidence(root, doc, sessionId) {
       for (const proof of task.evidence)
         for (const file of filesOf(proof)) pins.push({ at: proof.at, path: file.path, digest: file.digest });
 
-  // 封了的段：那一段的结论就是它那些钉子的结局，所以它不再挡放行——但照核不误，
+  // 已关闭的段：那一段的结论就是它那些记录的结局，所以它不再挡放行——但照核不误，
   // 变了记进 historic 报出来。整条跳过会让"字节变了"变成没人看的一格：一段封了之后
-  // 有人不经交付就改它钉过的文件，verify 说有效，谁也不知道那份字节已经换了人。
+  // 有人不经交付就改它记下的文件，verify 说有效，谁也不知道那份字节已经换了人。
   const shut = new Map();
   for (const one of doc.sessions)
     for (const segment of one.segments) shut.set(one.id + "/" + segment.id, segment.closedAt !== null);

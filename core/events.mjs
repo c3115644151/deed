@@ -8,7 +8,7 @@ export const EVENT_KINDS = [
   "task.undo",
   "task.defer",
   "task.drop",
-  // 一段送审之后就不再收新活：没做的条目靠这一行搬到下一段（理由写在清单的 搬： 里）。
+  // 一段送审之后就不再收新活：没做的条目靠这一行改到下一段（理由写在清单的 改到下一段： 里）。
   "task.carry",
   "ask.raise",
   "ask.resolve",
@@ -40,7 +40,7 @@ export const EVENT_VERSION = 12;
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
 export const MEANING = {
-  // 不合格必须点名要重做的条目；pass 当场封段（打回不再是另一条命令）。
+  // 不合格必须点名要重做的条目；pass 当场关闭这一段（打回不再是另一条命令）。
   namedFail: 3,
   // 整期审打回时点名的是段号，不是段里的条目。
   segmentRework: 9,
@@ -222,7 +222,7 @@ export function validateEvent(ev, at) {
       need(ev, "why");
       need(ev, "by");
       break;
-    // 免审段的结局：门槛说这一段不用审，但段仍然要有人封，不然它永远开在
+    // 免审段的结局：审查设置说这一段不用审，但段仍然要有人封，不然它永远开在
     // state 里、谁也签不了收。它不是审查结论，所以不写 review.log。
     case "segment.seal":
       need(ev, "segment");

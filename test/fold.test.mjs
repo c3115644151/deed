@@ -87,8 +87,8 @@ test("there is one prep segment, and every batch that moves in lands in it", () 
   }
 });
 
-test("a delivery does not move: 搬 is for work not yet done", () => {
-  assert.throws(() => fold([turn(1), add(2, "T1"), done(3, "T1"), carry(4, "T1")]), /只有没做的能搬到下一段/u);
+test("a delivery does not move: 改到下一段 is for work not yet done", () => {
+  assert.throws(() => fold([turn(1), add(2, "T1"), done(3, "T1"), carry(4, "T1")]), /只有没做的能改到下一段/u);
 });
 
 test("judging closes the segment and accepts what was delivered", () => {
@@ -153,8 +153,8 @@ test("a judgement cannot close a segment holding unfinished tasks", () => {
 // second session, and reusing an id are all refused before the line lands.
 test("only a turn opens a period; a task cannot invent one", () => {
   assert.throws(() => fold([add(1, "T1")]), /还没有会话/);
-  assert.throws(() => fold([turn(1), sign(2), add(3, "T1")]), /已经收口/);
-  assert.throws(() => fold([turn(1), sign(2), turn(3, "x", "S01")]), /已经收口/);
+  assert.throws(() => fold([turn(1), sign(2), add(3, "T1")]), /已经结束/);
+  assert.throws(() => fold([turn(1), sign(2), turn(3, "x", "S01")]), /已经结束/);
 });
 
 test("a duplicate id is refused instead of shadowing the first one", () => {
@@ -254,10 +254,10 @@ test("a rework takes back the paths the delivered work touched, not just the cla
   const task = after.sessions[0].tasks[0];
   assert.deepEqual(task.changed, ["notes.md"], "退回的那条交付碰过的路径不再算这一段的性质");
   assert.deepEqual(Object.keys(task.sizes), ["notes.md"]);
-  // 门槛就在这几条路径上判：退回之前那一批有 .gitignore，要审；退回之后只剩 *.md，免审。
+  // 审查设置就在这几条路径上判：退回之前那一批有 .gitignore，要审；退回之后只剩 *.md，免审。
   const config = { review: { required: ["core/**"], exempt: ["*.md"] } };
   assert.equal(needsReview(config, before.sessions[0], before.sessions[0].segments[0]), true, "碰过 .gitignore 的那一批要审");
-  assert.equal(needsReview(config, after.sessions[0], after.sessions[0].segments[0]), false, "退回之后再交的只有 *.md，门槛不再判要审");
+  assert.equal(needsReview(config, after.sessions[0], after.sessions[0].segments[0]), false, "退回之后再交的只有 *.md，审查设置不再判要审");
   // 退回那一刻也得干净：不等下一次交付重算，被退回的那条交付碰过的路径当场就不再算。
   const justReworked = fold([
     turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"]),
@@ -279,7 +279,7 @@ test("taking a delivery back, or sending it to rework, also gives its paths back
   const reworked = fold([
     turn(1), add(2, "T1"), touched(3, "T1", [".gitignore", "notes.md"]),
     { v: 5, at: T(4), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b.md" },
-    { v: 5, at: T(5), k: "judge.rework", s: null, segment: "S01.1", tasks: ["T1"], why: "补钉", by: "user" },
+    { v: 5, at: T(5), k: "judge.rework", s: null, segment: "S01.1", tasks: ["T1"], why: "补记", by: "user" },
   ]);
   assert.deepEqual(reworked.sessions[0].tasks[0].changed, [], "人点名重做之后，路径同样归零");
   assert.deepEqual(reworked.sessions[0].tasks[0].sizes, {});
@@ -287,7 +287,7 @@ test("taking a delivery back, or sending it to rework, also gives its paths back
 test("a delivery that only pins files still counts as touching them", () => {
   const config = { review: { required: ["core/**"], exempt: ["*.md"] } };
   const pinnedOnly = {
-    v: 3, at: T(3), k: "task.done", s: null, id: "T1", evidence: "重钉", by: "agent",
+    v: 3, at: T(3), k: "task.done", s: null, id: "T1", evidence: "重新记", by: "agent",
     files: [{ path: "core/fold.mjs", digest: "a".repeat(64) }], changed: [],
   };
   const doc = fold([turn(1), add(2, "T1"), pinnedOnly]);

@@ -60,22 +60,22 @@ function sessionOf(doc, ev) {
       return newSession(doc, ev.at);
     }
     if (!last) noway("这个工作区还没有会话：先记一轮，会话自己开出来");
-    if (last.closedAt) noway(`会话 ${last.id} 已经收口：先记一轮，会话自己开出来`);
+    if (last.closedAt) noway(`会话 ${last.id} 已经结束：先记一轮，会话自己开出来`);
     return bind(last);
   }
   const found = doc.sessions.find((one) => one.id === ev.s);
   if (!found) noway(`账本里没有这个会话：${ev.s}`);
   if (found.closedAt)
-    noway(`会话 ${found.id} 已经收口（${found.closeKind === "signed" ? "签收" : "归档"}），不能再往里写`);
+    noway(`会话 ${found.id} 已经结束（${found.closeKind === "signed" ? "签收" : "归档"}），不能再往里写`);
   return bind(found);
 }
 
 // A segment opens itself when something first lands in it: it is a view reset
 // after a verdict, not a thing anyone schedules. 新活落进最新那个开段：一段送审之后
-// 还在等结论，它不再收东西，搬出来的条目和新写的条目都往下走。
+// 还在等结论，它不再收东西，改到下一段的条目和新写的条目都往下走。
 function nextSegment(session, at, carried = false) {
   const segment = {
-    // 这一段是搬出来的条目开的：它就是预备段，别为每一条开一个新段。
+    // 这一段是改到下一段的条目开的：它就是预备段，别为每一条开一个新段。
     carried,
     id: `${session.id}.${session.segments.length + 1}`,
     openedAt: at,
@@ -98,8 +98,8 @@ function nextSegment(session, at, carried = false) {
 export const awaitingVerdict = (session, segment) =>
   (session.briefs ?? []).some((one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null);
 
-// 预备段只有一个：已经接着活的那个就是它，后来搬的、新写的都往里放。
-// 「搬出来的条目」若每次都开一个新段，一次讨论搬三批就成了三段，等结论期间谁也说不清
+// 预备段只有一个：已经接着活的那个就是它，后来改到下一段的、新写的都往里放。
+// 「改到下一段的条目」若每次都开一个新段，一次讨论改三批就成了三段，等结论期间谁也说不清
 // 下一批活算哪一段的。
 const livePrep = (session) =>
   session.segments.find(
@@ -111,7 +111,7 @@ const livePrep = (session) =>
       session.tasks.some((task) => task.segment === one.id),
   ) ?? null;
 
-// 空着的预备段不是一个段：它是某次搬运开出来又没接住活的格子，留着会让下一条新活落进
+// 空着的预备段不是一个段：它是某次改段开出来又没接住活的格子，留着会让下一条新活落进
 // 一个谁也没打算做的段。
 const settle = (session) => {
   session.segments = session.segments.filter(
@@ -137,13 +137,13 @@ function segmentOf(session, at, v = 1) {
 
 // 任务碰过哪些路径、各多大，只由还在的交付说得算。交付退回（撤回，或者审查者点名
 // 重做把那条交付清掉）之后，它碰过的字节就不再是这段工作的性质；所以每动一次交付
-// 就重算一遍，不靠逐条加减——加减漏一处，门槛就会拿一批已经不存在的工作去判要不要审。
+// 就重算一遍，不靠逐条加减——加减漏一处，审查设置就会拿一批已经不存在的工作去判要不要审。
 const rederive = (task) => {
   const paths = [];
   const sizes = {};
   for (const proof of task.evidence) {
     // 交付自己记下的文件也算碰过：手工 --digest 交付没有工作区差可量（changed 为空），
-    // 只认 changed 就会让门槛看不见它到底动了哪一份字节。
+    // 只认 changed 就会让审查设置看不见它到底动了哪一份字节。
     const touched = [...(proof.changed ?? []), ...(proof.files ?? []).map((one) => one.path)];
     for (const one of touched) if (!paths.includes(one)) paths.push(one);
     Object.assign(sizes, proof.sizes ?? {});
@@ -253,7 +253,7 @@ export function fold(events) {
           // 交付那一刻称的各路径大小，随这条交付走：交付退回，它称过的数也一起退。
           sizes: ev.bytes ?? {},
           // 一批 submit 落了好几条交付时，工作区只量了一次差：改动的归属是整批，
-          // 不是其中某一条。账本把这件事写下来，读的人就不会以为每条各钉了各的。
+          // 不是其中某一条。账本把这件事写下来，读的人就不会以为每条各记了各的。
           batch: ev.batch
             ? typeof ev.batch === "string"
               ? { at: ev.batch, size: null }
@@ -294,15 +294,15 @@ export function fold(events) {
         task.status = task.evidence.length > 0 ? "done" : "todo";
         break;
       }
-      // 这一段送审之后就不再收新活：没做的条目搬到下一段，等一下段开出来。
+      // 这一段送审之后就不再收新活：没做的条目改到下一段，等一下段开出来。
       // 开路只有这一条——放弃（drop）说的是「不做了」，写不成「换个时候做」。
       case "task.carry": {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
         if (task.status !== "todo")
-          noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能搬到下一段`);
-        // 一批搬运会连着写好几十行：预备段接过活就接着往里放，
+          noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能改到下一段`);
+        // 一批改到下一段会连着写好几十行：预备段接过活就接着往里放，
         // 不然十三条未做的条目会开出十三个各含一条的段；第二批又开一个新的，就成了两个预备段。
         const prep = livePrep(session) ?? nextSegment(session, ev.at, true);
         task.segment = prep.id;
@@ -428,7 +428,7 @@ export function fold(events) {
               `${subject} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"）`,
             );
         }
-        // 这条新记录自己带的是哪一版的含义：第 3 版起 pass 自己封段、fail 必须点名。
+        // 这条新记录自己带的是哪一版的含义：第 3 版起 pass 自己关闭这一段、fail 必须点名。
         const meaning = meaningOf(ev);
         // 点名要重做的条目：记录落盘之前先确认它们都在这一段里，否则一条
         // 打回会写到别的段的任务上，而账本只说"已打回"。
@@ -502,7 +502,7 @@ export function fold(events) {
             }
           }
         }
-        // 不合格不封段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
+        // 不合格不关闭这一段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
         // 不必再回来问"到底哪几条要重做"。
         if (ev.verdict === "fail" && !segment && sessionRework) {
           // 整体审退回的是段：整段重开，段里的条目保持交付——重新看的是这一段的
@@ -550,7 +550,7 @@ export function fold(events) {
             task.evidence = [];
             task.deferredWhy = null;
             task.touchedAt = ev.at;
-            // 退回的交付连同它碰过的路径一起退：门槛判的是这一段现在的字节，
+            // 退回的交付连同它碰过的路径一起退：审查设置判的是这一段现在的字节，
             // 不是那条没人认账的旧交付留下的痕迹。
             rederive(task);
           }
@@ -652,7 +652,7 @@ export function fold(events) {
         // older segment would leave two open at once.
         const newest = session.segments[session.segments.length - 1];
         if (sealed(segment) && segment.id !== newest.id)
-          noway(`段 ${segment.id} 后面还有 ${newest.id}：先把它收口，再回打这一段`);
+          noway(`段 ${segment.id} 后面还有 ${newest.id}：先把它结束，再回打这一段`);
         for (const id of ev.tasks) {
           const task = taskOf(session, id);
           if (task.segment !== segment.id)

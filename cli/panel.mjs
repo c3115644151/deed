@@ -13,7 +13,7 @@ const entry = path.join(here, "deed.mjs");
 
 export const panelOff = () => process.env.DEED_NO_PANEL === "1";
 
-// 端口固定：给人一个能收藏的地址。工作区各自的门槛里写着它（config.board.port，
+// 端口固定：给人一个能收藏的地址。工作区各自的审查设置里写着它（config.board.port，
 // 默认 7317）；被别的程序占了，serve 会退回系统给的号并在输出里说清。
 const portOf = (root) => {
   try {
@@ -92,7 +92,7 @@ export async function ensurePanel(root) {
   if (!fs.existsSync(path.join(root, ".deed", "config.json"))) return null;
   const now = await panelNow(root);
   if (now.running) {
-    // 门槛里写的那个号空出来了，而活着的这一个还停在当初退回的号上：换回去。
+    // 审查设置里写的那个号空出来了，而活着的这一个还停在当初退回的号上：换回去。
     // 地址是用来收藏的，"退回的号"只是一次意外的落点，不该变成新的地址。
     const asked = portOf(root);
     if (now.port === asked || !(await canBind(asked))) return { ...now, started: false };
