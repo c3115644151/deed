@@ -102,14 +102,17 @@ export const awaitingVerdict = (session, segment) =>
 // 「改到下一段的条目」若每次都开一个新段，一次讨论改三批就成了三段，等结论期间谁也说不清
 // 下一批活算哪一段的。
 const livePrep = (session) =>
-  session.segments.find(
-    (one) =>
-      one.closedAt === null &&
-      one.carried &&
-      // 预备段一旦自己也送了审，它就不再是预备段：它是又一批在等结论的活。
-      !awaitingVerdict(session, one) &&
-      session.tasks.some((task) => task.segment === one.id),
-  ) ?? null;
+  session.segments
+    .filter(
+      (one) =>
+        one.closedAt === null &&
+        one.carried &&
+        // 预备段一旦自己也送了审，它就不再是预备段：它是又一批在等结论的活。
+        !awaitingVerdict(session, one) &&
+        session.tasks.some((task) => task.segment === one.id),
+    )
+    // 接着往里放的是最后一个：从预备段里再改出去时，新开的那个才是"下一段"。
+    .at(-1) ?? null;
 
 // 空着的预备段不是一个段：它是某次改段开出来又没接住活的格子，留着会让下一条新活落进
 // 一个谁也没打算做的段。
@@ -307,8 +310,24 @@ export function fold(events) {
           noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能改到下一段`);
         // 一批改到下一段会连着写好几十行：预备段接过活就接着往里放，
         // 不然十三条未做的条目会开出十三个各含一条的段；第二批又开一个新的，就成了两个预备段。
-        const prep = livePrep(session) ?? nextSegment(session, ev.at, true);
-        task.segment = prep.id;
+        const prep = livePrep(session);
+        // 旧行按它写的时候那套含义读：那时从预备段里改出去是原地不动（v14 之前）。
+        if (prep && prep.id === task.segment && meaningOf(ev) >= MEANING.carryOut) {
+          // 「改到下一段」说的是别处的段。已经站在预备段里再往里改就是原地不动：那一段
+          // 既有没做的、又永远出不了清单（清单要等交付完），于是它一路堆到收不了尾。
+          // 所以只在一种情况下这么写有意义：这一段已经有交过的活、正要送审。那时把没做的
+          // 挪进新开的预备段，而这一段从此不再接新活（它不是预备段了）。
+          const delivered = session.tasks.some(
+            (one) => one.segment === task.segment && (one.status === "done" || one.status === "accepted" || one.status === "dropped"),
+          );
+          if (!delivered)
+            noway(
+              `${task.id} 已经在预备段 ${task.segment} 里，而这一段还没有交过的活：改到下一段说的是「这一段要送审了，没做的先挪开」——先在这一段做完，或者先交一条`,
+            );
+          prep.carried = false;
+          task.segment = nextSegment(session, ev.at, true).id;
+        } else if (prep) task.segment = prep.id;
+        else task.segment = nextSegment(session, ev.at, true).id;
         task.touchedAt = ev.at;
         settle(session);
         break;

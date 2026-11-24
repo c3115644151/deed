@@ -35,7 +35,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 13;
+export const EVENT_VERSION = 14;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -46,6 +46,8 @@ export const MEANING = {
   segmentRework: 9,
   // 轮次只记人开口的那一轮：agent 的进展不记成轮次。
   userOnlyRounds: 12,
+  // 「改到下一段」从预备段里挪出去就真挪：以前它原地不动，那一段于是永远出不了清单。
+  carryOut: 14,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。

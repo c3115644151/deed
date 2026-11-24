@@ -560,3 +560,40 @@
 {"at":"2026-11-24T15:32:37.119Z","k":"task.done","s":"S02","id":"T107","evidence":"量差之后、写入之前重算每条要记下的路径，变了整批拒：requireUnchanged 在没变时不抛、变了抛「记账之前这些路径变了：a.md」；写入之后按同一份 movedSince 再核一遍并 exit 1，用例分开盯「变了」与「文件不在了」两种；node --test 203/203 在这一份字节上。写入之后那一次核对只有记账那一瞬被别的东西写过才会触发，用例造不出那个窗口——这一点写进 HANDOFF，不装作有用例盯着。","by":"agent","run":{"command":"node --test","exit":0,"tests":203,"pass":203,"fail":0},"digest":"9fb07292d2e01509dcaebb2450558146158481d39910a38e48491a5bdc80b89a","digestPath":"AGENTS.md","files":[{"path":"AGENTS.md","digest":"9fb07292d2e01509dcaebb2450558146158481d39910a38e48491a5bdc80b89a"},{"path":"HANDOFF.md","digest":"8be777444dd48fe13fc8c85d97f73eca9a90361e8264d48c93161de05c6e5cf1"},{"path":"README.md","digest":"7c3998b7d278d9dd28e7b61820a674e0b23d4a9f0f7331a3437c804a0cd9a590"},{"path":"cli/brief.mjs","digest":"56cb09c10037db7240dbc6e13c99d8af359bf41e68ff521671a28c21b95f1c3f"},{"path":"cli/pins.mjs","digest":"46d7fc7c6819a7a0122da6dbee0c485c675d6550dcf9c9935886a27befd46d19"},{"path":"cli/spec.mjs","digest":"8b3f760ba860bcbd5cc41cdc2a8e8ec489bc439504cee88f4488e64a44b9cc1c"},{"path":"cli/verbs/submit.mjs","digest":"ea26f2f7b9a79df0495b48ed900b75725829bd1db180eae5f82a0b0e7341cbd7"},{"path":"core/events.mjs","digest":"c3cb85df9677263d0e07302e8f4599ab4a16485b8e522e2485ca3d95befdb4c7"},{"path":"core/fold.mjs","digest":"fc22963d0bb91679b193d761cd898322f3eb38b3d7db9942c0d12a5c694cdc6c"},{"path":"docs/DESIGN.md","digest":"b67db3f28fdc08d93cc6ee3170879411d5f9aac66a618310ea175b29b9ad0c95"},{"path":"docs/INSTALL.md","digest":"9097dc9bd4783e8b5f64e491c81fb3cc6d42c54b60fe9843147ec4c682ecce12"},{"path":"lib/words.mjs","digest":"c03e57170a9223e308cb331243512ef1b36ebefa78ced45d9057de038de10d43"},{"path":"package.json","digest":"f7809e07c95ee580ae1bbf266d60e61f80db78d98544cd5091832d2eed3d4ea3"},{"path":"test/cli.test.mjs","digest":"837f35b11a2561e115404e39bfefabc36f73b8107eb96736cbc318995f495708"}],"changed":["AGENTS.md","HANDOFF.md","README.md","cli/brief.mjs","cli/pins.mjs","cli/spec.mjs","cli/verbs/submit.mjs","core/events.mjs","core/fold.mjs","docs/DESIGN.md","docs/INSTALL.md","lib/words.mjs","package.json","test/cli.test.mjs"],"bytes":{"AGENTS.md":9650,"HANDOFF.md":23383,"README.md":19272,"cli/brief.mjs":13849,"cli/pins.mjs":3537,"cli/spec.mjs":5521,"cli/verbs/submit.mjs":16389,"core/events.mjs":13383,"core/fold.mjs":35086,"docs/DESIGN.md":52251,"docs/INSTALL.md":7201,"lib/words.mjs":6871,"package.json":510,"test/cli.test.mjs":139444},"batch":{"at":"2026-11-24T15:32:37.119Z","size":3},"v":13,"w":"0.12.0"}
 {"at":"2026-11-24T15:43:19.657Z","k":"task.drop","s":"S02","id":"T96","why":"和 T103 是同一条：都要求出清单前先算要不要审。重复登记，按 T103 做，这条不单独立项。","v":13,"w":"0.12.0"}
 {"at":"2026-11-24T15:43:19.657Z","k":"task.done","s":"S02","id":"T103","evidence":"审查设置为免审时不再出清单：一期的段改动全落在免审路径，deed review --segment S01.1 现在 exit 0、印「审查设置说这一段不用审（改动都落在免审路径）：不出清单与角色包」+ 关闭它的 deed seal 命令行，账本不新增一条 review.brief，.deed/review 里也不生成文件（用例盯住事件数与目录）；一期各段都免审时 deed review --all 同样不写账本、不生成文件，改印「不需要整期结论」+ 签收那句。混着要审的段时整期清单照旧出，免审那一段在清单里写「免审封存 · agent」与当初的理由。node --test 204/204 在这一份字节上。","by":"agent","run":{"command":"node --test","exit":0,"tests":204,"pass":204,"fail":0},"digest":"434d4df371f91cb1880db83ebfc4f640a53f43a735ce922596bc149e2d1277d8","digestPath":"cli/verbs/review.mjs","files":[{"path":"cli/verbs/review.mjs","digest":"434d4df371f91cb1880db83ebfc4f640a53f43a735ce922596bc149e2d1277d8"},{"path":"docs/DESIGN.md","digest":"ba430d48e8fb40d4054c8b12055196ca49f24137c1fa089e6071985a25b7f1fe"},{"path":"test/cli.test.mjs","digest":"df7487806134c0495789142d833f26261286943963b7a29bc3ceb877b2acd1a7"},{"path":"undefined/temp/dbg-t103/docs/a.md","digest":"ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"},{"path":"undefined/temp/dbg-t103/docs/b.md","digest":"3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"},{"path":"undefined/temp/dbg-t103/src/a.mjs","digest":"037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"}],"changed":["cli/verbs/review.mjs","docs/DESIGN.md","test/cli.test.mjs","undefined/temp/dbg-t103/docs/a.md","undefined/temp/dbg-t103/docs/b.md","undefined/temp/dbg-t103/src/a.mjs"],"bytes":{"cli/verbs/review.mjs":19008,"docs/DESIGN.md":52396,"test/cli.test.mjs":142604,"undefined/temp/dbg-t103/docs/a.md":1,"undefined/temp/dbg-t103/docs/b.md":1,"undefined/temp/dbg-t103/src/a.mjs":20},"v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T79","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T80","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T81","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T82","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T83","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T87","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T88","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T89","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T90","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T91","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T92","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T93","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T94","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T97","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T98","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T99","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T101","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:43:21.106Z","k":"task.carry","s":"S02","id":"T102","v":13,"w":"0.12.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T79","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T80","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T81","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T82","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T83","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T87","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T88","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T89","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T90","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T91","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T92","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T93","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T94","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T97","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T98","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T99","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T101","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:49:41.591Z","k":"task.carry","s":"S02","id":"T102","v":14,"w":"0.13.0"}
+{"at":"2026-11-24T18:50:09.707Z","k":"review.brief","s":"S02","segment":"S02.19","brief":".deed/review/S02.19-11250250.md","briefDigest":"2e624f41aaddae4fe14e8ff7bae9c506e88bb9e248895445f0b38de72501e58a","guide":".deed/review/S02.19-11250250-reviewer.md","guideDigest":"cec1dced7aac504745b2e209c46677a5a5f51eb167b869cd73ecd764b3e4ad86","v":14,"w":"0.13.0"}

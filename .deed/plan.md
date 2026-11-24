@@ -226,48 +226,12 @@
   交付：预备段只有一个：core/fold.mjs 的 livePrep 让搬第二批仍落在同一个预备段（不再排除条目自己那一段），settle 把搬出来却没接住活的空段从重放里去掉，segmentOf 在等结论时也取同一个预备段；真账本重放从 20 段变 19 段、S02.20 消失、T96..T99 回到 S02.19（17 条未做）；node --test 191/191（test/fold.test.mjs 28/28）；变异：把搬运改回每次都开新段 → test/fold.test.mjs 新用例红
 
 ## 段 S02.19
-- [ ] T79 T79 一轮只记一句话：deed say 取代 tick
-  标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
-- [ ] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
-  标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
-- [ ] T81 T81 收口与免审并进已有动词：review --skip、sign --shelve，删 goal
-  标准：deed review --skip --why 封免审段（取代 deed seal）；deed sign --shelve --why 归档（取代 shelve）；deed goal 删除（目的来自清单第一行，submit 已落 goal.set）；三个旧动词 exit 1；有用例覆盖
-- [ ] T82 T82 视图与推翻：state --check/--gates，judge 变 overturn
-  标准：deed state 带 --check 时跑核交付与体检（取代 verify、doctor），带 --gates 时跑门检查（取代 gate）；deed overturn R1 --why 取代 judge --overturn；旧动词 exit 1；有用例覆盖
-- [ ] T83 T83 删掉旧命令：cli/verbs/task.mjs 真删除，测试改走清单+submit
-  标准：cli/spec.mjs 与 ORDER 里不再有 task；cli/verbs/task.mjs 删除；test/cli.test.mjs 里 163 处 task add/done/undo/defer/drop 的夹具改走 deed plan + deed submit（或集中在一处替身里翻译），并有用例断言旧动词 exit 1；全量绿
-- [ ] T87 议题是账本上的对象：立项、追加正文、折得出状态
-  标准：deed topic "标题" --body "…" 自开号 I1、I2（与题的 A、清单条目的 T 不撞）；再次 deed topic I1 --body "…" 追加正文；core/fold.mjs 折出 topics（id/title/body/轮次索引/状态）；不复制任何轮次正文；EVENT_VERSION 升 1 且旧账本照读；有用例覆盖立项、追加、空标题被拒
-- [ ] T88 轮次按议题建索引，面板上的号点得到原话
-  标准：deed say "…" --topic I1 只把这一轮的编号追加进该议题，不复制文本；不存在的议题号 exit 1 且一个字不落账；面板议题卡上的号是指向 #turn-N 的锚点、点得到那一轮；cli 与 board 各有用例
-- [ ] T89 题长在议题里：谈成之后并进正文，题塌成一行历史
-  标准：deed ask "…" --reading "…" --topic I1 把题挂在议题下；deed ask answer 同一条命令追加 topic.merge（这条决策进议题正文，题留 id 与关闭时刻）；面板上题不单独立卡，摆在议题卡内部；题全关时议题状态是「都说定了」；有用例覆盖
-- [ ] T90 放出那道闸：题全关才有按钮，点了才落账，命令行没有这条路
-  标准：面板在「题全关 + 正文非空 + 至少一轮」时显示按钮，其余时候不显示；POST /topic/release 只收 127.0.0.1 且同源，落 {k:"topic.release", by:"user", via:"panel"}；cli/spec.mjs 里没有 topic release 这条，任何 --via 自称都不认；有用例覆盖闸与拒绝
-- [ ] T91 放出之后才有活：清单条目写「来自：I1」，submit 核过再记进任务
-  标准：plan 行可带一行 来自：I1；submit 核对议题存在且已放出，否则整批拒并点名第几行；task.add 落 topic；没放出的议题一条都出不来；state 在「有已放出的议题、清单还没条目」时把下一步指向写清单；有用例
-- [ ] T92 面板的 /events 在对方断开时不把进程带走
-  标准：board/serve.mjs 的 /events 有 res.on("error") 与写失败处理；客户端连一次再断开之后进程仍活着（探针记 pid 前后一致）；有用例或可复跑的命令
-- [ ] T93 state 只在真要出整期审时提目的
-  标准：单段会话的 state 不印「目的 · 还没有」；多段且要整期审时印成「整期审的尺子 · …」；deed --help 与 DESIGN 里 goal 的说法同步（T81 删掉 goal 动词之后，那句话只指清单第一行）；有用例
-- [ ] T94 有清单的段不再收新条目：送审之后新活开下一段
-  标准：一段一旦发过清单，就不再接收新条目（后来加的活开下一段，段号自己往上走）；在案的那份清单不因后来加的条目而作废，只有这一段自己被动过（撤回、改写）才算旧；state 在段等结论时先给「落结论」而不是「写新条目」；整期审打回一段只重开那一段，点名的条目回未做、其余保持交付，之后新加的活仍开下一段；有用例覆盖上面四条，把 core/fold.mjs 的这条判断改回去就红
 ~~ T96 出清单前先算要不要审：免审就不出清单，直接把下一步指到封存或签收
   标准：deed review --segment 与 deed review --all 出清单之前先算门槛（needsReview／needsWhole）；算下来不用审时不写账本、不生成清单与角色包，打印「门槛说这一段不用审」并把下一步指到 deed seal（段）或签收（整期），exit 0；要审时行为与现在一样；有用例断言免审段调用后账本没有新的 review.brief、目录里没有新文件
   理由：和 T103 是同一条：都要求出清单前先算要不要审。重复登记，按 T103 做，这条不单独立项。
-- [ ] T97 整期审的范围在发出那一刻固定：预备段里后来的活不让它过期
-  标准：整期结论的过期只看它发出那一刻已经存在的段；之后预备段里新加的任务、新的交付不让它过期；被点名退回的段重新打开时它照旧过期；有用的用例（发出整期清单之后在下一段加一条任务并交付，整期结论仍算数）
-- [ ] T98 打回的返工只重开被点名的条目，其余交付不重判
-  标准：review fail 之后只有 --rework 点到的条目回到未做；段里其余已交付条目保持、不复位；重审的那份清单只写被点名与之后改动的条目；有用例（fail 点名 T1 之后 T2 仍是已交付，清单里不再出现 T2）
-- [ ] T99 段能在规划时拆成子段：逐个子段审，全部审完再对整段审一次
-  标准：清单里能把一段写成若干子段（各带自己的标准与条目）；deed review 只回答一个子段，结论落在子段上；子段全有结论之后才轮到整段的结论；state 与面板显示子段进度；没拆子段的段行为不变；有用例覆盖拆、逐个子段审、整段结论在子段齐了之后才可落
 - [x] T100 审查者说那条没人看着的分支，其实是一条死路：删掉它，而不是给它补用例
   标准：core/fold.mjs 的 segmentOf 在等结论时不查 livePrep（预备段就是最末那个开段，查也查不到第二处）；这条删除有用例看着——把搬运改回每次开新段，test/fold.test.mjs 的预备段用例仍红；全量测试全绿；HANDOFF 的「下一步」不再写已经做完的事
   交付：审查者说 livePrep 那半句没人看着：查下来它是一条死路——预备段就是最末那个开段，等结论时查不到第二处预备，所以删掉这一处查找而不是给它补用例；segmentOf 直接开一段并记成预备段。test/fold.test.mjs 28/28、test/cli.test.mjs 107/107、test/rules.test.mjs 25/25、test/docs.test.mjs 5/5 全绿；把搬运改回每次开新段，预备段那条用例仍红。HANDOFF 的下一步改成这一段已封
-- [ ] T101 审查结论按条落下：判过的条目下一轮不再重判
-  标准：review.log 带 results:[{id, verdict, note}]，一条条目一个判定（达成／未达成／无法判断）；pass 只在段里每条条目都有判定时才封段，缺哪条就拒并说出号；重审的清单只列「还没判过」与「自上次判定以来字节变过」的条目，其余条目的判定沿用；旧账本里没有 results 的结论照读（按整段 pass／fail）；有用例（判过 T1 之后改 T2，重审清单只列 T2，pass 之后 T1 的旧判定仍算数）
-- [ ] T102 清单指纹按条目算：改一条不连坐整段
-  标准：review.brief 的指纹按条目的现行交付算（每条目自己的 files 与 digest），不再用一个整段打包哈希；改一条条目的字节只让那一条的判定作废，其余条目的判定仍算数；清单与账本里看得出是哪一条变了；有用例（改一条的文件，另几条的判定仍可复用，清单只把改了的那条列为变动）
 - [x] T103 材料只在真要判时才出：不用审的段与整期不生成清单
   标准：deed review --segment 与 deed review --all 出清单之前先算 needsReview／needsWhole；算下来不用审就不写账本、不生成清单与角色包，打印门槛的原话并把下一步指到 deed seal 或签收，exit 0；要审时行为与现在一致；有用例（免审段调用之后账本没有新的 review.brief，.deed/review 下没有新文件）
   交付：审查设置为免审时不再出清单：一期的段改动全落在免审路径，deed review --segment S01.1 现在 exit 0、印「审查设置说这一段不用审（改动都落在免审路径）：不出清单与角色包」+ 关闭它的 deed seal 命令行，账本不新增一条 review.brief，.deed/review 里也不生成文件（用例盯住事件数与目录）；一期各段都免审时 deed review --all 同样不写账本、不生成文件，改印「不需要整期结论」+ 签收那句。混着要审的段时整期清单照旧出，免审那一段在清单里写「免审封存 · agent」与当初的理由。node --test 204/204 在这一份字节上。
@@ -298,5 +262,43 @@
 - [x] T112 verify 的覆盖行不再往一屏里倒号
   标准：被覆盖的交付超过十条时只说条数与分属几条任务，十及以内照旧点名；短与长各有用例；把判据改回一律点名，长的那条用例会红
   交付：node --test 196/196（跑在这一份字节上，DEED_NO_PANEL=1；test/cli.test.mjs 109/109）；变异核对：把 covered.length <= 10 改成 <= 100000 → 只跑那条用例 1 个测试 0 过 1 败，原件随即还原后再跑全量 196/196；实录 deed verify 打「早先的交付 717 条（分属 84 条任务） · 已被后来的交付覆盖：记下的内容现在是什么不再核对」，十条及以内照旧点名（短的那半由同一条用例的另一个工作区盯着）
+
+## 段 S02.20
+- [ ] T79 T79 一轮只记一句话：deed say 取代 tick
+  标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
+- [ ] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
+  标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
+- [ ] T81 T81 收口与免审并进已有动词：review --skip、sign --shelve，删 goal
+  标准：deed review --skip --why 封免审段（取代 deed seal）；deed sign --shelve --why 归档（取代 shelve）；deed goal 删除（目的来自清单第一行，submit 已落 goal.set）；三个旧动词 exit 1；有用例覆盖
+- [ ] T82 T82 视图与推翻：state --check/--gates，judge 变 overturn
+  标准：deed state 带 --check 时跑核交付与体检（取代 verify、doctor），带 --gates 时跑门检查（取代 gate）；deed overturn R1 --why 取代 judge --overturn；旧动词 exit 1；有用例覆盖
+- [ ] T83 T83 删掉旧命令：cli/verbs/task.mjs 真删除，测试改走清单+submit
+  标准：cli/spec.mjs 与 ORDER 里不再有 task；cli/verbs/task.mjs 删除；test/cli.test.mjs 里 163 处 task add/done/undo/defer/drop 的夹具改走 deed plan + deed submit（或集中在一处替身里翻译），并有用例断言旧动词 exit 1；全量绿
+- [ ] T87 议题是账本上的对象：立项、追加正文、折得出状态
+  标准：deed topic "标题" --body "…" 自开号 I1、I2（与题的 A、清单条目的 T 不撞）；再次 deed topic I1 --body "…" 追加正文；core/fold.mjs 折出 topics（id/title/body/轮次索引/状态）；不复制任何轮次正文；EVENT_VERSION 升 1 且旧账本照读；有用例覆盖立项、追加、空标题被拒
+- [ ] T88 轮次按议题建索引，面板上的号点得到原话
+  标准：deed say "…" --topic I1 只把这一轮的编号追加进该议题，不复制文本；不存在的议题号 exit 1 且一个字不落账；面板议题卡上的号是指向 #turn-N 的锚点、点得到那一轮；cli 与 board 各有用例
+- [ ] T89 题长在议题里：谈成之后并进正文，题塌成一行历史
+  标准：deed ask "…" --reading "…" --topic I1 把题挂在议题下；deed ask answer 同一条命令追加 topic.merge（这条决策进议题正文，题留 id 与关闭时刻）；面板上题不单独立卡，摆在议题卡内部；题全关时议题状态是「都说定了」；有用例覆盖
+- [ ] T90 放出那道闸：题全关才有按钮，点了才落账，命令行没有这条路
+  标准：面板在「题全关 + 正文非空 + 至少一轮」时显示按钮，其余时候不显示；POST /topic/release 只收 127.0.0.1 且同源，落 {k:"topic.release", by:"user", via:"panel"}；cli/spec.mjs 里没有 topic release 这条，任何 --via 自称都不认；有用例覆盖闸与拒绝
+- [ ] T91 放出之后才有活：清单条目写「来自：I1」，submit 核过再记进任务
+  标准：plan 行可带一行 来自：I1；submit 核对议题存在且已放出，否则整批拒并点名第几行；task.add 落 topic；没放出的议题一条都出不来；state 在「有已放出的议题、清单还没条目」时把下一步指向写清单；有用例
+- [ ] T92 面板的 /events 在对方断开时不把进程带走
+  标准：board/serve.mjs 的 /events 有 res.on("error") 与写失败处理；客户端连一次再断开之后进程仍活着（探针记 pid 前后一致）；有用例或可复跑的命令
+- [ ] T93 state 只在真要出整期审时提目的
+  标准：单段会话的 state 不印「目的 · 还没有」；多段且要整期审时印成「整期审的尺子 · …」；deed --help 与 DESIGN 里 goal 的说法同步（T81 删掉 goal 动词之后，那句话只指清单第一行）；有用例
+- [ ] T94 有清单的段不再收新条目：送审之后新活开下一段
+  标准：一段一旦发过清单，就不再接收新条目（后来加的活开下一段，段号自己往上走）；在案的那份清单不因后来加的条目而作废，只有这一段自己被动过（撤回、改写）才算旧；state 在段等结论时先给「落结论」而不是「写新条目」；整期审打回一段只重开那一段，点名的条目回未做、其余保持交付，之后新加的活仍开下一段；有用例覆盖上面四条，把 core/fold.mjs 的这条判断改回去就红
+- [ ] T97 整期审的范围在发出那一刻固定：预备段里后来的活不让它过期
+  标准：整期结论的过期只看它发出那一刻已经存在的段；之后预备段里新加的任务、新的交付不让它过期；被点名退回的段重新打开时它照旧过期；有用的用例（发出整期清单之后在下一段加一条任务并交付，整期结论仍算数）
+- [ ] T98 打回的返工只重开被点名的条目，其余交付不重判
+  标准：review fail 之后只有 --rework 点到的条目回到未做；段里其余已交付条目保持、不复位；重审的那份清单只写被点名与之后改动的条目；有用例（fail 点名 T1 之后 T2 仍是已交付，清单里不再出现 T2）
+- [ ] T99 段能在规划时拆成子段：逐个子段审，全部审完再对整段审一次
+  标准：清单里能把一段写成若干子段（各带自己的标准与条目）；deed review 只回答一个子段，结论落在子段上；子段全有结论之后才轮到整段的结论；state 与面板显示子段进度；没拆子段的段行为不变；有用例覆盖拆、逐个子段审、整段结论在子段齐了之后才可落
+- [ ] T101 审查结论按条落下：判过的条目下一轮不再重判
+  标准：review.log 带 results:[{id, verdict, note}]，一条条目一个判定（达成／未达成／无法判断）；pass 只在段里每条条目都有判定时才封段，缺哪条就拒并说出号；重审的清单只列「还没判过」与「自上次判定以来字节变过」的条目，其余条目的判定沿用；旧账本里没有 results 的结论照读（按整段 pass／fail）；有用例（判过 T1 之后改 T2，重审清单只列 T2，pass 之后 T1 的旧判定仍算数）
+- [ ] T102 清单指纹按条目算：改一条不连坐整段
+  标准：review.brief 的指纹按条目的现行交付算（每条目自己的 files 与 digest），不再用一个整段打包哈希；改一条条目的字节只让那一条的判定作废，其余条目的判定仍算数；清单与账本里看得出是哪一条变了；有用例（改一条的文件，另几条的判定仍可复用，清单只把改了的那条列为变动）
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

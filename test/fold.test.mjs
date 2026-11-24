@@ -46,7 +46,8 @@ test("a segment exists only once a task arrives, and a judged one never reopens 
   assert.equal(after.sessions[0].tasks[1].segment, "S01.2");
 });
 
-const carry = (n, id) => ({ v: 1, at: T(n), k: "task.carry", s: null, id });
+// 当前含义版本：从预备段里改出去会真挪（v14 起）。
+const carry = (n, id) => ({ v: 14, at: T(n), k: "task.carry", s: null, id });
 const brief = (n, segment) => ({
   v: 1, at: T(n), k: "review.brief", s: null, segment, brief: "b.md", briefDigest: "a".repeat(64), guideDigest: "c".repeat(64),
 });
@@ -73,18 +74,60 @@ test("a segment waiting for a verdict takes no new work: the next entry opens a 
   assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
 });
 
-test("there is one prep segment, and every batch that moves in lands in it", () => {
-  // 送审的那一批不再收活，接下来的活全进同一个预备段：第二批搬进来不该再开一个新段。
+test("there is one prep segment, and work written after it lands in it", () => {
+  // 送审的那一批不再收活，接下来的活全进同一个预备段：后来的新活不该每批开一个新段。
   const doc = fold([
     turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
-    add11(5, "T2"), carry(6, "T2"), add11(7, "T3"), carry(8, "T3"), add11(9, "T4"),
+    add11(5, "T2"), add11(6, "T3"), add11(7, "T4"),
   ]);
   const session = doc.sessions[0];
-  assert.equal(session.segments.length, 2, "预备段只有一个：搬几次都还是它");
+  assert.equal(session.segments.length, 2, "预备段只有一个：写几条新活都还是它");
   assert.equal(session.segments[1].carried, true);
   for (const id of ["T2", "T3", "T4"]) {
     assert.equal(session.tasks.find((one) => one.id === id).segment, "S01.2", id + " 该在预备段里");
   }
+});
+
+test("改到下一段 out of a prep segment that has deliveries hands the work to a new one", () => {
+  // 预备段里既有交过的、也有没做的：这一段要送审，没做的挪进新开的预备段，
+  // 这一段自己不再接新活——不然它永远出不了清单（清单要等交付完）。
+  const doc = fold([
+    turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
+    add11(5, "T2"), add11(6, "T3"), done(7, "T2"),
+    carry(8, "T3"), add11(9, "T4"),
+  ]);
+  const session = doc.sessions[0];
+  const t3 = session.tasks.find((one) => one.id === "T3");
+  const t4 = session.tasks.find((one) => one.id === "T4");
+  const source = session.segments.find((one) => one.id === "S01.2");
+  assert.equal(t3.segment, t4.segment, "同批的活落在同一个新预备段里");
+  assert.equal(session.segments.find((one) => one.id === t3.segment).carried, true);
+  assert.equal(source.carried, false, "要送审的那一段不再是预备段");
+  assert.deepEqual(
+    session.tasks.filter((one) => one.segment === source.id).map((one) => one.id),
+    ["T2"],
+    "没做的都走了：这一段只剩交付过的（T1 在送审的那一段）",
+  );
+});
+
+test("a carry row written before meaning 14 still reads as staying put", () => {
+  // 旧账本里那一批「改到下一段」是在原地不动的那套含义下写的：照它当时的意思读，
+  // 不然这些行一升级就会把一段的收尾判成坏账。
+  const doc = fold([
+    turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
+    add11(5, "T2"), add11(6, "T3"), { v: 13, at: T(7), k: "task.carry", s: null, id: "T3" },
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(session.segments.length, 2, "旧行不开新段");
+  assert.equal(session.tasks.find((one) => one.id === "T3").segment, "S01.2");
+});
+
+test("a prep segment with nothing delivered cannot hand work off to itself", () => {
+  // 原地改没有意义：那一段没有要审的东西，改出去只会再开一个空段。
+  assert.throws(
+    () => fold([turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"), add11(5, "T2"), carry(6, "T2")]),
+    /已经在预备段 S01\.2 里，而这一段还没有交过的活/u,
+  );
 });
 
 test("a delivery does not move: 改到下一段 is for work not yet done", () => {
