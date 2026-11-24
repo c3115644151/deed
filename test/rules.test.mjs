@@ -169,12 +169,12 @@ test("a brief handed out after the last change is answered, not replaced", () =>
     { v: 5, at: T(5), k: "review.brief", s: null, segment: "S01.1", brief: "S01.1-1.md", briefDigest: "b".repeat(64) },
     sealed(6),
     add(7, "T2", ["core/b.mjs"]), done(8, "T2"), sealed(9, "S01.2"),
-    // 整期审打回 S01.1：那一段重新打开，它自己那条通过结论留史但作废，条目保持交付
+    // 签收核对打回 S01.1：那一段重新打开，它自己那条通过结论留史但作废，条目保持交付
     { v: 9, at: T(10), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail", rework: ["S01.1"], why: "记录说错了", brief: "all.md", briefDigest: "c".repeat(64) },
     done(11, "T1"),
   ];
   const old = fold(base);
-  // 整期审把它那条结论作废了：这一段回到没人判过的样子，不是「结论旧了」。
+  // 签收核对把它那条结论作废了：这一段回到没人判过的样子，不是「结论旧了」。
   assert.equal(reviewState(config, old.sessions[0], old.sessions[0].segments[0]), "missing");
   assert.equal(nextAction(old, config).what, "重审", "手上那份早于最后一次交付：另出一份");
   const fresh = fold([...base,
@@ -196,7 +196,7 @@ test("a brief handed out after the last change is answered, not replaced", () =>
 });
 
 // 一段的一期不审两遍：那一段的结论已经回答了这一期。
-// 下一步也得照这个读——段封了就该签收，不能再要一句目的、再要一次整期审。
+// 下一步也得照这个读——段封了就该签收，不能再要一句目的、再要一次签收核对。
 test("one segment's verdict answers for the period, so no second pass is asked for", () => {
   const doc = fold([turn(1), goal(2), add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5)]);
   assert.equal(wholeState(doc.sessions[0]), "pass");
@@ -228,7 +228,7 @@ test("the next step names one actor and one action", () => {
   const judged = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
   assert.equal(nextAction(judged, config).what, "签收");
 });
-// 一段都没人要审的一期，没有可比对的东西：整期审的对象本来就是"审查者看过的那些段"。
+// 一段都没人要审的一期，没有可比对的东西：签收核对的对象本来就是"审查者看过的那些段"。
 // 少了这一条，两段免审的期会被要一份没人能写的整期结论，签收永远差一格。
 test("a period whose segments all sat out review needs no conclusion on the period", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
@@ -301,7 +301,7 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   assert.equal(reviewState(tight, session, first), "exempt");
   // 守卫读的是「真写下过一次封存」，所以两个字段都要当着：sealedBy 有名字、
   // closedAt 是那一刻。少了 closedAt 就不算封过——而且这个形状不是手改账本才有的：
-  // 整期审把这一段点回来时，fail 分支就留着 sealedBy、把 closedAt 清成 null。
+  // 签收核对把这一段点回来时，fail 分支就留着 sealedBy、把 closedAt 清成 null。
   assert.equal(first.sealedBy, "agent", "封它的是 deed seal");
   assert.notEqual(first.closedAt, null, "账本上真写过一次封存");
   assert.equal(needsReview(tight, session, { ...first, closedAt: undefined }), true, "没有 closedAt 就不是封存");
@@ -324,7 +324,7 @@ test("a segment a reviewer passed is still weighed, so the exemption is only for
   assert.equal(first.sealedBy, null, "半封存不在这条上");
 });
 
-// 半个封存的真实来路：整期审把一条写在 deed seal 封过的段里的任务点回来，段被重新打开——
+// 半个封存的真实来路：签收核对把一条写在 deed seal 封过的段里的任务点回来，段被重新打开——
 // 留着 sealedBy（写过封存的人），closedAt 清成 null。这不是手改账本才出现的形状，
 // 而是 fail 分支每天都会造出来的；对它按审查设置重算是本意，所以这条用例要跟着它走。
 test("a whole-period rework reopens a sealed segment, and that half-seal is weighed again", () => {
@@ -339,12 +339,12 @@ test("a whole-period rework reopens a sealed segment, and that half-seal is weig
   ]).sessions[0];
   const first = session.segments[0];
   assert.equal(first.sealedBy, "agent", "写过封存的人还留在这一格上");
-  assert.equal(first.closedAt, null, "可这一段已经被整期审打回、重新打开");
+  assert.equal(first.closedAt, null, "可这一段已经被签收核对打回、重新打开");
   assert.equal(needsReview(config, session, first), true, "半个封存不算封过：按今天的审查设置重算");
 });
 
-// 整期审的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。
-// 少了这一条，段一旦被 pass 封住，它后来算不算「小改动」就会决定这一期还要不要整期审——
+// 签收核对的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。
+// 少了这一条，段一旦被 pass 封住，它后来算不算「小改动」就会决定这一期还要不要签收核对——
 // 而真正该问的是有没有人看过。这条用例自己结束，不要借上面那条的夹具，否则一次变异会把两条
 // 用例一起带红，看不出是哪一条在守。
 test("a segment a reviewer read counts for the whole review, whatever its deliveries weigh later", () => {
@@ -358,8 +358,8 @@ test("a segment a reviewer read counts for the whole review, whatever its delive
   ]);
   const session = doc.sessions[0];
   assert.equal(needsReview(config, session, session.segments[0]), false, "这一段的字节数出来确实很小");
-  assert.equal(needsWhole(config, session), true, "可它被人看过：整期审还得有一句结论");
-  assert.equal(signBlockers(doc, session, config).some((one) => one.includes("整体审")), true);
+  assert.equal(needsWhole(config, session), true, "可它被人看过：签收核对还得有一句结论");
+  assert.equal(signBlockers(doc, session, config).some((one) => one.includes("签收核对")), true);
 });
 
 // 守卫的语义要直接写下来：只删东西的交付指着它动过的那条路径，不算「什么也没指着」。
@@ -374,8 +374,8 @@ test("a delivery that points at nothing is told apart from one that points at a 
 });
 
 
-// 整期审打回的是段：那一段还开着就是没结清，一天没人重新看过，这一期就还不算过。
-// 少了这条，整体审判了不合格之后立刻再判一次通过就能把话绕过去。
+// 签收核对打回的是段：那一段还开着就是没结清，一天没人重新看过，这一期就还不算过。
+// 少了这条，签收核对判了不合格之后立刻再判一次通过就能把话绕过去。
 test("a whole-period failure stays open until the segment it named is reviewed again", () => {
   const whole = (n, verdict, rework) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: verdict === "fail" ? "qa" : "qa2",
     verdict, brief: verdict === "fail" ? "all-1.md" : "all-2.md", briefDigest: "a".repeat(64),

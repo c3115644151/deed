@@ -14,9 +14,9 @@ export default function review(argv) {
     guard(() => {
       const { doc } = load();
       const one = targetSession(doc, flags);
-      // 整体审：对象是这一期的各段。清单列各段的结论（谁判的、什么时候、判定、发现、
+      // 签收核对：对象是这一期的各段。清单列各段的结论（谁判的、什么时候、判定、发现、
       // 退回的段），pass 时把还没封的段一起封，fail 点名退回的也是段。一段的一期不审
-      // 两遍：它的段审就是整期审，所以这里直接拒。
+      // 两遍：它的整体审就是签收核对，所以这里直接拒。
       if (flags.all) {
         if (flags.segment) fail("--all 说的是这一期，--segment 说的是某一段：一次只审一个对象");
         if (one.segments.length === 1)
@@ -25,15 +25,15 @@ export default function review(argv) {
           );
         const goal = goalOf(one);
         if (!flags.verdict) {
-          if (!goal) fail('这一期还没写目的：先说清这一期要做成什么（deed goal "…"），整体审才有尺子');
+          if (!goal) fail('这一期还没写目的：先说清这一期要做成什么（deed goal "…"），签收核对才有尺子');
           const openSegs = one.segments.filter((s) => s.closedAt === null);
           if (one.segments.length !== 1 && openSegs.length > 0)
-            fail("还有段没封：" + openSegs.map((s) => s.id).join("、") + "：多段的一期先逐段封，最后整体审");
+            fail("还有段没封：" + openSegs.map((s) => s.id).join("、") + "：多段的一期先逐段封，最后签收核对");
           const pending = one.tasks.filter((task) => task.status === "todo");
           if (pending.length > 0)
-            fail("这一期还有没交付的（" + pending.map((task) => task.id).join("、") + "）：整体审的清单等交付完再发");
+            fail("这一期还有没交付的（" + pending.map((task) => task.id).join("、") + "）：签收核对的清单等交付完再发");
           // 审查设置说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
-          // 免得账本上留下一条看着像「这一期被整体审过」的结论。这句话排在检查
+          // 免得账本上留下一条看着像「这一期被签收核对过」的结论。这句话排在检查
           // 之后：还有段没封的期上说「各段都免审」是假话。
           if (!needsWhole(doc.config, one)) {
             console.log("审查设置说这一期的各段都不用审（段由 deed seal 关闭）：不需要整期结论，也不出整期清单");
@@ -105,12 +105,12 @@ export default function review(argv) {
         const findings = list(flags.finding);
         const rework = split(flags.rework).filter(Boolean);
         if (flags.verdict === "fail") {
-          // 整体审点的是段：它手上就是各段的结论，段里哪一条不行由那一段自己判。
+          // 签收核对点的是段：它手上就是各段的结论，段里哪一条不行由那一段自己判。
           if (rework.length === 0) fail("不合格要点名要重做的段：--rework S0x.N,S0x.M（不点名的结论没人能接）");
           const unknown = rework.filter((id) => !one.segments.some((seg) => seg.id === id));
           if (unknown.length > 0)
             fail(
-              unknown.join("、") + " 不是段：整体审退回的是段（" + one.segments.map((seg) => seg.id).join("、") + "），段里的条目由那一段的审查者点名",
+              unknown.join("、") + " 不是段：签收核对退回的是段（" + one.segments.map((seg) => seg.id).join("、") + "），段里的条目由那一段的审查者点名",
             );
           if (!flags.why) fail('不合格要说清为什么：--why "一句话总结"（具体问题写在 --finding 里）');
         } else if (rework.length > 0) {
@@ -129,11 +129,11 @@ export default function review(argv) {
           ...(flags.verdict === "fail" ? { rework, why: flags.why } : {}),
         })).doc;
         if (flags.verdict === "pass") {
-          console.log("整体审通过 · " + one.id + " · " + flags.by + " · 段已封存");
+          console.log("签收核对通过 · " + one.id + " · " + flags.by + " · 段已封存");
           console.log("  清单 " + handed.brief);
           for (const one2 of findings) console.log("  发现 · " + one2);
         } else {
-          console.log("整体审不合格 · " + one.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
+          console.log("签收核对不合格 · " + one.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
           console.log("  清单 " + handed.brief);
           for (const one2 of findings) console.log("  发现 · " + one2);
           console.log("  被点名的段整段重开（段里的条目保持交付）；先给它重出清单，再由它自己的审查者再审");

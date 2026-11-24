@@ -356,7 +356,7 @@ test("a take-back is read from the line that recorded it, not from the delivery 
 });
 
 
-// 整体审的对象是各段的结论，所以它退回去的也只能是段：点条目在账本这一层就该拒，
+// 签收核对的对象是各段的结论，所以它退回去的也只能是段：点条目在账本这一层就该拒，
 // 不能只靠 CLI 挡——别的地方照样能写出这个形状的行。
 test("a whole-period verdict names segments, and a task id is refused in the ledger too", () => {
   const pass = (n, segment) => ({ v: 9, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: "pass",
@@ -366,7 +366,7 @@ test("a whole-period verdict names segments, and a task id is refused in the led
     ...(verdict === "fail" ? { rework, why: "那一段的结论没对上这一期" } : {}) });
   const base = [turn(1), add(2, "T1"), done(3, "T1"), pass(4, "S01.1"),
     add(5, "T2"), done(6, "T2"), pass(7, "S01.2")];
-  assert.throws(() => fold([...base, whole(8, "fail", ["T1"])]), /不是段/, "整体审点不了条目");
+  assert.throws(() => fold([...base, whole(8, "fail", ["T1"])]), /不是段/, "签收核对点不了条目");
   const session = fold([...base, whole(8, "fail", ["S01.1"])]).sessions[0];
   assert.equal(session.segments[0].closedAt, null, "被点名的段整段重开");
   assert.equal(session.tasks[0].status, "done", "段里的条目保持交付");
@@ -376,7 +376,7 @@ test("a whole-period verdict names segments, and a task id is refused in the led
   // 看着像"这一段顶掉了自己"，跟同名字段的语义（同文件里另一处记 R<n>）也对不上。
   const older = session.reviews.find((one) => one.scope === "segment");
   const newer = session.reviews.find((one) => one.scope === "session");
-  assert.equal(older.supersededBy, newer.id, "被整体审作废的结论记下顶掉它的那一条结论号");
+  assert.equal(older.supersededBy, newer.id, "被签收核对作废的结论记下顶掉它的那一条结论号");
   assert.match(older.supersededBy, /^R\d+$/, "记的是结论号，不是段号");
 });
 

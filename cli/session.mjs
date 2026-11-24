@@ -330,11 +330,11 @@ export function printState() {
     console.log(
       "会话 " + open.id + " · 开于 " + stamp0(open.openedAt) + " · " + userTurns(open).length + " 轮 · " + open.segments.length + " 段",
     );
-    // 一期要做成什么：整期审与签收都拿它当尺子，所以它得在状态里看得见。
+    // 一期要做成什么：签收核对与签收都拿它当尺子，所以它得在状态里看得见。
     const aim = goalOf(open);
     if (aim) console.log("  目的 · " + aim);
     else if (open.segments.length > 1 && needsWhole(config, open))
-      console.log('  目的 · 还没有（deed goal "…"）：整期审与签收都拿它当尺子');
+      console.log('  目的 · 还没有（deed goal "…"）：签收核对与签收都拿它当尺子');
     const shown = seg ?? open.segments[open.segments.length - 1];
     if (!shown) {
       console.log("  还没有段：范围说完就写第一条任务");
@@ -436,7 +436,7 @@ export const auditSegment = (doc, session, seg) => {
     );
 };
 
-// 整期审的同一件差事：抄一遍这一期全部任务，不再按段过滤。
+// 签收核对的同一件差事：抄一遍这一期全部任务，不再按段过滤。
 export const auditAll = (doc, session) => {
   const audit = auditEvidence(ROOT, doc, session.id);
   if (audit.outside.length > 0)

@@ -418,10 +418,10 @@ function acceptScreen(doc, session, config, zone, on) {
   const settled = session ? edges(session) : [];
   const wholeWord = !needsWhole(config, session ?? { segments: [] })
     ? null
-    : whole === "pass" ? { ok: true, label: "这一期整体审过", why: wholeReview ? wholeReview.by + " · " + when(wholeReview.at, zone) : "" }
+    : whole === "pass" ? { ok: true, label: "这一期签收核对过", why: wholeReview ? wholeReview.by + " · " + when(wholeReview.at, zone) : "" }
     : whole === "nogoal" ? { ok: false, label: "还没写清这一期要做成什么", why: "deed goal" }
-    : whole === "stale" ? { ok: false, label: "整体审的结论早于最后一次改动", why: "deed review --all" }
-    : { ok: false, label: "这一期还没有整体审", why: "deed review --all" };
+    : whole === "stale" ? { ok: false, label: "签收核对的结论早于最后一次改动", why: "deed review --all" }
+    : { ok: false, label: "这一期还没有签收核对", why: "deed review --all" };
   const wholeCard = wholeReview
     ? '<article class="vcard" data-kind="' + (wholeReview.verdict === "pass" ? "pass" : "fail") + '">' +
       '<div class="vhead"><span class="vid">整期</span>' +

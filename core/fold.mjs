@@ -401,7 +401,7 @@ export function fold(events) {
         ask.closedAt = ev.at;
         break;
       }
-      // 一期要做成什么：签收和整体审都比着它。可以改，改一次记一条，
+      // 一期要做成什么：签收和签收核对都比着它。可以改，改一次记一条，
       // 旧的留在 goals 里——"当初说要什么"是能查的事实，不是被覆盖的草稿。
       case "goal.set": {
         const session = sessionOf(doc, ev);
@@ -415,7 +415,7 @@ export function fold(events) {
       case "review.brief": {
         const session = sessionOf(doc, ev);
         const scope = ev.scope === "session" ? "session" : "segment";
-        // 整体审的清单覆盖整期：它没有段这一格，也不该被某一段的封存挡在外面。
+        // 签收核对的清单覆盖整期：它没有段这一格，也不该被某一段的封存挡在外面。
         const segment = scope === "session" ? null : segmentById(session, ev.segment);
         if (segment && sealed(segment))
           noway(`段 ${segment.id} 已经封存：要再审先由人推翻那份结论（deed judge --overturn <R> --why "…"）`);
@@ -435,7 +435,7 @@ export function fold(events) {
       }
       case "review.log": {
         const session = sessionOf(doc, ev);
-        // 两种对象：一段（段审）或整期（整体审）。整期没有"段"这一格，
+        // 两种对象：一段（整体审）或整期（签收核对）。整期没有"段"这一格，
         // 它看的是这一期全部任务；它通过时所有还没封的段一起封。
         const scope = ev.scope === "session" ? "session" : "segment";
         const segment = scope === "session" ? null : segmentById(session, ev.segment);
@@ -451,13 +451,13 @@ export function fold(events) {
           .filter((one) => one.evidence.some((proof) => proof.by === ev.by))
           .map((one) => one.id);
         if (ownWork.length > 0) {
-          // 段审说的是这一段的活，整体审说的是这一期的活：同一句话，两种说法。
+          // 整体审说的是这一段的活，签收核对说的是这一期的活：同一句话，两种说法。
           const hand = segment ? "段" : "活";
           noway(
             `${subject} 的 ${ownWork.join("、")} 是 ${ev.by} 交付的：同一个人不能判自己交付的${hand}（换一个 --by，或让用户判）`,
           );
         }
-        // 两种对象各有一份"在案结论"：段审的互斥只看本段，整体审的只看整期。
+        // 两种对象各有一份"在案结论"：整体审的互斥只看本段，签收核对的只看整期。
         const live = session.reviews.filter(
           (one) => one.voidedAt === null && (segment ? one.scope === "segment" && one.segment === segment.id : one.scope === "session"),
         );
@@ -470,7 +470,7 @@ export function fold(events) {
         // 旧账本里的 fail 没点名任何条目，也就没有可结清的东西——那种结论只能由人推翻。
         if (latest && latest.verdict === "fail" && ev.verdict === "pass") {
           const named = latest.rework ?? [];
-          // 整体审的结论点的是段：那一段还开着（或还没重新判过）就是没结清。
+          // 签收核对的结论点的是段：那一段还开着（或还没重新判过）就是没结清。
           const stuck = latest.scope === "session" && (latest.v ?? 1) >= 9
             ? named.filter((id) => session.segments.some((one) => one.id === id && one.closedAt === null))
             : named
@@ -498,16 +498,16 @@ export function fold(events) {
           noway(`${subject} 判不合格要点名重做的条目（--rework T1,T2）：不点名的结论没人能接`);
         const sessionRework = meaning >= MEANING.segmentRework;
         for (const id of rework) {
-          // 段审点的是段里的条目；整体审点的是段本身——它看的就是各段的结论，
+          // 整体审点的是段里的条目；签收核对点的是段本身——它看的就是各段的结论，
           // 所以它能退回的也只有"这一段要重做"，段里哪一条不行由那一段自己判。
-          // 第 9 版之前整体审点的是条目：那种行按当时的写法读，不拿今天的口径重判历史。
+          // 第 9 版之前签收核对点的是条目：那种行按当时的写法读，不拿今天的口径重判历史。
           if (!segment && !sessionRework) continue;
           if (segment) {
             const task = taskOf(session, id);
             if (task.segment !== segment.id)
               noway(`任务 ${task.id} 不在段 ${segment.id} 里（它在 ${task.segment}），打回不能跨段`);
           } else if (!session.segments.some((one) => one.id === id)) {
-            noway(`整体审点名的是段（${id} 不是段）：段里的条目由那一段的审查者点名`);
+            noway(`签收核对点名的是段（${id} 不是段）：段里的条目由那一段的审查者点名`);
           }
         }
         const id = `R${session.reviews.length + 1}`;
@@ -538,14 +538,14 @@ export function fold(events) {
         // Keep the pair traceable: which handed-out document this verdict answers.
         const handed = session.briefs.find((one) => one.brief === ev.brief && one.scope === scope);
         if (handed) handed.answeredBy = id;
-        // 段审要在段头上留下"谁、什么时候、什么结论"；整体审没有段头，它落在整期。
+        // 整体审要在段头上留下"谁、什么时候、什么结论"；签收核对没有段头，它落在整期。
         if (segment) {
           segment.reviewAt = ev.at;
           segment.reviewBy = ev.by;
           segment.reviewVerdict = ev.verdict;
         }
-        // 审查者放行就是结局，不再等第二个人签字：段审封这一段，整体审把还没封的段
-        // 一起封——那几段本身没被它的审查者看过，是整期审替它们封的。
+        // 审查者放行就是结局，不再等第二个人签字：整体审封这一段，签收核对把还没封的段
+        // 一起封——那几段本身没被它的审查者看过，是签收核对替它们封的。
         if (ev.verdict === "pass" && meaning >= 3) {
           const shut = segment ? [segment] : session.segments.filter((one) => one.closedAt === null);
           for (const one of shut) {
@@ -558,7 +558,7 @@ export function fold(events) {
               one.reviewAt = ev.at;
               one.reviewBy = ev.by;
               one.reviewVerdict = "pass";
-              // 记下是那次整体审封的：人推翻它的时候，要能把这几段一起打开。
+              // 记下是那次签收核对封的：人推翻它的时候，要能把这几段一起打开。
               one.sealedByReview = id;
             }
           }
@@ -566,11 +566,11 @@ export function fold(events) {
         // 不合格不关闭这一段：被点名的条目回到未做，其余保持交付；接到活的人读结论，
         // 不必再回来问"到底哪几条要重做"。
         if (ev.verdict === "fail" && !segment && sessionRework) {
-          // 整体审退回的是段：整段重开，段里的条目保持交付——重新看的是这一段的
+          // 签收核对退回的是段：整段重开，段里的条目保持交付——重新看的是这一段的
           // 结论，不是让每个人再交一遍。段内哪一条不行，由那一段的审查者点名。
           for (const named of rework) {
             const home = session.segments.find((one) => one.id === named);
-            // 这一段原先的结论回答的是它自己那份清单；整体审说这一期不对，
+            // 这一段原先的结论回答的是它自己那份清单；签收核对说这一期不对，
             // 那条结论就不再是在案的：留史（voidedAt），段回到没人判过的样子。
             for (const older of session.reviews)
               if (older.scope === "segment" && older.segment === home.id && older.voidedAt === null) {
@@ -594,7 +594,7 @@ export function fold(events) {
           for (const taskId of rework) {
             const task = taskOf(session, taskId);
             const home = session.segments.find((one) => one.id === task.segment);
-            // 整期审可以点回已经封存的段：那一段得跟着打开，否则被点名的条目
+            // 签收核对可以点回已经封存的段：那一段得跟着打开，否则被点名的条目
             // 连重新交付都做不了（已封存的段不收新交付）。
             if (home && home.closedAt !== null) {
               for (const other of session.tasks)
@@ -628,7 +628,7 @@ export function fold(events) {
         review.voidedAt = ev.at;
         review.voidedBy = ev.by;
         review.voidedWhy = ev.why;
-        // 被推翻的是整体审：它封过的段一起打开，活回到桌面上。
+        // 被推翻的是签收核对：它封过的段一起打开，活回到桌面上。
         if (review.scope === "session") {
           for (const one of session.segments) {
             if (one.sealedByReview !== review.id) continue;

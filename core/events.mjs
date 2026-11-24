@@ -44,7 +44,7 @@ export const EVENT_VERSION = 17;
 export const MEANING = {
   // 不合格必须点名要重做的条目；pass 当场关闭这一段（打回不再是另一条命令）。
   namedFail: 3,
-  // 整期审打回时点名的是段号，不是段里的条目。
+  // 签收核对打回时点名的是段号，不是段里的条目。
   segmentRework: 9,
   // 轮次只记人开口的那一轮：agent 的进展不记成轮次。
   userOnlyRounds: 12,
@@ -210,7 +210,7 @@ export function validateEvent(ev, at) {
       need(ev, "id");
       need(ev, "why");
       break;
-    // 一期要做成什么：签收签的是它，整体审比的也是它。可以改，改一次一条记录。
+    // 一期要做成什么：签收签的是它，签收核对比的也是它。可以改，改一次一条记录。
     case "goal.set":
       need(ev, "text");
       need(ev, "by");
@@ -218,7 +218,7 @@ export function validateEvent(ev, at) {
     // Handing the brief out is a fact, not a side effect: without it the
     // ledger cannot say which document a verdict answered.
     case "review.brief":
-      // 整体审的清单覆盖整期，没有"段"这一格；段审的必须有。
+      // 签收核对的清单覆盖整期，没有"段"这一格；整体审的必须有。
       if (ev.scope === "session") need(ev, "goal");
       else need(ev, "segment");
       need(ev, "brief");

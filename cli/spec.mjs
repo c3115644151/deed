@@ -51,7 +51,7 @@ export const SPEC = {
   },
   goal: {
     flags: ["text", "why", "session", "by"],
-    usage: ['deed goal "<这一期要做成什么>" [--why "…"]   签收与整体审都拿它当尺子'],
+    usage: ['deed goal "<这一期要做成什么>" [--why "…"]   签收与签收核对都拿它当尺子'],
   },
   review: {
     flags: ["all", "segment", "verdict", "by", "finding", "rework", "why", "session"],

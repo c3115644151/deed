@@ -20,7 +20,7 @@ function guideText(subject, target, briefName) {
     "",
     target
       ? "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。"
-      : "你要回答一件事：这一期各段的结论合起来，够不够得上它写下的目的。段里的条目由段审判过；你要看的是它们之间\u3001与这一期那句话之间还有什么没对齐。",
+      : "你要回答一件事：这一期各段的结论合起来，够不够得上它写下的目的。段里的条目由整体审判过；你要看的是它们之间\u3001与这一期那句话之间还有什么没对齐。",
     "清单在同目录（" + briefName + "）。你判的是清单上那几条，不是整个项目。",
     "",
     "## 先读标准，再读代码",
@@ -75,7 +75,7 @@ function guideText(subject, target, briefName) {
   ].join("\n");
 }
 
-// 一条任务在清单上的样子：段审和整体审共用，两种清单说的应该是同一件事。
+// 一条任务在清单上的样子：整体审和签收核对共用，两种清单说的应该是同一件事。
 // 一批 submit 里的几条交付共用一份工作区差，分不出哪条改了哪份。数出来说清楚，
 // 比让读的人自己发现「三份记录一模一样」好。
 // 批号说的是「这一批记账那一刻」；条数由记账时的账本记下。撤回同批的一条之后
@@ -193,12 +193,12 @@ export function planBrief(root, open, segment, at) {
   };
 }
 
-// 整期审的清单：目的在最上面（签收与这一份比的是它），下面是每一段的活与段审结论。
-// 单段的一期出这一份就够了——段审和整体审本来就看同一批任务。
+// 签收核对的清单：目的在最上面（签收与这一份比的是它），下面是每一段的活与整体审结论。
+// 单段的一期出这一份就够了——整体审和签收核对本来就看同一批任务。
 export function planWhole(root, session, at) {
   const p = ensureDirs(root);
-  // 整体审以段为单位：清单列的是每一段的结论，不是段里每条任务的清单。
-  // 段里每一条标准的判断，段审已经做过并留了依据；整期再审一遍等于把别人的
+  // 签收核对以段为单位：清单列的是每一段的结论，不是段里每条任务的清单。
+  // 段里每一条标准的判断，整体审已经做过并留了依据；整期再审一遍等于把别人的
   // 工作重做，也让「谁判了什么」变成两处都能改的事。
   const verdicts = new Map(
     session.reviews.filter((one) => one.scope !== "session" && !one.voidedAt).map((one) => [one.segment, one]),
@@ -209,7 +209,7 @@ export function planWhole(root, session, at) {
     if (review)
       return (
         "- " + segment.id + " · " +
-        (review.verdict === "pass" ? "段审通过" : "段审不合格") + " · " +
+        (review.verdict === "pass" ? "整体审通过" : "整体审不合格") + " · " +
         review.by + " · " + stamp0(review.at) + " · " +
         count + " 条" + (review.findings.length > 0 ? " · " + review.findings.length + " 条发现" : "") +
         (review.rework.length > 0 ? " · 退回 " + review.rework.join("、") : "")
@@ -220,7 +220,7 @@ export function planWhole(root, session, at) {
         stamp0(segment.closedAt) + " · " + count + " 条 · 审查设置说这一段不用审" +
         (segment.sealedWhy ? "（" + segment.sealedWhy + "）" : "")
       );
-    return "- " + segment.id + " · 没有段审 · " + count + " 条";
+    return "- " + segment.id + " · 没有整体审 · " + count + " 条";
   };
   const findings = session.segments.flatMap((segment) => {
     const review = verdicts.get(segment.id);
@@ -236,10 +236,10 @@ export function planWhole(root, session, at) {
       ),
   );
   const waiting = session.asks.filter((one) => one.resolvedAt === null);
-  // 这一期定过的边界与不做：整期审的尺子不只有目的那句话，还有拍板时划下的线。
+  // 这一期定过的边界与不做：签收核对的尺子不只有目的那句话，还有拍板时划下的线。
   const lines = edges(session).map((one) => "- " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
   const text = [
-    "# 整体审清单 · " + session.id,
+    "# 签收核对清单 · " + session.id,
     "",
     "会话 " + session.id + " · " + session.segments.length + " 段 · 生成于 " + stamp0(at),
     "",

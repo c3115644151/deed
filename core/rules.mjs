@@ -227,10 +227,10 @@ export const freshWholeBrief = (session) => {
   return handed;
 };
 
-// 一期要做成什么：签收和整体审都拿它当尺子。可以改，账本留每一次。
+// 一期要做成什么：签收和签收核对都拿它当尺子。可以改，账本留每一次。
 export const goalOf = (session) => session?.goal?.text ?? null;
 
-// 整期的在案结论（整体审）。段审的结论不算：它回答的是一批任务。
+// 整期的在案结论（签收核对）。一段的整体审结论不算：它回答的是一批任务够不够标准。
 export const sessionReview = (session) => {
   if (!session) return null;
   const live = session.reviews.filter((one) => one.scope === "session" && !one.voidedAt);
@@ -238,7 +238,7 @@ export const sessionReview = (session) => {
 };
 
 // 整期最后一次改动：任何一条任务的交付、撤回、增改。
-// 整体审的结论早于它，回答的就是旧的一期。
+// 签收核对的结论早于它，回答的就是旧的一期。
 // 那句目的只在多段的一期算改动：一段的一期没有整期清单，目的不进任何人的尺子，
 // 拿它去让段结论过期等于凭空要一次重审。
 export const periodChange = (session) => {
@@ -256,7 +256,7 @@ export const periodChange = (session) => {
   return times[times.length - 1] ?? null;
 };
 
-// 整期审的状态：没写目的 / 没审过 / 结论过期 / pass / fail。
+// 签收核对的状态：没写目的 / 没审过 / 结论过期 / pass / fail。
 // 一段的一期先读那一段的结论：同一批活不审两遍，也就不拿目的当尺子。
 export function wholeState(session) {
   const changed = periodChange(session);
@@ -271,10 +271,10 @@ export function wholeState(session) {
   return changed && review.at < changed ? "stale" : review.verdict;
 }
 
-// 这一期需不需要一次单独的整体审：一段的一期不需要——它的段审就是整期审。
+// 这一期需不需要一次单独的签收核对：一段的一期不需要——它那一段的整体审已经回答了这一期。
 // 多段的一期，只要有一段是审查者看过的（或者还开着、按审查设置要审），签收前就得
 // 再有一份落在整期上的结论；全都由 deed seal 封的多段期不要——没人需要看的东西
-// 不必再造一份清单。判断只看两件事：这一段有没有结论、还开着的段审查设置怎么判。
+// 不必再造一份清单。判断只看两件事：这一段有没有结论、还开着的整体审查设置怎么判。
 // 不拿已封存段的后来字节重量去重算：那会把「审过了」重新变成「该审而没审」，
 // 也会让封过的免审段翻回要审（上一轮修的就是这一条）。
 export const needsWhole = (config, session) => {
@@ -353,14 +353,14 @@ export function signBlockers(doc, session, config = null) {
         : shut.id + " 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
     );
   }
-  // 整期审：签收签的是这一期，最后一句结论该落在它身上。段都封了还没有整体审，
-  // 或者整体审的结论早于最后一次改动，都挡签收。一段的一期不走这里——needsWhole
+  // 签收核对：签收签的是这一期，最后一句结论该落在它身上。段都封了还没有签收核对，
+  // 或者签收核对的结论早于最后一次改动，都挡签收。一段的一期不走这里——needsWhole
   // 已经把那道门关上：那一段的结论就是整期的结论。
   if (needsWhole(config, session)) {
     const whole = wholeState(session);
     if (whole === "nogoal") blockers.push("还没有写清这一期要做成什么（deed goal \"…\"）");
-    else if (whole === "missing") blockers.push(`${session.id} 还没有整体审通过（deed review --all）`);
-    else if (whole === "stale") blockers.push(`${session.id} 的整体审结论早于这一期最后一次改动（deed review --all）`);
+    else if (whole === "missing") blockers.push(`${session.id} 还没有签收核对通过（deed review --all）`);
+    else if (whole === "stale") blockers.push(`${session.id} 的签收核对结论早于这一期最后一次改动（deed review --all）`);
   }
   // 一整期的结论判了不合格，就是把这一期否掉了：签收前这件事得有人处理。
   // 免审的期上也一样——一份已经记账的不合格，不能因为「审查设置说不用审」就当
@@ -369,7 +369,7 @@ export function signBlockers(doc, session, config = null) {
   if (onWhole && onWhole.verdict === "fail")
     blockers.push(
       session.id +
-        " 有一次整体审判了不合格（" + onWhole.by + "）：要么重出一份通过的，要么由人推翻（deed judge --overturn " +
+        " 有一次签收核对判了不合格（" + onWhole.by + "）：要么重出一份通过的，要么由人推翻（deed judge --overturn " +
         onWhole.id + ' --why "…" --by "…"）',
     );
   // Work owed outside the open segment is what a segment-level view cannot see;
@@ -423,29 +423,29 @@ export const pressure = (session) => {
   return { segment: segment.id, tasks: count.total, undecided: count.done };
 };
 
-// 整期审这一步：缺目的先说目的，清单已交出去就落结论，否则发清单。
+// 签收核对这一步：缺目的先说目的，清单已交出去就落结论，否则发清单。
 function wholeStep(session, whole) {
   const handed = freshWholeBrief(session);
   if (whole === "nogoal")
     return {
       who: "user",
       what: "写目的",
-      text: `${session.id} 的活都交付了，账本里还没有「这一期要做成什么」：整体审和签收都拿它当尺子`,
+      text: `${session.id} 的活都交付了，账本里还没有「这一期要做成什么」：签收核对和签收都拿它当尺子`,
       command: `deed goal "这一期要做成什么" --by "…"`,
     };
   if (handed && whole !== "pass")
     return {
       who: "reviewer",
       what: "落结论",
-      text: `整体审的清单已经交出去了：${handed.brief}（这一期 ${session.tasks.length} 条）`,
+      text: `签收核对的清单已经交出去了：${handed.brief}（这一期 ${session.tasks.length} 条）`,
       command: `deed review --all --by "你是谁" --verdict pass`,
     };
   return {
     who: "reviewer",
-    what: whole === "stale" ? "重审整期" : "整体审",
+    what: whole === "stale" ? "重出签收核对" : "签收核对",
     text:
       whole === "stale"
-        ? `${session.id} 的整体审结论早于这一期最后一次改动：它回答的是旧的一期`
+        ? `${session.id} 的签收核对结论早于这一期最后一次改动：它回答的是旧的一期`
         : `${session.id} 的 ${session.tasks.length} 条都交付了，要一份看整期的结论`,
     command: `deed review --all`,
   };
