@@ -137,7 +137,12 @@ export default function submit(argv) {
       fs.writeFileSync(file, planDraft(after) + "\n", "utf8");
       for (const ev of evs) {
         if (ev.k === "goal.set") console.log("目的 · " + ev.s + " · " + ev.text);
-        if (ev.k === "task.add") console.log("写进清单 · " + ev.id + " · " + ev.title);
+        // 新条目落到哪一段由账本说得算，不是清单里写着哪一节算哪一段：说出来，别让人
+        // 到下一次 deed plan 才发现它换了一节。
+        if (ev.k === "task.add")
+          console.log(
+            "写进清单 · " + ev.id + " · " + (after.tasks.find((t) => t.id === ev.id)?.segment ?? "") + " · " + ev.title,
+          );
         if (ev.k === "task.done") console.log("交付 · " + ev.id + " · " + ev.evidence);
         if (ev.k === "task.undo") console.log("撤回 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.defer") console.log("延后 · " + ev.id + " · " + ev.why);

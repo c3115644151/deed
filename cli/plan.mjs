@@ -6,6 +6,8 @@
 // editing the plan is not a change to the workspace, it is a change to say what
 // the work was.
 
+import { awaitingVerdict } from "../core/fold.mjs";
+
 export const HEAD = "# 这一期要做成什么";
 
 export const FORMAT = [
@@ -141,6 +143,15 @@ export function draft(session) {
     }
     out.push("");
   }
+  // 新条目落到哪一段，不是文件里写着哪一节就算哪一段：一段送审还在等结论时，
+  // 它不再收新东西。那一节既然印不出来，就把它印出来，让人知道自己的 ? 会去哪儿。
+  const open = session.segments.filter((one) => one.closedAt === null).at(-1) ?? null;
+  if (!open) out.push("## 下一段（这一段的活都收口了：写在这里的 ? 会开下一段）", "");
+  else if (awaitingVerdict(session, open))
+    out.push(
+      "## 下一段（" + open.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）",
+      "",
+    );
   out.push("<!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->");
   return out.join("\n");
 }

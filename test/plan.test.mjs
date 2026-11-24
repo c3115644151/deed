@@ -89,3 +89,29 @@ test("reading the draft back gives the ledger the same items", () => {
   assert.equal(back.items[2].later, "等下一轮");
   assert.equal(back.items[3].why, "想法变了");
 });
+
+// 清单里写着哪一节，不等于新条目就落进那一段：一段送审还在等结论时它不再收东西。
+// 那一节印不出来，就把它印出来——写 ? 的人得知道这些条目会去哪儿。
+test("the draft shows where a new entry will land when the open segment is waiting", () => {
+  const base = {
+    goal: { text: "把清单做成一个文件。" },
+    segments: [{ id: "S01.1", closedAt: null }],
+    tasks: [{ id: "T1", segment: "S01.1", title: "还没做", criteria: "写得出", status: "todo", evidence: [] }],
+    briefs: [],
+  };
+  const waiting = draft({
+    ...base,
+    briefs: [{ scope: "segment", segment: "S01.1", answeredBy: null }],
+  });
+  assert.match(waiting, /## 下一段（S01\.1 在等结论，它不再收新条目：写在这里的 \? 落到下一段，submit 时才领号）/);
+  assert.deepEqual(parse(waiting).problems, [], "多出来的那一节不该让清单读不懂");
+
+  const settled = draft({
+    ...base,
+    briefs: [{ scope: "segment", segment: "S01.1", answeredBy: "R1" }],
+  });
+  assert.doesNotMatch(settled, /## 下一段/, "这一段收得了活，就没有下一段可指");
+
+  const shut = draft({ ...base, segments: [{ id: "S01.1", closedAt: "2026-11-24T00:00:00.000Z" }], briefs: [] });
+  assert.match(shut, /## 下一段（这一段的活都收口了：写在这里的 \? 会开下一段）/);
+});

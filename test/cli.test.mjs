@@ -1564,8 +1564,8 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
   );
   const first = deed(cwd, "submit");
   assert.equal(first.status, 0, first.stderr);
-  assert.match(first.stdout, /写进清单 · T1 · 写一份说明/);
-  assert.match(first.stdout, /写进清单 · T2 · 写另一份说明/);
+  assert.match(first.stdout, /写进清单 · T1 · S01\.1 · 写一份说明/, "领号时把落进哪一段一起说出来");
+  assert.match(first.stdout, /写进清单 · T2 · S01\.1 · 写另一份说明/);
   assert.match(readPlan(cwd), /- \[ \] T1 写一份说明/, "领到的号要写回清单，不然下一次 submit 会再加一条");
 
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });

@@ -93,8 +93,10 @@ function nextSegment(session, at, carried = false) {
 
 // 这一段手上那份清单还没人回答，它就是"{等结论}"的状态：新活不再往里放，自己开下一段。
 // 决定收不收活的地方必须在这一层——只在 submit 里挡，重放出来的段仍会多出一条任务。
-const awaits = (session, segment) =>
-  session.briefs.some((one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null);
+// 这一段手上那份清单还没人回答：它就是等结论的样子。清单里写新条目时也要问同一句
+// ——新条目落不落进这一段，只由这里说得算。
+export const awaitingVerdict = (session, segment) =>
+  (session.briefs ?? []).some((one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null);
 
 // 预备段只有一个：已经接着活的那个就是它，后来搬的、新写的都往里放。
 // 「搬出来的条目」若每次都开一个新段，一次讨论搬三批就成了三段，等结论期间谁也说不清
@@ -105,7 +107,7 @@ const livePrep = (session) =>
       one.closedAt === null &&
       one.carried &&
       // 预备段一旦自己也送了审，它就不再是预备段：它是又一批在等结论的活。
-      !awaits(session, one) &&
+      !awaitingVerdict(session, one) &&
       session.tasks.some((task) => task.segment === one.id),
   ) ?? null;
 
@@ -127,7 +129,7 @@ function segmentOf(session, at, v = 1) {
   settle(session);
   const last = session.segments.filter((one) => one.closedAt === null).at(-1);
   if (!last) return nextSegment(session, at);
-  if (v < 11 || !awaits(session, last)) return last;
+  if (v < 11 || !awaitingVerdict(session, last)) return last;
   // 等结论时新写的活自己开一段，并记成预备段：它是最末那个开段，所以再没有第二处预备
   // 可去——预备段一旦也送了审，它就只是又一批等结论的活，同样的判断在这里也成立。
   return nextSegment(session, at, true);
