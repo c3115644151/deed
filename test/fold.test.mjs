@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
-import { needsReview } from "../core/rules.mjs";
+import { needsReview, userTurns } from "../core/rules.mjs";
 
 const T = (n) => new Date(Date.UTC(2026, 10, 22, 10, n)).toISOString();
 
@@ -21,6 +21,13 @@ test("the first recorded turn opens a session by itself", () => {
   assert.equal(doc.sessions[0].id, "S01");
   assert.equal(doc.sessions[0].turns.length, 1);
   assert.equal(doc.sessions[0].closedAt, null);
+});
+
+test("a turn the agent wrote for itself is read, but it is not a round", () => {
+  const events = [turn(1, "先看看"), { v: 2, at: T(2), k: "turn", s: null, who: "agent", said: "我改了三处" }];
+  const doc = fold(events);
+  assert.equal(doc.sessions[0].turns.length, 2, "旧账本里的自述照读");
+  assert.equal(userTurns(doc.sessions[0]).length, 1, "但它不算一轮");
 });
 
 test("the same ledger always folds to the same document", () => {

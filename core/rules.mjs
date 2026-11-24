@@ -395,6 +395,9 @@ export const debt = (session) => ({
   dropped: session.tasks.filter((one) => one.status === "dropped").map((one) => one.id),
 });
 
+// 轮次是你和用户之间的一轮对话：数出来的只有人开口的那些。
+export const userTurns = (session) => session.turns.filter((one) => one.who === "user");
+
 // 一段花了多少：几条任务、出过几份清单、重交了几次、开了多久才封。
 // 数全在账本里（封段时刻减开段时刻，不读时钟），只回答「为什么这么慢」，
 // 不参与任何门——慢不挡放行，看不见才没法谈省。

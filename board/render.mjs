@@ -20,6 +20,7 @@ import {
   reviewState,
   sessionReview,
   signBlockers,
+  userTurns,
   wholeState,
 } from "../core/rules.mjs";
 
@@ -110,7 +111,7 @@ function hud(doc, open, state, turns, events) {
 
 function stateTabs(doc, session, active) {
   const counts = {
-    discuss: session ? session.turns.length : 0,
+    discuss: session ? userTurns(session).length : 0,
     execute: session ? session.tasks.length : 0,
     accept: session ? session.segments.filter((segment) => segment.closedAt).length : 0,
   };
@@ -204,7 +205,7 @@ function discussScreen(session, zone, on) {
   };
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="discuss" id="screen-discuss">' +
-    screenHead("01", "讨论", "你说的每一句，和还没定下的那些", turns.length + " 轮 · " + open.length + " 条等你定") +
+    screenHead("01", "讨论", "你说的每一句，和还没定下的那些", turns.filter((one) => one.who === "user").length + " 轮 · " + open.length + " 条等你定") +
     '<div class="cols">' +
     '<div class="col logs">' +
     (turns.length ? '<ol class="turns">' + turns.map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
@@ -518,7 +519,7 @@ export function renderBoard(doc, config, options = {}) {
   const step = nextAction(doc, config);
   const session = currentSession(doc);
   const sign = session ? signBlockers(doc, session, config) : [];
-  const turns = doc.sessions.reduce((sum, one) => sum + one.turns.length, 0);
+  const turns = doc.sessions.reduce((sum, one) => sum + userTurns(one).length, 0);
   const stateKey = session ? reading(doc) : "discuss";
   const state = READING[stateKey];
   const here = stateKey;

@@ -128,8 +128,9 @@ function segmentOf(session, at, v = 1) {
   const last = session.segments.filter((one) => one.closedAt === null).at(-1);
   if (!last) return nextSegment(session, at);
   if (v < 11 || !awaits(session, last)) return last;
-  // 等结论时新写的活进预备段：送审的那一批不再收东西，但只有一处预备。
-  return livePrep(session) ?? nextSegment(session, at, true);
+  // 等结论时新写的活自己开一段，并记成预备段：它是最末那个开段，所以再没有第二处预备
+  // 可去——预备段一旦也送了审，它就只是又一批等结论的活，同样的判断在这里也成立。
+  return nextSegment(session, at, true);
 }
 
 // 任务碰过哪些路径、各多大，只由还在的交付说得算。交付退回（撤回，或者审查者点名
@@ -179,7 +180,7 @@ export function fold(events) {
     switch (ev.k) {
       case "turn": {
         const session = sessionOf(doc, ev);
-        session.turns.push({ at: ev.at, who: ev.who, said: ev.said, did: ev.did ?? null, n: session.turns.length + 1 });
+        session.turns.push({ at: ev.at, who: ev.who, said: ev.said, did: ev.did ?? null });
         break;
       }
       // Who changed the review threshold, when, and from what: a config file on

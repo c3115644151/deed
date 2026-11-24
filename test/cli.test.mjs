@@ -1749,19 +1749,17 @@ test("taking one delivery back does not shrink the batch it belonged to", () => 
   assert.match(text, /同批交付：这一批共 2 条（其中 1 条已撤回）/, "撤回不改变这一批原本几条");
 });
 
-// 一轮记的是「这一轮这个人说了什么」：agent 把用户原话抄进 --said，账本上就会
-// 出现同一句由两个人说的样子。
+// 轮次是你和用户之间的一轮对话：我自己做了什么不进轮次——那不是讨论，是交付。
 
-test("an agent turn cannot repeat the user's words as its own", () => {
-  const cwd = workspace("turn-copy");
+test("a round belongs to the user, and an agent cannot open one", () => {
+  const cwd = workspace("round-user-only");
   deed(cwd, "init", "--said", "开始");
-  const said = "把清单做成一个文件";
-  assert.equal(deed(cwd, "tick", "--who", "user", "--said", said).status, 0);
-  const copied = deed(cwd, "tick", "--who", "agent", "--said", said, "--did", "动手");
-  assert.equal(copied.status, 1);
-  assert.match(copied.stderr, /这句是用户说的/);
-  assert.equal(kinds(cwd).filter((one) => one === "turn").length, 2, "被拒的那轮不落账");
-  assert.equal(deed(cwd, "tick", "--who", "agent", "--said", "先出草稿", "--did", "动手").status, 0);
+  const mine = deed(cwd, "tick", "--who", "agent", "--said", "我改了三处");
+  assert.equal(mine.status, 1);
+  assert.match(mine.stderr, /轮次只记你和用户之间的一轮/);
+  assert.equal(kinds(cwd).filter((one) => one === "turn").length, 1, "被拒的那轮不落账");
+  assert.equal(deed(cwd, "tick", "--said", "再改一处").status, 0, "不写 --who 就是替用户记");
+  assert.match(deed(cwd, "state").stdout, /· 2 轮 ·/);
 });
 
 // 一整期的结论判了不合格，免审的期上也一样：签收前得有人重出或推翻，

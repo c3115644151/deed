@@ -27,13 +27,15 @@ export const EVENT_KINDS = [
   "config.change",
 ];
 
-export const WHO = ["user", "agent"];
+// 轮次是你和用户之间的一轮对话：只有人开口的那一轮才是轮次。agent 自己做了什么
+// 记在交付记录与结论里，说成轮次就把我的工作假装成了讨论。
+export const WHO = ["user"];
 
 // 事件含义的版本。每一行都记着写它的那一套含义（v 字段）；加一个事件类型、
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 11;
+export const EVENT_VERSION = 12;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -42,6 +44,8 @@ export const MEANING = {
   namedFail: 3,
   // 整期审打回时点名的是段号，不是段里的条目。
   segmentRework: 9,
+  // 轮次只记人开口的那一轮：agent 的进展不记成轮次。
+  userOnlyRounds: 12,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -83,7 +87,10 @@ export function validateEvent(ev, at) {
   switch (ev.k) {
     case "turn":
       need(ev, "who");
-      if (!WHO.includes(ev.who)) throw new Error(`轮次的 who 只能是 user 或 agent：${ev.who}`);
+      // 第 12 版起轮次只记人开口的那一轮。旧行里的 agent 轮照读：
+      // 拿新规矩去核旧行，会把当时合法的历史全判成坏账（doctor 会逐行核）。
+      if (meaning >= MEANING.userOnlyRounds && !WHO.includes(ev.who))
+        throw new Error(`轮次只记你和用户之间的一轮：你自己的进展写进交付记录或结论，不记成轮次（--who 写 user）`);
       need(ev, "said");
       // 空参数会被有些 shell 吞掉（PowerShell 5.1 会把 --did "" 变成裸开关），
       // 于是 did 落成 true，账本读起来像"这轮做过事"。类型也要查：这不是记轮的人

@@ -68,6 +68,15 @@ test("an older line is read by the standard it was written under, not today's", 
   assert.throws(() => validateEvent({ ...line, v: 3, why: "看不清" }, line.at), /rework/);
 });
 
+test("a round the agent wrote for itself is history, not a new breach", () => {
+  // 第 12 版起轮次只记人开口的那一轮。旧账本里 agent 自记的那些行要照读：
+  // 这条规矩只对写在它之后的行生效，否则 doctor 会把当时合法的历史全判成坏账。
+  const line = { k: "turn", s: "S01", who: "agent", said: "这一轮读了代码", at: "2026-11-23T00:00:00.000Z" };
+  assert.doesNotThrow(() => validateEvent({ ...line, v: 2 }, line.at), "第 2 版的 agent 轮照读");
+  assert.doesNotThrow(() => validateEvent({ ...line }, line.at), "没写 v 的行更早");
+  assert.throws(() => validateEvent({ ...line, v: EVENT_VERSION }, line.at), /轮次只记你和用户之间的一轮/);
+});
+
 test("the running version comes from the package it ships with", () => {
   assert.match(currentVersion(), /^\d+\.\d+\.\d+$/);
 });

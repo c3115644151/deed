@@ -13,7 +13,7 @@ import { digest } from "../core/digest.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
-import { costOf, edges, countIn, currentSession, debt, goalOf, needsWhole, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn } from "../core/rules.mjs";
+import { costOf, edges, countIn, currentSession, debt, goalOf, needsWhole, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
 import { auditEvidence, staleEvidence } from "./audit.mjs";
@@ -328,7 +328,7 @@ export function printState() {
   } else {
     const seg = openSegment(open);
     console.log(
-      "会话 " + open.id + " · 开于 " + stamp0(open.openedAt) + " · " + open.turns.length + " 轮 · " + open.segments.length + " 段",
+      "会话 " + open.id + " · 开于 " + stamp0(open.openedAt) + " · " + userTurns(open).length + " 轮 · " + open.segments.length + " 段",
     );
     // 一期要做成什么：整期审与签收都拿它当尺子，所以它得在状态里看得见。
     const aim = goalOf(open);
