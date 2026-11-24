@@ -17,7 +17,7 @@ deed 只有一个程序和一叠纯文本。装=让 `deed` 这个命令能在任
 
 ```bash
 git clone https://github.com/c3115644151/deed.git
-cd deed && npm test          # 203 条，确认这台机器上跑得动
+cd deed && npm test          # 204 条，确认这台机器上跑得动
 node cli/deed.mjs state      # 就地可用，不装任何东西
 ```
 

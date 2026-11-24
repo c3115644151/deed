@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { digest } from "../../core/digest.mjs";
-import { goalOf, lastBrief, lastSegmentChange, needsWhole, nextAction, openSegment, periodChange, reading, tasksIn } from "../../core/rules.mjs";
+import { goalOf, lastBrief, lastSegmentChange, needsReview, needsWhole, nextAction, openSegment, periodChange, reading, tasksIn } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, writeBrief } from "../brief.mjs";
 import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list, auditSegment, auditAll } from "../session.mjs";
@@ -35,8 +35,11 @@ export default function review(argv) {
           // 审查设置说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
           // 免得账本上留下一条看着像「这一期被整体审过」的结论。这句话排在检查
           // 之后：还有段没封的期上说「各段都免审」是假话。
-          if (!needsWhole(doc.config, one))
-            console.log("这一期的各段都免审（审查设置说不用审，段是 deed seal 封的）：不需要整期结论——要出一份也行，签收不看它");
+          if (!needsWhole(doc.config, one)) {
+            console.log("审查设置说这一期的各段都不用审（段由 deed seal 关闭）：不需要整期结论，也不出整期清单");
+            console.log('  下一步：签收 deed sign --words "…" --by "…"');
+            return;
+          }
           const last = one.briefs.filter((b) => b.scope === "session").at(-1) ?? null;
           const answered = last && one.reviews.some((rv) => rv.scope === "session" && rv.brief === last.brief);
           if (last && !answered) {
@@ -149,6 +152,13 @@ export default function review(argv) {
         );
       if (seg.closedAt) fail("段 " + seg.id + " 已经封存，结论不能再落");
       if (!flags.verdict) {
+        // 审查设置说这一段不用审（改动全落在免审路径）：不出清单。出了一份没人需要的卷子，
+        // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
+        if (!needsReview(doc.config, one, seg)) {
+          console.log("审查设置说这一段不用审（改动都落在免审路径）：不出清单与角色包，账本也不记一条等人回答的清单");
+          console.log('  关闭这一段：deed seal --segment ' + seg.id + ' --why "凭什么不审" --by "…"');
+          return;
+        }
         // 清单写的是"这些条目、这些交付记录"。还有条目没交，清单就是一份没人能答的卷子：
         // 交完再出，否则它一出生就是旧的。
         const pending = tasksIn(one, seg).filter((task) => task.status === "todo");

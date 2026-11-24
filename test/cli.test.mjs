@@ -1748,10 +1748,33 @@ test("a period with nothing to review is told it needs no whole conclusion", () 
   deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
   assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
 
+  const before = readEvents(cwd).length;
   const said = deed(cwd, "review", "--all");
   assert.equal(said.status, 0, said.stderr);
   assert.match(said.stdout, /不需要整期结论/, "先把话说在前面");
+  assert.equal(readEvents(cwd).length, before, "不用审就不写账本");
+  assert.deepEqual(fs.existsSync(path.join(cwd, ".deed", "review")) ? fs.readdirSync(path.join(cwd, ".deed", "review")) : [], [], "也不生成清单与角色包");
   assert.equal(deed(cwd, "state").stdout.includes("还没写目的"), false, "目的写着");
+});
+
+// 一段的改动全落在免审路径时，出清单是白费：账本上会多一条等人回答的清单，
+// 而这一段正确的结局是关闭（deed seal）。
+
+test("a segment the settings exempt gets no brief, and the step says to close it", () => {
+  const cwd = workspace("seg-not-needed");
+  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
+  deed(cwd, "tick", "--who", "user", "--said", "改一份文档");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
+  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
+  const before = readEvents(cwd).length;
+  const r = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /审查设置说这一段不用审/);
+  assert.match(r.stdout, /deed seal --segment S01\.1/, "下一步是关闭这一段，不是另审一份");
+  assert.equal(readEvents(cwd).length, before, "不写账本");
+  assert.deepEqual(fs.readdirSync(path.join(cwd, ".deed", "review")), [], "不生成文件");
 });
 
 // 撤回同批的一条再重交：数目不能跟着剩下的条数变小，否则两条一批撤回一条
@@ -1819,8 +1842,15 @@ test("a standing whole-period failure still blocks the signature", () => {
   deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
   deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
   assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
+  // 两段都免审，整期清单本来就不该出：要证明整期不合格挡签收，得有一段是要审的
+  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "src", "a.mjs"), "export const a = 1;\n", "utf8");
+  deed(cwd, "task", "add", "改 src", "--criteria", "src/a.mjs 导出 a");
+  deed(cwd, "task", "done", "T3", "--evidence", "改好 src/a.mjs", "--digest", "src/a.mjs");
+  assert.equal(deed(cwd, "review", "--segment", "S01.3").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.3", "--by", "qa", "--verdict", "pass").status, 0);
   assert.equal(deed(cwd, "review", "--all").status, 0);
-  assert.equal(deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "S01.1", "--why", "文档写得不清楚").status, 0);
+  assert.equal(deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "S01.3", "--why", "文档写得不清楚").status, 0);
   const signed = deed(cwd, "sign", "--words", "可以", "--by", "user");
   assert.equal(signed.status, 1, "整期不合格还活着，签收要挡住");
   assert.match(signed.stderr, /整体审判了不合格/);
@@ -2112,6 +2142,13 @@ test("a segment nobody reviewed says in the brief why it was not reviewed", () =
   deed(cwd, "task", "add", "写第二份文档", "--criteria", "读完能上手", "--files", "docs/b.md");
   deed(cwd, "task", "done", "T2", "--evidence", "写完了");
   assert.equal(deed(cwd, "seal", "--why", "也只改了文档", "--by", "agent").status, 0);
+  // 整期里有一段要审，整期清单才出得来；免审那一段在它里面露面
+  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "src", "a.mjs"), "export const a = 1;\n", "utf8");
+  deed(cwd, "task", "add", "改 src", "--criteria", "src/a.mjs 导出 a");
+  deed(cwd, "task", "done", "T3", "--evidence", "改好 src/a.mjs", "--digest", "src/a.mjs");
+  assert.equal(deed(cwd, "review", "--segment", "S01.3").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.3", "--by", "qa", "--verdict", "pass").status, 0);
   const whole = deed(cwd, "review", "--all");
   assert.equal(whole.status, 0, whole.stderr);
   const dir = path.join(cwd, ".deed", "review");
@@ -2143,6 +2180,12 @@ test("a sealed segment with no reason written says what it is, without empty bra
   deed(cwd, "task", "add", "写第二份文档", "--criteria", "读完能上手", "--files", "docs/b.md");
   deed(cwd, "task", "done", "T2", "--evidence", "写完了");
   assert.equal(deed(cwd, "seal", "--why", "也只改了文档", "--by", "agent").status, 0);
+  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "src", "a.mjs"), "export const a = 1;\n", "utf8");
+  deed(cwd, "task", "add", "改 src", "--criteria", "src/a.mjs 导出 a");
+  deed(cwd, "task", "done", "T3", "--evidence", "改好 src/a.mjs", "--digest", "src/a.mjs");
+  assert.equal(deed(cwd, "review", "--segment", "S01.3").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.3", "--by", "qa", "--verdict", "pass").status, 0);
   const whole = deed(cwd, "review", "--all");
   assert.equal(whole.status, 0, whole.stderr);
   const dir = path.join(cwd, ".deed", "review");
