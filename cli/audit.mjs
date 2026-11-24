@@ -22,12 +22,19 @@ export function auditEvidence(root, doc, sessionId) {
       for (const proof of task.evidence)
         for (const file of filesOf(proof)) pins.push({ at: proof.at, path: file.path, digest: file.digest });
 
+  // 封了的段：那一段的结论就是它那些钉子的结局。之后文件被谁改过是别人的事，
+  // 而封了的段里没人能再交付——拿今天的字节去追旧钉子，只会留一笔永远清不掉的债。
+  const shut = new Map();
+  for (const one of doc.sessions)
+    for (const segment of one.segments) shut.set(one.id + "/" + segment.id, segment.closedAt !== null);
+
   const stale = [];
   const outside = [];
   const covered = [];
   for (const one of doc.sessions) {
     if (sessionId && one.id !== sessionId) continue;
     for (const task of one.tasks) {
+      if (shut.get(one.id + "/" + task.segment) === true) continue;
       const claim = task.evidence[task.evidence.length - 1];
       for (const proof of task.evidence) {
         for (const file of filesOf(proof)) {

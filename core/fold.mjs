@@ -71,11 +71,12 @@ function sessionOf(doc, ev) {
 }
 
 // A segment opens itself when something first lands in it: it is a view reset
-// after a verdict, not a thing anyone schedules.
-function segmentOf(session, at) {
-  const open = session.segments.find((one) => one.closedAt === null);
-  if (open) return open;
+// after a verdict, not a thing anyone schedules. 新活落进最新那个开段：一段送审之后
+// 还在等结论，它不再收东西，搬出来的条目和新写的条目都往下走。
+function nextSegment(session, at, carried = false) {
   const segment = {
+    // 这一段是搬出来的条目开的：下一次搬还往里放，别为每一条开一个新段。
+    carried,
     id: `${session.id}.${session.segments.length + 1}`,
     openedAt: at,
     closedAt: null,
@@ -88,6 +89,10 @@ function segmentOf(session, at) {
   };
   session.segments.push(segment);
   return segment;
+}
+
+function segmentOf(session, at) {
+  return session.segments.filter((one) => one.closedAt === null).at(-1) ?? nextSegment(session, at);
 }
 
 // 任务碰过哪些路径、各多大，只由还在的交付说得算。交付退回（撤回，或者审查者点名
@@ -247,6 +252,23 @@ export function fold(events) {
         // 撤回的交付不再替这些字节说话：这一段碰过的路径与大小重新由还在的交付算。
         rederive(task);
         task.status = task.evidence.length > 0 ? "done" : "todo";
+        break;
+      }
+      // 这一段送审之后就不再收新活：没做的条目搬到下一段，等一下段开出来。
+      // 开路只有这一条——放弃（drop）说的是「不做了」，写不成「换个时候做」。
+      case "task.carry": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        editable(session, task);
+        if (task.status !== "todo")
+          noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能搬到下一段`);
+        // 一批搬运会连着写好几十行：新开的那一段还没接过活，就接着往里放，
+        // 不然十三条未做的条目会开出十三个各含一条的段。
+        const newest = session.segments
+          .filter((one) => one.closedAt === null && one.id !== task.segment)
+          .at(-1);
+        task.segment = (newest?.carried ? newest : nextSegment(session, ev.at, true)).id;
+        task.touchedAt = ev.at;
         break;
       }
       case "task.defer":

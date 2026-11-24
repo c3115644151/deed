@@ -39,6 +39,25 @@ test("a segment exists only once a task arrives, and a judged one never reopens 
   assert.equal(after.sessions[0].tasks[1].segment, "S01.2");
 });
 
+const carry = (n, id) => ({ v: 1, at: T(n), k: "task.carry", s: null, id });
+
+test("an entry not yet done moves to the next segment, and that segment takes what comes after it", () => {
+  const doc = fold([
+    turn(1), add(2, "T1"), add(3, "T2"), add(4, "T3"), done(5, "T1"),
+    carry(6, "T2"), carry(7, "T3"), add(8, "T4"),
+  ]);
+  const [session] = doc.sessions;
+  assert.equal(session.segments.length, 2, "一批搬运只开一段：十条未做的条目不该开出十个段");
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
+  assert.equal(session.tasks.find((one) => one.id === "T3").segment, "S01.2");
+  assert.equal(session.tasks.find((one) => one.id === "T4").segment, "S01.2", "新写的条目也跟着最新那一段走");
+  assert.equal(session.segments[0].closedAt, null, "原来那一段没被封：它只是不再收东西");
+});
+
+test("a delivery does not move: 搬 is for work not yet done", () => {
+  assert.throws(() => fold([turn(1), add(2, "T1"), done(3, "T1"), carry(4, "T1")]), /只有没做的能搬到下一段/u);
+});
+
 test("judging closes the segment and accepts what was delivered", () => {
   const doc = fold([turn(1), add(2, "T1"), done(3, "T1"), judgePass(4, "S01.1")]);
   const [task] = doc.sessions[0].tasks;

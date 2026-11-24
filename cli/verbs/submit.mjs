@@ -58,6 +58,13 @@ export default function submit(argv) {
               specs.push({ k: "task.drop", s: one.id, id: item.id, why: item.why });
               continue;
             }
+            // 这一段送审之后不再收活：没做的条目写一行 搬： 就落到下一段。
+            if (item.carry && item.box !== "x") {
+              if (task.status !== "todo")
+                fail(item.id + " 不是还没动手的条目（" + task.status + "）：只有没做的能搬到下一段");
+              specs.push({ k: "task.carry", s: one.id, id: item.id });
+              continue;
+            }
             if (item.box === "x") {
               // 判过（accepted）的条目在清单里也是勾着的：它已经交过、也有人判过，
               // 再交一次既没有意义，也会撞上「封了的段不能再改」。
@@ -127,6 +134,8 @@ export default function submit(argv) {
         if (ev.k === "task.undo") console.log("撤回 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.defer") console.log("延后 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.drop") console.log("放弃 · " + ev.id + " · " + ev.why);
+        if (ev.k === "task.carry")
+          console.log("搬到下一段 · " + ev.id + " · " + (after.tasks.find((t) => t.id === ev.id)?.segment ?? ""));
       }
       console.log("落账 " + evs.length + " 条 · 清单 " + rel(ROOT, file));
       const step = nextAction(doc, doc.config);

@@ -168,7 +168,6 @@ function discussScreen(session, zone, on) {
     '<span class="tclock">' + when(turn.at, zone) + "</span>" +
     '<span class="twho">' + (turn.who === "user" ? "你" : "agent") + "</span>" +
     '<p class="tsaid">' + esc(turn.said) + "</p>" +
-    (turn.did ? '<p class="tdid">' + esc(turn.did) + "</p>" : "") +
     "</li>";
   // 这一屏的主轴是轮次：谁在什么时候说了什么。题在右边，是还没发出去的档案——
   // 它不占主轴，只在窗口里自己攒你说的线索，攒到你说清为止。
@@ -694,7 +693,6 @@ html[data-theme="light"] body {
 .turn.user .twho { color: var(--warn); }
 .tsaid { margin: 0; font-size: 14.5px; line-height: 1.55; overflow-wrap: anywhere; }
 .turn.first .tsaid { font-size: 15.5px; }
-.tdid { grid-column: 3; margin: 4px 0 0; font-size: 11.5px; color: var(--dim); }
 
 /* ------------------------------------------------------------------ asks */
 .ask { border: 1px solid color-mix(in srgb, var(--warn) 32%, var(--line2)); background: color-mix(in srgb, var(--warn) 5%, var(--panel)); padding: 11px 13px; margin-bottom: 12px; }

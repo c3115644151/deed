@@ -212,6 +212,19 @@
 - [x] T78 放弃也算结清：被点名的条目改主意不做了，pass 落得下来，并且落的时候点名说它被放弃、理由是什么
   标准：旧账本里在案 fail 点名的条目若被 drop，pass 能落；落时 stdout 印出该条目与原因；panel 段头对已封段印「开了 N 分钟」、对开着的段不印；node --test 全绿
   交付：跑的是这一份字节：node --test → tests 183 / pass 183 / fail 0；test/cli.test.mjs 与 test/fold.test.mjs 合跑 127 条，board+fold 37 条。放弃结清：fold 里被点名条目 status 为 dropped 时 stuck 为空，pass 落得下来（a standing fail outranks a later pass 用例里那条断言从「抛还没结清」改成「段 verdict=pass」）；落 pass 时 review 印「被点名但已放弃 · T1 · 这一期不做了」（新用例 a named entry that was given up settles, and the verdict says so）。段头：已封段印「开了 N 分钟」、开着不印（board 用例 the turns… 之外那条 a segment that took more than one brief says so on its head 里断言 doesNotMatch 与 match 两半）。
+- [x] T84 T84 放弃的结清看得见也留得下
+  标准：pass 落下来时把放弃的条目与理由记进 review.log（gaveUp），不再只在当场 stdout；段清单里 dropped 条目印出理由；下一步在「被点名的都放弃了」时指向审查者的 pass 而不是 judge --overturn；有用例断言这三处
+  交付：落 pass 时带着理由进账本（review.log 的 gaveUp）；段清单里 dropped 印 状态：dropped · 理由：…；fail 之后被点名的都放弃时，state 给「它们改主意不做了」与 deed review --segment … --by（不再指 judge --overturn）。node --test test/cli.test.mjs → 104/104（跑的是这一份字节）
+- [x] T85 T85 免审段在整期清单里印出自己为什么免审
+  标准：整期与段清单里免审段那行印出账本里写下的理由（sealedWhy）；reason 为空时不印空括号；有用例
+  交付：免审段在整期清单里印出账本写下的理由（sealedWhy）；新增用例 a segment nobody reviewed says in the brief why it was not reviewed（两段都 seal 后 review --all）。node --test test/cli.test.mjs → 104/104
+- [x] T86 T86 交接文件与账本一致
+  标准：HANDOFF 的条目数、测试条数、在案结论、没做的清单（含删旧命令）与这一份字节一致；docs 的禁词检查通过
+  交付：本文件的数按账本重写：20 条、整期审 R33 退回 S02.18、184/184 与 104/104、没做的列出删旧命令。node --test → 184/184（跑的是这一份字节）；改完本文件之后 test/docs.test.mjs → 5/5
+- [ ] T95 清单上能写一行 搬：，没做的条目搬到下一段
+  标准：这一段送审之后不再收新活；十三条没做的条目一次搬进 S02.19，一批搬运只开一段；交付过的条目写 搬： 被拒；test/fold.test.mjs 与 test/cli.test.mjs 各有一条删掉它就红的用例
+
+## 段 S02.19
 - [ ] T79 T79 一轮只记一句话：deed say 取代 tick
   标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
 - [ ] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
@@ -222,11 +235,21 @@
   标准：deed state 带 --check 时跑核交付与体检（取代 verify、doctor），带 --gates 时跑门检查（取代 gate）；deed overturn R1 --why 取代 judge --overturn；旧动词 exit 1；有用例覆盖
 - [ ] T83 T83 删掉旧命令：cli/verbs/task.mjs 真删除，测试改走清单+submit
   标准：cli/spec.mjs 与 ORDER 里不再有 task；cli/verbs/task.mjs 删除；test/cli.test.mjs 里 163 处 task add/done/undo/defer/drop 的夹具改走 deed plan + deed submit（或集中在一处替身里翻译），并有用例断言旧动词 exit 1；全量绿
-- [ ] T84 T84 放弃的结清看得见也留得下
-  标准：pass 落下来时把放弃的条目与理由记进 review.log（gaveUp），不再只在当场 stdout；段清单里 dropped 条目印出理由；下一步在「被点名的都放弃了」时指向审查者的 pass 而不是 judge --overturn；有用例断言这三处
-- [ ] T85 T85 免审段在整期清单里印出自己为什么免审
-  标准：整期与段清单里免审段那行印出账本里写下的理由（sealedWhy）；reason 为空时不印空括号；有用例
-- [ ] T86 T86 交接文件与账本一致
-  标准：HANDOFF 的条目数、测试条数、在案结论、没做的清单（含删旧命令）与这一份字节一致；docs 的禁词检查通过
+- [ ] T87 议题是账本上的对象：立项、追加正文、折得出状态
+  标准：deed topic "标题" --body "…" 自开号 I1、I2（与题的 A、清单条目的 T 不撞）；再次 deed topic I1 --body "…" 追加正文；core/fold.mjs 折出 topics（id/title/body/轮次索引/状态）；不复制任何轮次正文；EVENT_VERSION 升 1 且旧账本照读；有用例覆盖立项、追加、空标题被拒
+- [ ] T88 轮次按议题建索引，面板上的号点得到原话
+  标准：deed say "…" --topic I1 只把这一轮的编号追加进该议题，不复制文本；不存在的议题号 exit 1 且一个字不落账；面板议题卡上的号是指向 #turn-N 的锚点、点得到那一轮；cli 与 board 各有用例
+- [ ] T89 题长在议题里：谈成之后并进正文，题塌成一行历史
+  标准：deed ask "…" --reading "…" --topic I1 把题挂在议题下；deed ask answer 同一条命令追加 topic.merge（这条决策进议题正文，题留 id 与关闭时刻）；面板上题不单独立卡，摆在议题卡内部；题全关时议题状态是「都说定了」；有用例覆盖
+- [ ] T90 放出那道闸：题全关才有按钮，点了才落账，命令行没有这条路
+  标准：面板在「题全关 + 正文非空 + 至少一轮」时显示按钮，其余时候不显示；POST /topic/release 只收 127.0.0.1 且同源，落 {k:"topic.release", by:"user", via:"panel"}；cli/spec.mjs 里没有 topic release 这条，任何 --via 自称都不认；有用例覆盖闸与拒绝
+- [ ] T91 放出之后才有活：清单条目写「来自：I1」，submit 核过再记进任务
+  标准：plan 行可带一行 来自：I1；submit 核对议题存在且已放出，否则整批拒并点名第几行；task.add 落 topic；没放出的议题一条都出不来；state 在「有已放出的议题、清单还没条目」时把下一步指向写清单；有用例
+- [ ] T92 面板的 /events 在对方断开时不把进程带走
+  标准：board/serve.mjs 的 /events 有 res.on("error") 与写失败处理；客户端连一次再断开之后进程仍活着（探针记 pid 前后一致）；有用例或可复跑的命令
+- [ ] T93 state 只在真要出整期审时提目的
+  标准：单段会话的 state 不印「目的 · 还没有」；多段且要整期审时印成「整期审的尺子 · …」；deed --help 与 DESIGN 里 goal 的说法同步（T81 删掉 goal 动词之后，那句话只指清单第一行）；有用例
+- [ ] T94 有清单的段不再收新条目：送审之后新活开下一段
+  标准：一段一旦发过清单，就不再接收新条目（后来加的活开下一段，段号自己往上走）；在案的那份清单不因后来加的条目而作废，只有这一段自己被动过（撤回、改写）才算旧；state 在段等结论时先给「落结论」而不是「写新条目」；整期审打回一段只重开那一段，点名的条目回未做、其余保持交付，之后新加的活仍开下一段；有用例覆盖上面四条，把 core/fold.mjs 的这条判断改回去就红
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

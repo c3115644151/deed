@@ -1337,6 +1337,21 @@ test("an older delivery is history, not a claim that keeps going stale", () => {
   assert.match(stale.stdout, /交付记录过期 · T1/);
 });
 
+test("a pin in a closed segment stops being checked: nobody there can deliver again", () => {
+  const cwd = workspace("shut-pins");
+  fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "记下内容", "--criteria", "文件在", "--files", "thing.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "thing.txt");
+  deed(cwd, "review", "--segment", "S01.1");
+  const passed = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass");
+  assert.equal(passed.status, 0, passed.stderr);
+  fs.writeFileSync(path.join(cwd, "thing.txt"), "v2");
+  const after = deed(cwd, "verify");
+  assert.equal(after.status, 0, after.stdout + after.stderr);
+  assert.doesNotMatch(after.stdout, /交付记录过期 · T1/, "封了的段里没人能再交付，追旧钉子只会留一笔清不掉的债");
+});
+
 test("a file pinned again by a later delivery is covered, not stale", () => {
   const cwd = workspace("repinned");
   fs.writeFileSync(path.join(cwd, "shared.md"), "v1");
@@ -2003,6 +2018,35 @@ test("a settled decision keeps its border and what it gave up, and they are not 
   // 它们不是任务：清单里没有多出条目，签收那一行的欠账也没变。
   const plan = deed(cwd, "plan", "--print");
   assert.doesNotMatch(plan.stdout, /文档里的旧词不再新增/);
+});
+
+test("an entry still to be done is carried to the next segment from the plan", () => {
+  const cwd = workspace("carry-plan");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "task", "add", "先做这一件", "--criteria", "能跑", "--files", "proof.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "跑了 1/1", "--digest", proof(cwd));
+  deed(cwd, "task", "add", "下一段再做", "--criteria", "也做完");
+  const plan = path.join(cwd, ".deed", "plan.md");
+  deed(cwd, "plan", "--force");
+  fs.writeFileSync(
+    plan,
+    fs.readFileSync(plan, "utf8").replace(/  标准：也做完\n/u, "  标准：也做完\n  搬：这一段已经送审，下一段接着做\n"),
+  );
+  const run = deed(cwd, "submit");
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /搬到下一段 · T2 · S01\.2/);
+  const session = fold(readEvents(cwd)).sessions[0];
+  assert.equal(session.segments.length, 2, "搬一格就是开下一段");
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
+
+  // 交付过的条目搬不动：那等于把一条交付换个段说话，账本里没有这件事的位置。
+  fs.writeFileSync(
+    plan,
+    ["# 这一期要做成什么", "开始。", "", "## 段 S01.1", "- [ ] T1 先做这一件", "  标准：能跑", "  搬：换个段", "", "## 段 S01.2", "- [ ] T2 下一段再做", "  标准：也做完", "  搬：这一段已经送审，下一段接着做"].join("\n") + "\n",
+  );
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /不是还没动手的条目（done）/u);
 });
 
 test("a segment nobody reviewed says in the brief why it was not reviewed", () => {
