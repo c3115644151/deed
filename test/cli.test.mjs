@@ -1182,12 +1182,15 @@ test("a panel says when the declared port was taken, and goes back to it when th
     assert.match(taken.stdout, /端口 7433 被占着；面板改开在 \d+/, "退到哪儿要说出来，不是无声换掉一条地址");
     assert.equal(record().port, fell, "记号里记的就是它实际在听的那个号");
     assert.match(String(record().build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
-    // 号让出来了：再起就回到门槛里写的那个地址——地址是用来收藏的，不是每次随机。
-    assert.equal(run("panel", "--stop").status, 0);
+    // 号让出来了：下一条命令要把它搬回门槛里写的那个地址——地址是用来收藏的。
+    // 这里不先停下旧面板：活着的那个停在退回的号上，得由"号空出来了"这件事把它搬回去，
+    // 否则它一辈子守着那个意外落点，声明过的地址就再也没人用过。
     await free();
     const again = run("state");
     assert.equal(again.status, 0, again.stderr);
     assert.equal(url(again.stdout), 7433, "号空出来之后回到声明的那个地址");
+    assert.equal(record().port, 7433, "记号里也跟着搬回去了");
+    assert.notEqual(record().pid, fell, "搬回去的是另一个进程，不是一个改过口的进程");
     // 面板代码换过（记号里的指纹对不上）：下一条命令自己把旧的换掉，
     // 不必有人记得"改完要重启"——换过之后地址不变。
     const heard = record();

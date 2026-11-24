@@ -64,7 +64,14 @@ export async function ensurePanel(root) {
   if (panelOff()) return null;
   if (!fs.existsSync(path.join(root, ".deed", "config.json"))) return null;
   const now = await panelNow(root);
-  if (now.running) return { ...now, started: false };
+  if (now.running) {
+    // 门槛里写的那个号空出来了，而活着的这一个还停在当初退回的号上：换回去。
+    // 地址是用来收藏的，"退回的号"只是一次意外的落点，不该变成新的地址。
+    const asked = portOf(root);
+    if (now.port === asked || (await answers(asked))) return { ...now, started: false };
+    stopPanel(root);
+    return startPanel(root);
+  }
   // 旧的那个还占着端口：先让它把号让出来，否则新进程只能退到别的号去。
   if (now.stale) stopPanel(root);
   return startPanel(root);
