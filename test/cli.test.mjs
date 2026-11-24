@@ -10,6 +10,7 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
+import { movedSince, requireUnchanged } from "../cli/pins.mjs";
 
 const CLI = path.join(import.meta.dirname, "..", "cli", "deed.mjs");
 // 面板默认关掉：每条命令都去拉一个后台服务，测试就成了端口和进程的集合。
@@ -1184,7 +1185,19 @@ test("a panel says when the declared port was taken, and goes back to it when th
   const env = { ...process.env };
   delete env.DEED_NO_PANEL;
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
-  const record = () => JSON.parse(fs.readFileSync(panelRecord(cwd), "utf8"));
+  // 子进程在 listen 之后才写记号，探活成功与记号落盘之间有几毫秒：读到就等它写完，
+  // 不让这条用例因为「差几毫秒」红（跑全量时机器更慢，这个窗口会放大）。
+  const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  const record = () => {
+    for (let step = 0; step < 40; step += 1) {
+      try {
+        return JSON.parse(fs.readFileSync(panelRecord(cwd), "utf8"));
+      } catch {
+        nap(100);
+      }
+    }
+    throw new Error("面板的记号一直没写出来：" + panelRecord(cwd));
+  };
   const url = (out) => Number(out.match(/127\.0\.0\.1:(\d+)/)[1]);
   const canBind = (port) =>
     new Promise((ok) => {
@@ -2154,4 +2167,179 @@ test("a panel is replaced when any module it loaded changes, not only its own fi
     stale.update(fs.readFileSync(path.join(pkg, one)));
   }
   assert.notEqual(buildNow(), stale.digest("hex").slice(0, 16), "只盖面板自己那三份，等于改了 core 也不换进程");
+});
+
+test("the counts in a delivery are taken by running the command, not copied", () => {
+  const cwd = workspace("run-counts");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(
+    path.join(cwd, "x.test.mjs"),
+    'import test from "node:test";\ntest("one", () => {});\ntest("two", () => {});\n',
+  );
+  deed(cwd, "task", "add", "写两条测试", "--criteria", "node --test x.test.mjs 报 2/2");
+  deed(cwd, "plan");
+  const file = path.join(cwd, ".deed", "plan.md");
+  const first = fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：写了 x.test.mjs，报 2/2 通过\n");
+  fs.writeFileSync(file, first, "utf8");
+  const good = deed(cwd, "submit", "--run", "node --test x.test.mjs");
+  assert.equal(good.status, 0, good.stderr);
+  const done = readEvents(cwd).find((one) => one.k === "task.done");
+  // 数在账本里，是从那条命令的输出读出来的，不是从交付那句话里抄的
+  assert.deepEqual(
+    { tests: done.run.tests, pass: done.run.pass, fail: done.run.fail },
+    { tests: 2, pass: 2, fail: 0 },
+    "run 这一格要记下命令自己报的条数",
+  );
+  assert.equal(done.run.exit, 0);
+  assert.equal(done.run.command, "node --test x.test.mjs");
+
+  // 清单里早交过的那条还带着当时的数：再接一条新活，--run 只核这一次真交的那条
+  deed(cwd, "task", "add", "再写一条", "--criteria", "也是 2/2");
+  fs.writeFileSync(path.join(cwd, "note.txt"), "这次真动了一下\n");
+  deed(cwd, "plan", "--force");
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace(/- \[ \] T2 (.*)\n/, "- [x] T2 $1\n  交付：也报 2/2 通过\n"),
+    "utf8",
+  );
+  const again = deed(cwd, "submit", "--run", "node --test x.test.mjs");
+  assert.equal(again.status, 0, again.stderr);
+});
+
+test("a delivery whose numbers disagree with the run is refused before anything lands", () => {
+  const cwd = workspace("run-lie");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(
+    path.join(cwd, "x.test.mjs"),
+    'import test from "node:test";\ntest("one", () => {});\ntest("two", () => {});\n',
+  );
+  deed(cwd, "task", "add", "写两条测试", "--criteria", "node --test x.test.mjs 报 2/2");
+  deed(cwd, "plan");
+  const file = path.join(cwd, ".deed", "plan.md");
+  const before = readEvents(cwd).length;
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：写了 x.test.mjs，报 1/2 通过\n"),
+    "utf8",
+  );
+  const bad = deed(cwd, "submit", "--run", "node --test x.test.mjs");
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /T1 的记录写着 1\/2，--run 采到的是 2\/2/);
+  assert.equal(readEvents(cwd).length, before, "整批拒：一条也不落");
+  // 抄上一轮的「3/3」也一样落不下来：分母对不上，等于这条记录里根本没有这个数
+  fs.writeFileSync(
+    file,
+    fs
+      .readFileSync(file, "utf8")
+      .replace(/- \[x\] T1 ([^\n]*)\n  交付：[^\n]*\n/, "- [x] T1 $1\n  交付：写了 x.test.mjs，报 3/3 通过\n"),
+    "utf8",
+  );
+  const stale = deed(cwd, "submit", "--run", "node --test x.test.mjs");
+  assert.equal(stale.status, 1);
+  assert.match(stale.stderr, /T1 的记录里没有一处写着 --run 跑出来的 2\/2/);
+  assert.equal(readEvents(cwd).length, before, "整批拒：一条也不落");
+});
+
+test("a red run cannot be handed in, and the refusal says what failed", () => {
+  const cwd = workspace("run-red");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(
+    path.join(cwd, "x.test.mjs"),
+    'import test from "node:test";\ntest("one", () => { throw new Error("boom"); });\n',
+  );
+  deed(cwd, "task", "add", "写一条测试", "--criteria", "跑得绿");
+  deed(cwd, "plan");
+  const file = path.join(cwd, ".deed", "plan.md");
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：写了一条同名测试\n"),
+    "utf8",
+  );
+  const bad = deed(cwd, "submit", "--run", "node --test x.test.mjs");
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /--run 的命令没有跑通（退出 1）/);
+});
+
+test("a delivery that says what it will show has to show it when the ledger is written", () => {
+  const cwd = workspace("run-expect");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(path.join(cwd, "say.mjs"), 'console.log("hi");\n');
+  deed(cwd, "task", "add", "写一句话", "--criteria", "node say.mjs 印 hi");
+  deed(cwd, "plan");
+  const file = path.join(cwd, ".deed", "plan.md");
+  const base = fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：说 hi 就印 hi；期望：node say.mjs => hi\n");
+  fs.writeFileSync(file, base, "utf8");
+  const good = deed(cwd, "submit");
+  assert.equal(good.status, 0, good.stderr);
+  // 成立的那条留下了凭据：账本记下命令与它必须印出的那段话，清单上也看得到
+  const first = readEvents(cwd).find((one) => one.k === "task.done");
+  assert.deepEqual(first.expects, [{ command: "node say.mjs", want: "hi" }]);
+  deed(cwd, "review", "--segment", "S01.1");
+  const brief = fs
+    .readdirSync(path.join(cwd, ".deed", "review"))
+    .filter((one) => !one.endsWith("-reviewer.md"))
+    .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8"))
+    .at(-1);
+  assert.match(brief, /核过：node say\.mjs => hi/);
+  assert.doesNotMatch(brief, /只是说法/);
+
+  // 说得出现象却跑不出来：记账前就拒
+  deed(cwd, "task", "add", "再写一句", "--criteria", "印 bye");
+  deed(cwd, "plan", "--force");
+  const next = fs
+    .readFileSync(file, "utf8")
+    .replace(/- \[ \] T2 (.*)\n/, "- [x] T2 $1\n  交付：说 bye 就印 bye；期望：node say.mjs => bye\n");
+  fs.writeFileSync(file, next, "utf8");
+  const bad = deed(cwd, "submit");
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /T2 的期望没跑出来：命令「node say.mjs」要看到「bye」/);
+});
+
+test("a delivery with no command behind it says so in the brief", () => {
+  const cwd = workspace("run-saying");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(path.join(cwd, "note.md"), "one\n");
+  deed(cwd, "task", "add", "改一句话", "--criteria", "改好了");
+  deed(cwd, "plan");
+  const file = path.join(cwd, ".deed", "plan.md");
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：改了一句，看起来没问题\n"),
+    "utf8",
+  );
+  const ok = deed(cwd, "submit");
+  assert.equal(ok.status, 0, ok.stderr);
+  deed(cwd, "review", "--segment", "S01.1");
+  const brief = fs
+    .readdirSync(path.join(cwd, ".deed", "review"))
+    .filter((one) => !one.endsWith("-reviewer.md"))
+    .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8"))
+    .at(-1);
+  // 没有命令核过的交付在清单上只算说法：审查者看得到它和「跑过」「核过」的区别
+  assert.match(brief, /只是说法：这条没配命令核过/);
+});
+
+test("a path that moved between the scan and the ledger write is caught, and a gone one says gone", () => {
+  // 量差到记账之间工作区可能被别的东西写过：那条判断要能分开"变了"与"不在了"，
+  // 因为两者都算变了，但说出来的话不一样。
+  const cwd = workspace("moved");
+  fs.writeFileSync(path.join(cwd, "a.md"), "one");
+  const pin = { path: "a.md", digest: createHash("sha256").update("one").digest("hex") };
+  assert.deepEqual(movedSince(cwd, [pin]), []);
+  fs.writeFileSync(path.join(cwd, "a.md"), "two");
+  const moved = movedSince(cwd, [pin]);
+  assert.equal(moved.length, 1);
+  assert.equal(moved[0].path, "a.md");
+  assert.equal(moved[0].now, createHash("sha256").update("two").digest("hex"));
+  fs.rmSync(path.join(cwd, "a.md"));
+  assert.equal(movedSince(cwd, [pin])[0].now, null, "文件不在了要说成不在了，不是没说变");
+});
+
+test("a delivery is refused when a pinned path moved before it was written down", () => {
+  const cwd = workspace("moved-refuse");
+  fs.writeFileSync(path.join(cwd, "a.md"), "one");
+  const pin = { path: "a.md", digest: createHash("sha256").update("one").digest("hex") };
+  assert.doesNotThrow(() => requireUnchanged(cwd, [pin]), "没变的路径不该拦");
+  fs.writeFileSync(path.join(cwd, "a.md"), "two");
+  assert.throws(() => requireUnchanged(cwd, [pin]), /记账之前这些路径变了：a\.md/);
 });

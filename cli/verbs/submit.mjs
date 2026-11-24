@@ -1,10 +1,82 @@
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { nextAction, sessionById } from "../../core/rules.mjs";
 import { changedPaths, rel, writeSnapshot } from "../../lib/store.mjs";
-import { pinSet, weigh } from "../pins.mjs";
+import { movedSince, pinSet, requireUnchanged, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
-import { ROOT, parse, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
+import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
+
+
+// 数由工具采。node --test 两种输出（TAP 的 # tests 与默认的 ℹ tests）都认；
+// 命令不报条数时留 null——「没有数」与「数对不上」是两件事。
+const summary = (text) => {
+  const num = (name) => {
+    const hit = new RegExp("(?:^# " + name + " |\u2139 " + name + " )(\\d+)", "mu").exec(text);
+    return hit ? Number(hit[1]) : null;
+  };
+  return { tests: num("tests"), pass: num("pass"), fail: num("fail") };
+};
+
+// 自己是在测试进程里被调起来的（node --test 会给子进程设 NODE_TEST_CONTEXT）：
+// 把那个变量带进被测命令，它的总结行会换成另一种格式，条数就采不到。
+const cleanEnv = () => {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  return env;
+};
+
+const runOnce = (command) => {
+  const r = spawnSync(command, { shell: true, cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 24, env: cleanEnv() });
+  const text = (r.stdout ?? "") + (r.stderr ?? "");
+  return { command, exit: r.status ?? -1, ...summary(text), tail: text.trim().split("\n").slice(-4).join(" / ") };
+};
+
+// 交付记录里写着 196/196，而采到的是 195/196：那是抄来的数。
+// 只比与总条数同一分母的那些对，逐文件的条数（109/109）不归它管。
+const checkNumbers = (item, observed) => {
+  if (!observed || observed.tests === null) return;
+  const total = observed.pass + "/" + observed.tests;
+  const pairs = [...item.claim.matchAll(/(\d+)\s*\/\s*(\d+)/gu)].map((one) => [Number(one[1]), Number(one[2])]);
+  // 同一个分母的那一对必须与采到的分子一致：1/2 而报 2/2，说明这数是抄来的。
+  for (const [pass, all] of pairs)
+    if (all === observed.tests && pass !== observed.pass)
+      fail(
+        item.id + " 的记录写着 " + pass + "/" + all + "，--run 采到的是 " + total +
+          "：数字要在你要交的那份字节上跑出来，抄上一轮的数不行",
+      );
+  // 分母都不同的，也得有一处写着跑出来的那一对：没有就等于这条记录里根本没有这个数。
+  if (!pairs.some(([pass, all]) => pass === observed.pass && all === observed.tests))
+    fail(
+      item.id + " 的记录里没有一处写着 --run 跑出来的 " + total + "：数要在你要交的那份字节上跑出来；" +
+        "这一条要是只跑了另一件事，就别加 --run，或者把两件都写上",
+    );
+};
+
+// 交付记录里写「这么一跑会看到那个」的，配一行 期望：命令 => 要看到的话，记账前真跑一遍。
+// 说得出现象却跑不出来，那条记录就是假的——比事后被人对出来便宜。
+const expectLines = (text) =>
+  [...text.matchAll(/(?:^|[；;])\s*期望\s*[:：]\s*(.+?)\s*(?:=>|→)\s*(.+?)\s*$/gmu)].map((one) => ({ command: one[1], want: one[2] }));
+
+// 交回真跑过的那几条：账本里要留下「这条说法是怎么核的」，不然它只是话。
+const runExpectations = (item) => {
+  const list = expectLines(item.claim ?? "");
+  const done = [];
+  if (list.length > 5) fail(item.id + " 写了 " + list.length + " 条期望：一次交付最多核 5 条，多的写进下一次的交付记录");
+  for (const one of list) {
+    const r = spawnSync(one.command, { shell: true, cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 24, env: cleanEnv() });
+    const text = (r.stdout ?? "") + (r.stderr ?? "");
+    if (text.includes(one.want)) {
+      done.push({ command: one.command, want: one.want });
+      continue;
+    }
+    fail(
+      item.id + " 的期望没跑出来：命令「" + one.command + "」要看到「" + one.want + "」，实际是「" +
+        text.trim().split("\n").slice(0, 2).join(" / ").slice(0, 200) + "」",
+    );
+  }
+  return done;
+};
 
 export default function submit(argv) {
     const { flags } = parse(argv, "submit");
@@ -14,6 +86,31 @@ export default function submit(argv) {
       const plan = parsePlan(fs.readFileSync(file, "utf8"));
       if (plan.problems.length > 0)
         fail("清单有 " + plan.problems.length + " 处看不懂，一个字都没落：" + "\n" + "  " + plan.problems.join("\n" + "  "));
+      // 先跑，再量：--run 与期望都会动工作区（测试会写临时文件），
+      // 记下的字节要以跑完之后磁盘上的为准。
+      const observed = flags.run === undefined ? null : runOnce(String(flags.run));
+      if (observed) {
+        if (observed.exit !== 0)
+          fail("--run 的命令没有跑通（退出 " + observed.exit + "）：这份东西不成立，先别记账" +
+            (observed.tail ? "；最后几行：" + observed.tail : ""));
+        if (observed.fail !== null && observed.fail !== 0)
+          fail("--run 的命令报了 " + observed.fail + " 条失败（" + observed.pass + "/" + observed.tests + " 通过）：红了不能记成交付");
+      }
+      // --run 只给这一次真交的那几条核数：清单里早就交过的条目还带着当时的数，
+      // 拿今天跑的条数去核它们，等于每交一条就把整份清单判错一次。
+      const { doc: peek } = load();
+      const still = new Set(
+        peek.sessions.flatMap((one) => one.tasks)
+          .filter((task) => task.status !== "done" && task.status !== "accepted")
+          .map((task) => task.id),
+      );
+      const expectsOf = new Map();
+      const claiming = plan.items.filter((item) => item.box === "x" && item.id && item.claim && still.has(item.id));
+      for (const item of claiming) {
+        checkNumbers(item, observed);
+        expectsOf.set(item.id, runExpectations(item));
+      }
+
       // 称重与快照在锁外做：跑一遍工作区是慢的那一半，锁里只做判与落。
       const scanned = changedPaths(ROOT);
       const by = flags.by ?? "agent";
@@ -94,6 +191,8 @@ export default function submit(argv) {
                 id: item.id,
                 evidence: item.claim,
                 by,
+                ...(observed ? { run: { command: observed.command, exit: observed.exit, tests: observed.tests, pass: observed.pass, fail: observed.fail } } : {}),
+                ...((expectsOf.get(item.id) ?? []).length > 0 ? { expects: expectsOf.get(item.id) } : {}),
                 digest: pins[0]?.digest ?? null,
                 digestPath: pins[0]?.path ?? null,
                 files: pins,
@@ -120,6 +219,9 @@ export default function submit(argv) {
           // 给它们同一个批号，账本上写着「这几条共用一份差」，而不是谎称各记各的。
           const dones = specs.filter((spec) => spec.k === "task.done");
           if (dones.length > 1) for (const spec of dones) spec.batch = true;
+          // 量差到记账之间，工作区可能被别的东西写过：记账之前再核一遍每条交付要记的路径。
+          // 这一处能真拒——抛在 build 里，一条事件都不落。
+          requireUnchanged(ROOT, pins);
           const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
           if (gone.length > 0)
             fail("清单里少了 " + gone.map((t) => t.id).join("、") + "：账本里有的条目不能自己消失——不做了就写 ~~ " + gone[0].id + " " + gone[0].title + "，再加一行 理由：");
@@ -129,6 +231,19 @@ export default function submit(argv) {
           // 只有真交付过才刷新基线：一次只加条目或只领号的 submit 如果也刷新，
           // 工作区里那些改动就被它吃掉了——下一条交付看起来什么都没动。
           if (stamped.some((ev) => ev.k === "task.done")) writeSnapshot(ROOT, scanned.now);
+          // 记账与落到磁盘之间还剩一条缝：重算一遍每条交付记下的路径。
+          // 变了不能当没发生——那条交付已经在账本里，只能撤回。
+          for (const ev of stamped) {
+            if (ev.k !== "task.done") continue;
+            for (const one of movedSince(ROOT, ev.files ?? [])) {
+              console.log(
+                "字节变了 · " + ev.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12) +
+                  "，记账这一刻是 " + (one.now === null ? "文件不在了" : one.now.slice(0, 12)),
+              );
+              console.log("  这条交付已经写进账本：deed task undo " + ev.id + " --why \"记账时字节变了\"，重跑一遍再交");
+              process.exitCode = 1;
+            }
+          }
         },
       );
       // 落过账就把清单按账本重写一遍：新条目领到的号要写回去，不然下一次 submit

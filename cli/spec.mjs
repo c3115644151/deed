@@ -38,8 +38,11 @@ export const SPEC = {
     usage: ["deed plan [--format|--print] [--force]   把这一期的清单写成草稿（--format 打印格式，--force 覆盖磁盘上那份）"],
   },
   submit: {
-    flags: ["by", "session"],
-    usage: ['deed submit [--by "谁"]                把清单上的改动一次记账（勾上=交付，取消勾=撤回，~~=不做）'],
+    flags: ["by", "session", "run"],
+    usage: [
+      'deed submit [--by "谁"] [--run "<命令>"]   把清单上的改动一次记账（勾上=交付，取消勾=撤回，~~=不做）',
+      '                                            --run 先真跑一遍，把条数记进账本；记录里对不上就整批拒',
+    ],
   },
   goal: {
     flags: ["text", "why", "session", "by"],

@@ -252,6 +252,9 @@ export function fold(events) {
           changed: ev.changed ?? [],
           // 交付那一刻称的各路径大小，随这条交付走：交付退回，它称过的数也一起退。
           sizes: ev.bytes ?? {},
+          // 交付时跑的那条命令与它报的条数：清单上的数从这一格读，不从文本读。
+          run: ev.run ?? null,
+          expects: ev.expects ?? [],
           // 一批 submit 落了好几条交付时，工作区只量了一次差：改动的归属是整批，
           // 不是其中某一条。账本把这件事写下来，读的人就不会以为每条各记了各的。
           batch: ev.batch

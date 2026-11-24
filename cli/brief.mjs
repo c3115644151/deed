@@ -125,7 +125,11 @@ function taskBlock(task, batches = new Map()) {
       return (
         "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
         (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")) +
-        (proof.batch ? batchLine(batches.get(proof.batch.at)) : "")
+        (proof.run ? "\n  - 跑过：" + proof.run.command + " · 退出 " + proof.run.exit +
+            (proof.run.tests === null ? "" : " · " + proof.run.pass + "/" + proof.run.tests + " 通过") : "") +
+        (proof.batch ? batchLine(batches.get(proof.batch.at)) : "") +
+        (proof.expects ?? []).map((one) => "\n  - 核过：" + one.command + " => " + one.want).join("") +
+        (proof.run || (proof.expects ?? []).length > 0 ? "" : "\n  - 只是说法：这条没配命令核过")
       );
     }),
     ...(task.undone ?? []).map(

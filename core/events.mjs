@@ -35,7 +35,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 12;
+export const EVENT_VERSION = 13;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -124,11 +124,37 @@ export function validateEvent(ev, at) {
         if (typeof one.at !== "string" || !Number.isInteger(one.size) || one.size < 2)
           throw new Error("task.done 的 batch 要有 at 与不少于 2 的 size");
       }
+      // 数由工具采：交付时跑过的那条命令、它的退出码与它自己报的条数。
+      // 账本里有这一格，清单与面板上的数才有出处，不是从我抄来的。
+      if (ev.run !== undefined) {
+        const one = ev.run;
+        if (!one || typeof one !== "object" || Array.isArray(one))
+          throw new Error("task.done 的 run 要是 {command, exit, tests, pass, fail}");
+        if (typeof one.command !== "string" || one.command === "")
+          throw new Error("task.done 的 run.command 要是那条命令的原文");
+        if (!Number.isInteger(one.exit)) throw new Error("task.done 的 run.exit 要是退出码");
+        for (const key of ["tests", "pass", "fail"])
+          if (one[key] !== null && !Number.isInteger(one[key]))
+            throw new Error("task.done 的 run." + key + " 要是条数或 null");
+      }
       if (ev.files !== undefined) {
         if (!Array.isArray(ev.files)) throw new Error("task.done 的 files 要是 {path, digest} 数组");
         for (const one of ev.files) {
           if (!one || typeof one.path !== "string" || typeof one.digest !== "string")
             throw new Error("task.done 的 files 每一项都要有 path 与 digest");
+        }
+      }
+      // 说得出会看到什么的那几条，真跑过才算数：账本记下命令与它必须印出的那段话。
+      if (ev.expects !== undefined) {
+        if (!Array.isArray(ev.expects) || ev.expects.length === 0)
+          throw new Error("task.done 的 expects 要是 [{command, want}]");
+        for (const one of ev.expects) {
+          if (!one || typeof one !== "object" || Array.isArray(one))
+            throw new Error("task.done 的 expects 一条要写成 {command, want}");
+          if (typeof one.command !== "string" || one.command === "")
+            throw new Error("task.done 的 expects 里那条命令要是原文");
+          if (typeof one.want !== "string" || one.want === "")
+            throw new Error("task.done 的 expects 里那条期望要是原文");
         }
       }
       break;

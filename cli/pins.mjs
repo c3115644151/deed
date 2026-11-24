@@ -50,3 +50,34 @@ export function namedPins(root, given = []) {
     return { path: rel(root, file), digest: digest(fs.readFileSync(file)), size: stat.size };
   });
 }
+
+// 量差与记账之间还剩一条缝：外部有东西正好在这几毫秒里写了那条路径。记完账立刻
+// 重算一遍，变了就说出来——这时那条交付已经在账本里，只能撤回，不能当没发生。
+export function movedSince(root, files = []) {
+  const moved = [];
+  for (const one of files) {
+    const full = path.join(root, one.path);
+    let now = null;
+    try {
+      now = digest(fs.readFileSync(full));
+    } catch {
+      moved.push({ path: one.path, digest: one.digest, now: null });
+      continue;
+    }
+    if (now !== one.digest) moved.push({ path: one.path, digest: one.digest, now });
+  }
+  return moved;
+}
+
+// 量差之后、记账之前再核一次：变了就不记账（这一处能真拒——抛在 build 里，一条都不落）。
+export function requireUnchanged(root, files = []) {
+  const moved = movedSince(root, files);
+  if (moved.length === 0) return;
+  throw new Error(
+    "记账之前这些路径变了：" +
+      moved
+        .map((one) => one.path + "（记下 " + one.digest.slice(0, 12) + "，现在是 " + (one.now === null ? "文件不在" : one.now.slice(0, 12)) + "）")
+        .join("、") +
+      "；重跑一遍再交",
+  );
+}
