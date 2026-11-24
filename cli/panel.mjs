@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { answers, buildNow, clearPanel, readPanel } from "../lib/panel.mjs";
@@ -43,27 +44,33 @@ const waitFor = async (root, ms) => {
   return null;
 };
 
+// 「这个号现在能不能占」跟「这个号上有没有人应答」不是一回事：刚停掉的进程会把号
+// 留在 TIME_WAIT 里，connect 不上去，listen 还是 EADDRINUSE。判的是能不能占。
+const canBind = (port) =>
+  new Promise((ok) => {
+    const probe = net.createServer(() => {});
+    probe.once("error", () => ok(false));
+    probe.listen(port, "127.0.0.1", () => probe.close(() => ok(true)));
+  });
+
+const holdFor = async (port, ms) => {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (await canBind(port)) return true;
+    await new Promise((step) => setTimeout(step, 60));
+  }
+  return false;
+};
+
 export async function startPanel(root) {
   const asked = portOf(root);
-  // 声明的号被别的程序长期占着时，退到哪一格要算是出来的，不是抽出来的：
-  // 挨着的下一个空号（声明号 + 1、+2…）。地址才收藏得住，也不需要在磁盘上记一行。
-  // 声明号空出来之后，ensurePanel 会把面板搬回去。
-  // 刚停掉旧进程的那一下，号还在 TIME_WAIT 里没让干净：先等它一小会儿，
-  // 别把"正在退"当成"被别人占着"，否则换进程就等于给自己换一条地址。
-  const clears = async (port, ms) => {
-    const until = Date.now() + ms;
-    while (Date.now() < until) {
-      if (!(await answers(port))) return true;
-      await new Promise((step) => setTimeout(step, 60));
-    }
-    return false;
-  };
+  // 声明的号空着就用它。空不出来（别人占着、或者刚落下的号还在 TIME_WAIT 里），
+  // 就守住这个工作区上一次实际在听的那一格：地址是给书签用的，重启不该换一条。
+  // 那一格也守不住时，serve 自己挨着往后试（+1、+2…），落点仍然是算得出来的。
   let want = asked;
-  if (!(await clears(asked, 900))) {
-    want = 0;
-    for (let step = 1; step <= 9; step += 1) {
-      if (!(await answers(asked + step))) { want = asked + step; break; }
-    }
+  if (!(await holdFor(asked, 600))) {
+    const last = readPanel(root);
+    if (last?.port && (await canBind(last.port))) want = last.port;
   }
   const child = spawn(process.execPath, [entry, "serve", "--port", String(want)], {
     cwd: root,
@@ -88,7 +95,7 @@ export async function ensurePanel(root) {
     // 门槛里写的那个号空出来了，而活着的这一个还停在当初退回的号上：换回去。
     // 地址是用来收藏的，"退回的号"只是一次意外的落点，不该变成新的地址。
     const asked = portOf(root);
-    if (now.port === asked || (await answers(asked))) return { ...now, started: false };
+    if (now.port === asked || !(await canBind(asked))) return { ...now, started: false };
     stopPanel(root);
     return startPanel(root);
   }

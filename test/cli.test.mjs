@@ -1176,8 +1176,9 @@ test("a panel comes up with the first command, and the next one leaves it alone"
 });
 
 // 地址要能收藏：面板守在工作区门槛里写的那个端口；那个号被别人占着时，
-// 它退到系统给的号，并且"哪个被占、改开在哪"这句话必须由拉它起来的那一头说出来——
+// 它挨着往后找一格（+1、+2…），并且"哪个被占、改开在哪"这句话必须由拉它起来的那一头说出来——
 // 子进程不接管道，它自己那句只会掉进虚空。
+// 起点号每跑一次现挑一格：写死 7433 会让并发的另一次跑抢走同一格，红了也说明不了代码有问题。
 test("a panel says when the declared port was taken, and goes back to it when the port is free", async () => {
   const cwd = workspace("panel-port");
   const env = { ...process.env };
@@ -1185,32 +1186,49 @@ test("a panel says when the declared port was taken, and goes back to it when th
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
   const record = () => JSON.parse(fs.readFileSync(panelRecord(cwd), "utf8"));
   const url = (out) => Number(out.match(/127\.0\.0\.1:(\d+)/)[1]);
+  const canBind = (port) =>
+    new Promise((ok) => {
+      const probe = net.createServer(() => {});
+      probe.once("error", () => ok(false));
+      probe.listen(port, "127.0.0.1", () => probe.close(() => ok(true)));
+    });
+  const pick = async () => {
+    for (let step = 0; step < 40; step += 1) {
+      const want = 5200 + Math.floor(Math.random() * 600);
+      if (await canBind(want)) return want;
+    }
+    return 0;
+  };
   const held = net.createServer(() => {});
-  const listen = () => new Promise((ok) => held.listen(7433, "127.0.0.1", ok));
+  const base = await pick();
+  assert.notEqual(base, 0, "找不到一格空号，这一条跑不了");
+  const listen = () => new Promise((ok) => held.listen(base, "127.0.0.1", ok));
   const free = () => new Promise((ok) => held.close(() => ok()));
   try {
-    assert.equal(run("init", "--said", "起点", "--port", "7433").status, 0);
+    assert.equal(run("init", "--said", "起点", "--port", String(base)).status, 0);
     await listen();
     const taken = run("tick", "--who", "user", "--said", "看看面板");
     assert.equal(taken.status, 0, taken.stderr);
     const fell = url(taken.stdout);
-    assert.equal(fell, 7434, "7433 被占着，就挨着它退一格——退到哪儿是算出来的，不是抽出来的");
-    assert.match(taken.stdout, /端口 7433 被占着；面板改开在 7434/, "退到哪儿要说出来，不是无声换掉一条地址");
+    assert.ok(fell > base && fell <= base + 9, "被占着就挨着往后找，落点离声明号不超过九格：" + fell + " 对 " + base);
+    for (let step = 1; step < fell - base; step += 1)
+      assert.equal(await canBind(base + step), true, base + step + " 当时是空的，却跳了过去");
+    assert.match(taken.stdout, new RegExp("端口 " + base + " 被占着；面板改开在 " + fell), "退到哪儿要说出来，不是无声换掉一条地址");
     assert.equal(record().port, fell, "记号里记的就是它实际在听的那个号");
     assert.match(String(record().build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
     // 停了再起：声明号还被占着，退回的地址也得是同一格，否则每次重启都要人重收一次书签。
     run("panel", "--stop");
     const restarted = run("state");
     assert.equal(restarted.status, 0, restarted.stderr);
-    assert.equal(url(restarted.stdout), 7434, "重新起来还是那一格");
-        // 号让出来了：下一条命令要把它搬回门槛里写的那个地址——地址是用来收藏的。
+    assert.equal(url(restarted.stdout), fell, "重新起来还是那一格");
+    // 号让出来了：下一条命令要把它搬回门槛里写的那个地址——地址是用来收藏的。
     // 这里不先停下旧面板：活着的那个停在退回的号上，得由"号空出来了"这件事把它搬回去，
     // 否则它一辈子守着那个意外落点，声明过的地址就再也没人用过。
     await free();
     const again = run("state");
     assert.equal(again.status, 0, again.stderr);
-    assert.equal(url(again.stdout), 7433, "号空出来之后回到声明的那个地址");
-    assert.equal(record().port, 7433, "记号里也跟着搬回去了");
+    assert.equal(url(again.stdout), base, "号空出来之后回到声明的那个地址");
+    assert.equal(record().port, base, "记号里也跟着搬回去了");
     assert.notEqual(record().pid, fell, "搬回去的是另一个进程，不是一个改过口的进程");
     // 面板代码换过（记号里的指纹对不上）：下一条命令自己把旧的换掉，
     // 不必有人记得"改完要重启"——换过之后地址不变。
@@ -1220,7 +1238,7 @@ test("a panel says when the declared port was taken, and goes back to it when th
     assert.equal(swapped.status, 0, swapped.stderr);
     const now = record();
     assert.notEqual(now.pid, heard.pid, "旧进程被换掉了");
-    assert.equal(now.port, 7433, "换掉的进程守的还是同一个号");
+    assert.equal(now.port, base, "换掉的进程守的还是同一个号");
   } finally {
     run("panel", "--stop");
     if (held.listening) await free();
@@ -2063,4 +2081,35 @@ test("a segment nobody reviewed says in the brief why it was not reviewed", () =
   const text = fs.readFileSync(path.join(dir, file), "utf8");
   assert.match(text, /免审封存 · agent/, "没人看过的段要在整期清单里露面");
   assert.match(text, /门槛说这一段不用审（只改了文档，门槛说不用审）/, "理由不能印成空括号");
+});
+
+// 老账本里可能有一条封存没写理由（早先的 CLI 不校验）：理由为空时只印那半句，
+// 不能补一对空括号出来——那会让人以为是排版坏了，而不是"当时没写"。
+test("a sealed segment with no reason written says what it is, without empty brackets", () => {
+  const cwd = workspace("seal-why-blank");
+  deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
+  deed(cwd, "goal", "把文档写完", "--by", "user");
+  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  assert.equal(deed(cwd, "seal", "--why", "只改了文档", "--by", "agent").status, 0);
+  const logDir = path.join(cwd, ".deed", "log");
+  const name = fs.readdirSync(logDir).find((one) => one.endsWith(".jsonl"));
+  const file = path.join(logDir, name);
+  const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean);
+  const at = lines.findIndex((one) => JSON.parse(one).k === "segment.seal");
+  assert.notEqual(at, -1, "先得有一条封存可改");
+  const ev = JSON.parse(lines[at]);
+  delete ev.why;
+  lines[at] = JSON.stringify(ev);
+  fs.writeFileSync(file, lines.join("\n") + "\n");
+  deed(cwd, "task", "add", "写第二份文档", "--criteria", "读完能上手", "--files", "docs/b.md");
+  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
+  assert.equal(deed(cwd, "seal", "--why", "也只改了文档", "--by", "agent").status, 0);
+  const whole = deed(cwd, "review", "--all");
+  assert.equal(whole.status, 0, whole.stderr);
+  const dir = path.join(cwd, ".deed", "review");
+  const latest = fs.readdirSync(dir).filter((one) => one.startsWith("S01-all-") && !one.endsWith("-reviewer.md")).sort().pop();
+  const text = fs.readFileSync(path.join(dir, latest), "utf8");
+  assert.match(text, /免审封存 · agent/, "这一行照旧要露面");
+  assert.doesNotMatch(text, /（）/u, "没有理由就不该有括号");
 });

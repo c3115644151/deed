@@ -173,14 +173,21 @@ export function handler(root, onRequest = () => {}) {
 export function start(root, port) {
   let lastRequest = Date.now();
   const server = http.createServer(handler(root, () => { lastRequest = Date.now(); }));
-  // 端口被别的程序先占了也照开：面板的意义是"随时能看"，不是为了守着一个号而死掉。
-  // 退到系统给的号，并在页面上说清它开在哪——下一次命令读到记号，就知道别的地方还有它。
-  // 只退一次：退到空闲端口之后再撞 EADDRINUSE 就是别的问题，那时该炸就炸。
-  let fellBack = false;
+  // 地址是用来收藏的：声明号被别的程序占着时，挨着它往后一格一格试（+1、+2…），
+  // 不是抽一个系统给的号——抽出来的号每次重启都不一样，书签就废了。
+  // 挨着的九格都被占才落到系统给的号；落到那个号之后每撞一次都算别的问题，该炸就炸。
+  let asked = port;
+  let spare = false;
   server.on("error", (error) => {
-    if (error.code === "EADDRINUSE" && !fellBack) {
-      fellBack = true;
-      console.error(`deed: 端口 ${port} 被占着；面板改开在系统给的空闲端口（下面一行是新的 URL）`);
+    if (error.code !== "EADDRINUSE") throw error;
+    asked += 1;
+    if (asked <= port + 9) {
+      server.listen(asked, "127.0.0.1", ready);
+      return;
+    }
+    if (!spare) {
+      spare = true;
+      console.error(`deed: 端口 ${port} 到 ${port + 9} 都被占着；面板改开在系统给的空闲端口（下面一行是新的 URL）`);
       server.listen(0, "127.0.0.1", ready);
       return;
     }
