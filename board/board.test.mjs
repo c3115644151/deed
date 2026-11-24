@@ -261,3 +261,25 @@ test("a port somebody else already holds does not take the panel down with it", 
     await new Promise((resolve) => other.close(resolve));
   }
 });
+
+test("the discussion screen groups turns under the question they belong to, and keeps answered ones", () => {
+  // 一条题 = 它的开与关，加上这段时间落在会话上的轮次；时间窗重叠的轮次只出现一次。
+  // 裁定过的题不下屏——拍板的文本跟着题一起留着。
+  const events = [
+    ...configEvents,
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先说两句" },
+    { v: 1, at: T(2), k: "ask.raise", s: null, id: "A1", text: "第一个问题", reading: "当成这样", why: "得你定" },
+    { v: 1, at: T(3), k: "turn", s: null, who: "user", said: "第一个问题接着问" },
+    { v: 1, at: T(4), k: "ask.raise", s: null, id: "A2", text: "第二个问题", reading: "当成那样", why: "也得你定" },
+    { v: 1, at: T(5), k: "turn", s: null, who: "user", said: "两个都谈谈" },
+    { v: 1, at: T(6), k: "ask.resolve", s: null, id: "A1", decision: "按第一个办", by: "user", why: "就这么定" },
+    { v: 1, at: T(7), k: "turn", s: null, who: "agent", said: "记下了" },
+  ];
+  const html = renderBoard(fold(events), config, { zone, events: 7 });
+  assert.match(html, /data-state="resolved"[\s\S]{0,300}A1/, "裁定过的题还在屏上");
+  assert.match(html, /按第一个办/, "结论跟着题一起留着");
+  assert.match(html, /data-state="pending"[\s\S]{0,300}A2/, "还开着的题标成等你定");
+  assert.match(html, /A1[\s\S]{0,160}2 轮/, "题头写它那段时间里有几轮");
+  assert.equal((html.match(/两个都谈谈/gu) ?? []).length, 1, "重叠的轮次只出现一次，不复制");
+  assert.match(html, /还没成题 · 1 轮/, "成不了题的轮次单独一段");
+});

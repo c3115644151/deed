@@ -159,37 +159,62 @@ function screenHead(index, name, note, meter) {
 
 function discussScreen(session, zone, on) {
   const turns = session ? session.turns : [];
-  const asks = session ? pendingAsks(session) : [];
-  const rows = turns
-    .map(
-      (turn, index) =>
-        '<li class="turn ' + turn.who + (index === 0 ? " first" : "") + '">' +
-        '<span class="tclock">' + when(turn.at, zone) + "</span>" +
-        '<span class="twho">' + (turn.who === "user" ? "你" : "agent") + "</span>" +
-        '<p class="tsaid">' + esc(turn.said) + "</p>" +
-        (turn.did ? '<p class="tdid">' + esc(turn.did) + "</p>" : "") +
-        "</li>",
-    )
-    .join("");
-  const askCards = asks
-    .map(
-      (ask) =>
-        '<article class="ask"><div class="ahead"><span class="aid">' + esc(ask.id) +
-        '</span><span class="await">等你定</span></div>' +
+  const asks = session ? session.asks ?? [] : [];
+  const open = session ? pendingAsks(session) : [];
+  const shown = new Set();
+  const inside = (turn, ask) => {
+    const at = Date.parse(turn.at);
+    const to = ask.closedAt ? Date.parse(ask.closedAt) : Infinity;
+    return at >= Date.parse(ask.at) && at <= to;
+  };
+  const row = (turn, first) =>
+    '<li class="turn ' + turn.who + (first ? " first" : "") + '">' +
+    '<span class="tclock">' + when(turn.at, zone) + "</span>" +
+    '<span class="twho">' + (turn.who === "user" ? "你" : "agent") + "</span>" +
+    '<p class="tsaid">' + esc(turn.said) + "</p>" +
+    (turn.did ? '<p class="tdid">' + esc(turn.did) + "</p>" : "") +
+    "</li>";
+  const WORD = { pending: "等你定", resolved: "已裁", withdrawn: "已撤" };
+  // 一条题就是它自己的开与关，加上这段时间里落在会话上的轮次：
+  // 一个轮次可以同时裁掉几条题（裁定按题落、不按轮落），所以题不记「我答了哪轮」；
+  // 时间窗会重叠，同一轮只出现在先成的那条题里，不复制一遍。
+  const blocks = asks
+    .map((ask) => {
+      const mine = turns.filter((turn) => !shown.has(turn.at) && inside(turn, ask));
+      for (const turn of mine) shown.add(turn.at);
+      return (
+        '<article class="qa" data-state="' + esc(ask.state) + '">' +
+        '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
+        '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span>" +
+        '<span class="qmeta">' + mine.length + " 轮 · 起于 " + when(ask.at, zone) + "</span></div>" +
         '<p class="atext">' + esc(ask.text) + "</p>" +
         '<p class="areading"><span class="k">当成</span>' + esc(ask.reading) + "</p>" +
         '<p class="areading"><span class="k">为什么得你定</span>' + esc(ask.why) + "</p>" +
-        cmd('deed ask resolve ' + ask.id + ' --decision "…"') +
-        "</article>",
-    )
+        (mine.length
+          ? '<details class="qthread"><summary>这段里的 ' + mine.length + ' 轮</summary><ol class="turns">' + mine.map((turn) => row(turn, false)).join("") + "</ol></details>"
+          : "") +
+        (ask.state === "resolved"
+          ? '<p class="qdone"><span class="k">结论</span>' + esc(ask.decision) + '<span class="qby">' + esc(ask.by ?? "") + " · " + when(ask.closedAt, zone) + "</span></p>"
+          : ask.state === "withdrawn"
+            ? '<p class="qdone"><span class="k">撤</span>' + esc(ask.why2 ?? "") + "</p>"
+            : cmd('deed ask resolve ' + ask.id + ' --decision "…"')) +
+        "</article>"
+      );
+    })
     .join("");
+  const rest = turns.filter((turn) => !shown.has(turn.at));
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="discuss" id="screen-discuss">' +
-    screenHead("01", "讨论", "说过的话，一句都没改", turns.length + " 轮") +
-    '<div class="cols">' +
-    '<div class="col logs">' + (rows ? '<ol class="turns">' + rows + "</ol>" : '<p class="quiet">还没有一轮：这一期还没开口</p>') + "</div>" +
-    '<aside class="col side">' +
-    (askCards ? '<h3 class="colh">等你定 · ' + asks.length + "</h3>" + askCards : '<h3 class="colh">等你定</h3><p class="quiet">没有悬着的问题</p>') +
+    screenHead("01", "讨论", "说过的话，一句都没改", asks.length + " 题 · " + turns.length + " 轮") +
+    '<div class="cols"><div class="col logs">' +
+    (blocks || '<p class="quiet">还没有成题的讨论</p>') +
+    (rest.length
+      ? '<h3 class="colh">还没成题 · ' + rest.length + ' 轮</h3><ol class="turns">' + rest.map((turn, index) => row(turn, index === 0)).join("") + "</ol>"
+      : "") +
+    '</div><aside class="col side">' +
+    (open.length
+      ? '<h3 class="colh">等你定 · ' + open.length + "</h3>" + open.map((ask) => '<p class="quiet">' + esc(ask.id) + " · " + esc(ask.text) + "</p>").join("")
+      : '<h3 class="colh">等你定</h3><p class="quiet">没有悬着的问题</p>') +
     "</aside></div></section>"
   );
 }
@@ -661,6 +686,21 @@ html[data-theme="light"] body {
 .atext { margin: 8px 0 0; font-size: 14px; }
 .areading { margin: 6px 0 0; font-size: 11.5px; color: var(--dim); }
 .areading .k { display: inline; margin: 0 8px 0 0; letter-spacing: .2em; }
+// 讨论屏按题分组：题头一行写状态与代价，组里是它那段时间的轮次（重叠的只出现一次），
+// 组尾是结论。裁定过、撤过的题不下屏——拍板的文本跟着题一起留着。
+.qa { border: 1px solid var(--line2); background: var(--panel2); padding: 12px 13px; margin: 0 0 10px; }
+.qa[data-state="pending"] { border-color: color-mix(in srgb, var(--warn) 40%, var(--line2)); background: color-mix(in srgb, var(--warn) 4%, var(--panel2)); }
+.qhead { display: flex; align-items: baseline; gap: 10px; }
+.qstate { font-family: var(--mono); font-size: 8.5px; letter-spacing: .22em; text-transform: uppercase; padding: 0 6px; border: 1px solid currentColor; color: var(--dim); }
+.qa[data-state="pending"] .qstate { color: var(--warn); }
+.qa[data-state="resolved"] .qstate { color: var(--signal); }
+.qmeta { margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--dim); white-space: nowrap; }
+.qthread { margin: 9px 0 0; }
+.qthread summary { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; color: var(--dim); cursor: pointer; }
+.qthread .turns { margin: 8px 0 0; padding: 0 0 0 10px; border-left: 1px solid var(--line); }
+.qdone { margin: 9px 0 0; font-size: 12px; }
+.qdone .k { display: inline; margin: 0 8px 0 0; letter-spacing: .2em; color: var(--signal); }
+.qby { display: block; margin-top: 4px; font-family: var(--mono); font-size: 9px; color: var(--dim); }
 
 /* -------------------------------------------------------------- segments */
 .segs { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
