@@ -196,6 +196,14 @@ export function validateEvent(ev, at) {
         if (!Array.isArray(ev.rework) || ev.rework.length === 0)
           throw new Error("review.log 的 fail 要点名要重做的条目（--rework T1,T2）");
       }
+      // 被点名之后改主意不做的条目，放行时要把这件事与理由一起记下来：它是这条
+      // 结论为什么会过的一部分，只印在当场终端里，读账本的人就看不到。
+      if (ev.gaveUp !== undefined) {
+        if (!Array.isArray(ev.gaveUp)) throw new Error("review.log 的 gaveUp 要是 [{ id, why }] 数组");
+        for (const one of ev.gaveUp)
+          if (!one || typeof one.id !== "string" || !one.id.trim())
+            throw new Error("review.log 的 gaveUp 每一条都要写清是哪一条（id）");
+      }
       break;
     case "review.overturn":
       need(ev, "review");

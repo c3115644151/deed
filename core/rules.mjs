@@ -546,14 +546,14 @@ export function nextAction(doc, config) {
     const named = (review?.rework ?? [])
       .map((id) => session.tasks.find((one) => one.id === id))
       .filter(Boolean);
-    const stuck = named.filter((one) => one.status !== "done" && one.status !== "accepted");
+    // 放弃是落过的决定，带着理由：它结清的是"这件事改主意不做了"，不是"还没做"。
+    const stuck = named.filter((one) => one.status !== "done" && one.status !== "accepted" && one.status !== "dropped");
     if (stuck.length > 0) {
-      // 被点名的条目要么还能重新交付，要么已经被放弃——后者在这份账本里没有回头路，
-      // 说了"重新交付"只会让人白跑一趟。
-      const gone = stuck.filter((one) => one.status === "dropped" || one.status === "deferred");
+      // 延后不是放弃：延后的条目还欠着活，说了"重新交付"才算说实话。
+      const gone = stuck.filter((one) => one.status === "deferred");
       const text =
         gone.length > 0
-          ? `${segment.id} 的不合格（${review.by}）压着已经${gone[0].status === "deferred" ? "延后" : "放弃"}的 ${gone.map((one) => one.id).join("、")}：这条结论只能由人推翻，或者开新一期重做`
+          ? `${segment.id} 的不合格（${review.by}）压着已经延后的 ${gone.map((one) => one.id).join("、")}：要么重新交付，要么由人推翻那条结论`
           : `${segment.id} 的不合格（${review.by}）还压着：${stuck.map((one) => one.id).join("、")} 没有重新交付${findings > 0 ? `（${findings} 条发现）` : ""}——重新交付，或者由人推翻那条结论`;
       return {
         who: "agent",
@@ -578,6 +578,15 @@ export function nextAction(doc, config) {
         what: "清结论",
         text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，只能由人推翻那条结论，或者开新一期`,
         command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
+      };
+    // 点名的条目改主意不做了：没有活可以重交，放行落下来会把它记为放弃并留下理由。
+    const gave = named.filter((one) => one.status === "dropped");
+    if (gave.length > 0)
+      return {
+        who: "reviewer",
+        what: "落结论",
+        text: `${segment.id} 的不合格（${review.by}）点名了 ${gave.map((one) => one.id).join("、")}，它们改主意不做了：没有活可以重交，放行会把放弃与理由记进账本`,
+        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
       };
     return {
       who: "reviewer",

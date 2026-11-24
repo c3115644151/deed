@@ -638,11 +638,18 @@ test("a named entry that was given up settles, and the verdict says so", () => {
   deed(cwd, "review", "--segment", "S01.1");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录").status, 0);
   assert.equal(deed(cwd, "task", "drop", "T1", "--why", "这一期不做了：重放改到下一期").status, 0);
+  const step = deed(cwd, "state");
+  assert.match(step.stdout, /它们改主意不做了/, "放弃已结清，下一步该是落结论");
+  assert.match(step.stdout, /deed review --segment S01\.1 --by/, "下一步指向审查者的 pass，不是推翻");
   deed(cwd, "review", "--segment", "S01.1");
   const after = deed(cwd, "review", "--segment", "S01.1", "--by", "qa2", "--verdict", "pass");
   assert.equal(after.status, 0, after.stderr);
   assert.match(after.stdout, /被点名但已放弃 · T1 · 这一期不做了/);
   assert.match(after.stdout, /段已封存/);
+  const logged = readEvents(cwd).find((one) => one.k === "review.log" && one.verdict === "pass");
+  assert.deepEqual(logged.gaveUp, [{ id: "T1", why: "这一期不做了：重放改到下一期" }], "放弃与理由要进账本：只印在终端里，读账本的人看不到");
+  const sheet = fs.readFileSync(path.join(cwd, logged.brief), "utf8");
+  assert.match(sheet, /状态：dropped · 理由：这一期不做了/, "审查者手上那份要看得出为什么放弃");
 });
 
 test("a verdict cannot answer work that has not been delivered yet", () => {
@@ -1996,4 +2003,23 @@ test("a settled decision keeps its border and what it gave up, and they are not 
   // 它们不是任务：清单里没有多出条目，签收那一行的欠账也没变。
   const plan = deed(cwd, "plan", "--print");
   assert.doesNotMatch(plan.stdout, /文档里的旧词不再新增/);
+});
+
+test("a segment nobody reviewed says in the brief why it was not reviewed", () => {
+  const cwd = workspace("seal-why");
+  deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
+  deed(cwd, "goal", "把文档写完", "--by", "user");
+  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  assert.equal(deed(cwd, "seal", "--why", "只改了文档，门槛说不用审", "--by", "agent").status, 0);
+  deed(cwd, "task", "add", "写第二份文档", "--criteria", "读完能上手", "--files", "docs/b.md");
+  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
+  assert.equal(deed(cwd, "seal", "--why", "也只改了文档", "--by", "agent").status, 0);
+  const whole = deed(cwd, "review", "--all");
+  assert.equal(whole.status, 0, whole.stderr);
+  const dir = path.join(cwd, ".deed", "review");
+  const file = fs.readdirSync(dir).filter((one) => one.startsWith("S01-all-") && !one.endsWith("-reviewer.md")).sort().pop();
+  const text = fs.readFileSync(path.join(dir, file), "utf8");
+  assert.match(text, /免审封存 · agent/, "没人看过的段要在整期清单里露面");
+  assert.match(text, /门槛说这一段不用审（只改了文档，门槛说不用审）/, "理由不能印成空括号");
 });

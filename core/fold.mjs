@@ -406,6 +406,7 @@ export function fold(events) {
           briefDigest: ev.briefDigest ?? null,
           findings: ev.findings ?? [],
           rework,
+          gaveUp: ev.gaveUp ?? [],
           v: meaningOf(ev),
           at: ev.at,
           voidedAt: null,

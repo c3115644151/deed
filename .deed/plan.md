@@ -182,26 +182,51 @@
   交付：node --test 175/175；这一份字节上重跑 test/version.test.mjs 5/5（旧行按它当年那版读，含义超前时说「升级 deed」）；写盘时版本号只有一处给：cli/session.mjs:104 与 :140 的 validateEvent({... , v: EVENT_VERSION })。
 - [x] T69 删掉迁移壳、按名字落账、把自造词换掉
   标准：judge 只剩 --overturn，--pass/--rework 不认；ask resolve/withdraw 走 signer；仓库与文档里不再有「材料」这个绰号（「过程材料」除外）
-  交付：node --test 177/177（这一份字节上跑出来的总��）；单文件复跑：test/cli.test.mjs 100/100、board/board.test.mjs 11/11、test/docs.test.mjs 5/5。judge --pass／--rework exit 1 且报「它认的是 --overturn、--why、--by」；ask resolve 从管道里缺 --by 被拒、写了 --by user 通过。「材料」作为绰号 0 处；守卫改成先把「过程材料」整句抹掉再看剩几处——豁免不再挂在正则上：/材料/gu 换成 /材料/g 仍然全绿，把 docs\README.md 第 28 行的「过程材料」改成「材料」立刻红并报那一行。上一份记录写「99 条来自 test/cli.test.mjs」是抄来的旧数，这一份不写那种分解，只写这几个当场跑出来的数。
-- [x] T70 面板守住工作区写的端口，代码换过就自己换进程，不必有人记得重启
+  交付：重新记下 cli/brief.mjs 这一刻的字节：盖住这条路径的那枚交付随 T73 一起被放弃了（T73 被 T76 换掉），账本里它一度没有现行交付。跑的是这一份字节：node --test test/docs.test.mjs → tests 5 / pass 5 / fail 0。
+~~ T70 面板守住工作区写的端口，代码换过就自己换进程，不必有人记得重启
   标准：端口取自门槛（默认 7317）；被占时退回系统给的号并说清；记号里带面板代码的指纹，对不上就换进程；地址在重启前后一致
   交付：panel 端口与回落这条线在现行字节上重交一次：board/render.mjs 这一轮改过（讨论屏）。回落与搬回的行为在 cli/panel.mjs:63-71 与 cli/deed.mjs:59，用例在 test/cli.test.mjs 的「a panel says when the declared port was taken, and goes back to it when the port is free」。
+  理由：被 T77 换掉：退回的号不再抽系统给的，改成声明号 +1 起的第一格空号，重启后也落在同一格
 - [x] T71 一段的成本看得见：几条任务、几份清单、几次重交、开了多久
   标准：数从账本算（不读时钟，封段时刻减开段时刻）；state 的段行与面板的段头都显示；不参与任何门
   交付：core/rules.mjs 的 costOf 给出 {tasks, briefs, undos, minutes}，minutes 是封段时刻减开段时刻（读账本不读时钟，只回答为什么慢，不参与任何门）；test/rules.test.mjs 断言 {tasks:2,briefs:2,undos:1,minutes:8}；这一份字节上 deed state 在 S02.18 段行下印「花了 · 重交 6 次」（0 份清单不印）；跑 test/rules.test.mjs+test/cli.test.mjs+board/board.test.mjs+test/docs.test.mjs 138/138。
 - [x] T72 出清单时说清这是这一段的第几份，第 3 份起提醒先看前一份哪里不够
   标准：deed review 出清单时打印序号；第 3 份起多一句提醒；不拦、不要求解释
   交付：node --test 175/175；演示账本上连出三份清单：第一份印「S01.1 的第 1 份」，第二份「的第 2 份」且没有提醒，第三份「的第 3 份」并多一句「先看上一份的审查者点了哪几条」；整期同理印「这一期的第 N 份」；只打印，不拦。
-- [x] T73 讨论屏按题分组：一条题带着它那段时间的轮次、状态与结论下屏
+~~ T73 讨论屏按题分组：一条题带着它那段时间的轮次、状态与结论下屏
   标准：讨论屏按题分组渲染，题头写状态与轮数，组里是它那段时间的轮次，组尾是结论；重叠的轮次只出现一次；裁定过、撤过的题仍在屏上；成不了题的轮次单独一段；board 测试有用例断言这五件事
   交付：node --test (DEED_NO_PANEL=1) → tests 178 / pass 178 / fail 0，exit 0；node --test board/board.test.mjs → tests 12 / pass 12 / fail 0；新用例把一份账本渲成 HTML，断言「裁定过的题仍在屏上」「结论跟着题留着」「还开着的题标成等你定」「题头写 2 轮」「重叠的一轮只出现一次」「还没成题 · 1 轮」，删掉 shown 去重那一行该用例即红。
-- [ ] T74 结论块：ask resolve 的裁定里认「边界：」「弃：」两行，落成账本原来就有的那句话，不进清单也不进任何门
+  理由：被 T76 换掉：讨论屏不再按题分组，轮次回到主轴，题在右栏攒线索
+- [x] T74 结论块：ask resolve 的裁定里认「边界：」「弃：」两行，落成账本原来就有的那句话，不进清单也不进任何门
   标准：ask resolve 接受裁定文本里的「边界：…」「弃：…」行并当场报记下几条；空内容的行 exit 1 并说清；这些行从账本算出来（不新增事件、不加字段），state 与验收屏、整期审清单都列得出来；rules 与 board 与 cli 各有用例
-- [ ] T75 state / verify / doctor 也过开关表：拼错的开关一样 exit 1
+  交付：结论块落地：core/rules.mjs 的 edges(session) 从已裁的题里逐行认「边界：」「弃：」（半角全角冒号都认）；ask resolve 当场报记下几条；state 在签收差之前列这两行；验收屏左列加「定过的边界与不做」。跑的是这一份字节：node --test → tests 182 / pass 182 / fail 0；test/rules.test.mjs → 25/25；test/cli.test.mjs → 102/102；board/board.test.mjs → 13/13。
+- [x] T75 state / verify / doctor 也过开关表：拼错的开关一样 exit 1
   标准：这三个动词带任何不认的开关都 exit 1 并猜最接近的一个（与其余动词同一句文案）；有用例覆盖
-- [ ] T76 讨论屏回到轮次为主轴，题在右边攒线索
+  交付：三个只读动词也过开关表：state/verify/doctor 带 --digset 各 exit 1，文案「deed: deed state 不认 --digset 这个开关；deed state 不收开关」。跑的是这一份字节：node --test test/cli.test.mjs → tests 102 / pass 102 / fail 0。
+- [x] T76 讨论屏回到轮次为主轴，题在右边攒线索
   标准：轮次平铺在主轴（一条不折、不过滤）；开着的题在右边，把窗口里用户说的话攒在自己名下；裁过的题收成一行；这条屏由用例管住。
-- [ ] T77 声明的端口长期被占时，退回的那一格算得出来，重启后地址不变
+  交付：讨论屏回到轮次为主轴：五条轮次平铺在主轴上（一条不折），开着的题在右栏、把窗口里用户说的话攒在自己名下（用例断言「攒到 1 句」），裁过的题收成一行。node --test board/board.test.mjs → tests 13 / pass 13 / fail 0。
+- [x] T77 声明的端口长期被占时，退回的那一格算得出来，重启后地址不变
   标准：声明端口被占时退到它 +1、+2…的第一格空号；停了再起仍落同一格；号让出来之后搬回声明号；三条都有用例。
+  交付：面板的退回号算得出来：7433 被占时退到 7434 并由拉起它的命令说清；panel --stop 后再起仍落 7434；7433 让开后下一条命令搬回 7433；面板代码指纹对不上时换进程但端口不变；刚停掉旧进程的 TIME_WAIT 先等 900ms 再判。node --test test/cli.test.mjs → tests 102 / pass 102 / fail 0。
+- [x] T78 放弃也算结清：被点名的条目改主意不做了，pass 落得下来，并且落的时候点名说它被放弃、理由是什么
+  标准：旧账本里在案 fail 点名的条目若被 drop，pass 能落；落时 stdout 印出该条目与原因；panel 段头对已封段印「开了 N 分钟」、对开着的段不印；node --test 全绿
+  交付：跑的是这一份字节：node --test → tests 183 / pass 183 / fail 0；test/cli.test.mjs 与 test/fold.test.mjs 合跑 127 条，board+fold 37 条。放弃结清：fold 里被点名条目 status 为 dropped 时 stuck 为空，pass 落得下来（a standing fail outranks a later pass 用例里那条断言从「抛还没结清」改成「段 verdict=pass」）；落 pass 时 review 印「被点名但已放弃 · T1 · 这一期不做了」（新用例 a named entry that was given up settles, and the verdict says so）。段头：已封段印「开了 N 分钟」、开着不印（board 用例 the turns… 之外那条 a segment that took more than one brief says so on its head 里断言 doesNotMatch 与 match 两半）。
+- [ ] T79 T79 一轮只记一句话：deed say 取代 tick
+  标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
+- [ ] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
+  标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
+- [ ] T81 T81 收口与免审并进已有动词：review --skip、sign --shelve，删 goal
+  标准：deed review --skip --why 封免审段（取代 deed seal）；deed sign --shelve --why 归档（取代 shelve）；deed goal 删除（目的来自清单第一行，submit 已落 goal.set）；三个旧动词 exit 1；有用例覆盖
+- [ ] T82 T82 视图与推翻：state --check/--gates，judge 变 overturn
+  标准：deed state 带 --check 时跑核交付与体检（取代 verify、doctor），带 --gates 时跑门检查（取代 gate）；deed overturn R1 --why 取代 judge --overturn；旧动词 exit 1；有用例覆盖
+- [ ] T83 T83 删掉旧命令：cli/verbs/task.mjs 真删除，测试改走清单+submit
+  标准：cli/spec.mjs 与 ORDER 里不再有 task；cli/verbs/task.mjs 删除；test/cli.test.mjs 里 163 处 task add/done/undo/defer/drop 的夹具改走 deed plan + deed submit（或集中在一处替身里翻译），并有用例断言旧动词 exit 1；全量绿
+- [ ] T84 T84 放弃的结清看得见也留得下
+  标准：pass 落下来时把放弃的条目与理由记进 review.log（gaveUp），不再只在当场 stdout；段清单里 dropped 条目印出理由；下一步在「被点名的都放弃了」时指向审查者的 pass 而不是 judge --overturn；有用例断言这三处
+- [ ] T85 T85 免审段在整期清单里印出自己为什么免审
+  标准：整期与段清单里免审段那行印出账本里写下的理由（sealedWhy）；reason 为空时不印空括号；有用例
+- [ ] T86 T86 交接文件与账本一致
+  标准：HANDOFF 的条目数、测试条数、在案结论、没做的清单（含删旧命令）与这一份字节一致；docs 的禁词检查通过
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

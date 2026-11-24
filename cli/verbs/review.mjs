@@ -250,6 +250,9 @@ export default function review(argv) {
         briefDigest: handed.briefDigest,
         findings,
         ...(flags.verdict === "fail" ? { rework, why: flags.why } : {}),
+        ...(gaveUp.length > 0
+          ? { gaveUp: gaveUp.map((one2) => ({ id: one2.id, why: one2.deferredWhy ?? null })) }
+          : {}),
       })).doc;
       if (flags.verdict === "pass") {
         console.log("审查通过 · " + seg.id + " · " + flags.by + " · 段已封存");

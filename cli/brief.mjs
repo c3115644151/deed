@@ -119,7 +119,7 @@ function taskBlock(task, batches = new Map()) {
     "",
     "- 做完的标准：" + task.criteria,
     "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
-    "- 状态：" + task.status,
+    "- 状态：" + task.status + (task.deferredWhy ? (task.status === "dropped" ? " · 理由：" : " · 为什么延后：") + task.deferredWhy : ""),
     ...task.evidence.map((proof) => {
       const files = proof.files ?? (proof.digest ? [{ path: proof.path, digest: proof.digest }] : []);
       return (
@@ -208,7 +208,7 @@ export function planWhole(root, session, at) {
     if (segment.sealedBy)
       return (
         "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " +
-        stamp0(segment.closedAt) + " · " + count + " 条 · 门槛说这一段不用审（" + (segment.sealWhy ?? "") + "）"
+        stamp0(segment.closedAt) + " · " + count + " 条 · 门槛说这一段不用审（" + (segment.sealedWhy ?? "") + "）"
       );
     return "- " + segment.id + " · 没有段审 · " + count + " 条";
   };

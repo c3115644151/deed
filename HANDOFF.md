@@ -5,15 +5,15 @@
 ## 现在到哪一步
 
 - **第 1 期（S01）已签收**（11-23 18:28，原话「可以通过」）。
-- **第 2 期（S02）开着，18 段**：S02.1…S02.17 都判过或封存（S02.15、S02.16 是 deed seal 封的免审段）；S02.18 现在 8 条，T67/T70/T71/T72/T73/T74/T75 已交付，等第 7 份清单的结论。
-- S02.18 的清单与角色包：`.deed/review` 下最新的 `S02.18-*`（两份一起交给审查者）。
-- 整期结论过期：S02.18 封过之后要 `deed review --all` 重出一份。
-- 目的那句话：把操作面收成一个清单文件：写清单、deed submit 一次落账；要不要审看规模。
+- **第 2 期（S02）开着，18 段**：S02.1…S02.17 都判过或封存（S02.15、S02.16 由 `deed seal` 封，没人审过）；**S02.18 现在 20 条**，整期审把它退回来了。
+- 在案结论：整期审 `R33` · `reviewer:s2-whole4` · 不合格 · 退回 `S02.18` · 4 条发现；`R32`（S02.18 的 pass）随之作废。它退的理由一句话：这一期的目的第一截没成立——旧命令 `task add/done/undo/defer/drop` 还在（`cli/spec.mjs`、`ORDER`、`cli/verbs/task.mjs`），清单能走，但旁边照样开着另一条路。
+- 已经处理掉的三条发现：放弃的结清进了账本（`review.log` 的 `gaveUp`，清单里 `状态：dropped · 理由：…`，下一步指向审查者的 pass 而不是推翻）；免审段在清单里印出自己为什么免审（`sealedWhy`，不再是空括号）；本文件的数与账本对齐。
+- 还差的：`T79`…`T83` 五条把命令面收干净（`say` / `ask answer|drop` / `review --skip` / `sign --shelve` / `state --check|--gates` / `overturn`），其中 `T83` 要真删 `cli/verbs/task.mjs` 并把测试改成清单 + `submit`。
 - 待裁两条：`A5`（提效四条先落哪两条；「落账前重放账本」本来就在 `cli/session.mjs` 的 transactMany 里，③④已落）、`A6`（A4 那三格现在落还是签收后落）。`A8` 已裁（题与裁定怎么记、结论块往哪走），`A9` 已裁：要人点头的门一律是界面上的按钮。
 - 远端：github.com/c3115644151/deed（PUBLIC，MIT，main，无 tag）。版本 0.8.0。
 ## 最后一次验证
 
-`node --test` **182/182**（跑的是这一份字节；单文件复跑：`test/cli.test.mjs` 102/102、`board/board.test.mjs` 13/13、`test/rules.test.mjs` 25/25、`test/fold.test.mjs` 24/24、`test/docs.test.mjs` 5/5、`test/plan.test.mjs` 6/6、`test/version.test.mjs` 5/5、`test/heartbeat.test.mjs` 2/2）。
+`node --test` **184/184**（跑的是这一份字节；单文件复跑：`test/cli.test.mjs` 104/104、`board/board.test.mjs` 13/13、`test/rules.test.mjs` 25/25、`test/fold.test.mjs` 24/24、`test/docs.test.mjs` 5/5、`test/plan.test.mjs` 6/6、`test/version.test.mjs` 5/5、`test/heartbeat.test.mjs` 2/2）。
 `deed verify` exit 0（早先的交付按覆盖算，不算过期），`deed doctor` exit 0（只报事实：先做后记的条目、空交付都不挡放行）。
 面板不必手动起：任意一条命令前它会自己探测、不在就拉起来，那一行会打印 URL；端口取门槛里的 7317，那个号被别的程序先占了就退到系统给的空号，并由这条命令说清「哪个被占着、改开在哪」；面板代码换过（指纹对不上）就自己换进程，端口不变。
 ## 这一轮：裁定里能写「边界」「弃」，讨论屏改成一题一卡
