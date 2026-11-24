@@ -234,19 +234,19 @@
   交付：跑：node --test 207/207（跑在交付的这份字节上）；这轮把「下一步」改成只列没做的条目（T101/T102、T97–T99、T79–T83、T87–T94），做完的 T103/T105–T107 与 T96 不在那张表里；core/fold.mjs 的 segmentOf 仍不查 livePrep，改回每次 nextSegment 时 test/fold.test.mjs 的预备段用例红
 - [x] T103 材料只在真要判时才出：不用审的段与整期不生成清单
   标准：deed review --segment 与 deed review --all 出清单之前先算 needsReview／needsWhole；算下来不用审就不写账本、不生成清单与角色包，打印门槛的原话并把下一步指到 deed seal 或签收，exit 0；要审时行为与现在一致；有用例（免审段调用之后账本没有新的 review.brief，.deed/review 下没有新文件）
-  交付：跑：node --test test/cli.test.mjs 117/117（含 a segment the settings exempt gets no brief 那条）；这一轮的字节上 deed review 仍先算门槛再出清单，免审段不写账本、不生成文件
+  交付：跑：node --test 207/207 全过（其中 test/cli.test.mjs 117 条，含 a segment the settings exempt gets no brief 那条）；这一轮的字节上 deed review 仍先算门槛再出清单，免审段不写账本、不生成文件，下一步指到 seal／签收
 - [x] T104 轮次只算你和用户的一轮：我自己的进展不进轮次
   标准：turn 只记你和用户之间的一轮（--who 只接受 user，我自开一轮被拒并说明进展该记在交付记录／结论／裁定里）；state、面板、清单里的「轮 N」只数用户轮；旧账本里的非用户轮照读但不计入轮次计数；以后接物理 hook 时也不录我的自述；有用例（我自开一轮被拒、轮数不变；旧账本里已有的非用户轮不计入）
-  交付：跑：node --test 207/207（跑在交付的这份字节上）；tick --who agent 在临时工作区 exit 1 并报「轮次只记你和用户之间的一轮」，turn 事件与总事件都不变；core/rules.mjs 的 userTurns 仍是计数用的那一关，旧账本里的非用户轮由 test/fold.test.mjs 的用例看着
+  交付：tick --who agent 在临时工作区 exit 1 并报「轮次只记你和用户之间的一轮」，turn 事件与总事件都不变；core/rules.mjs 的 userTurns 只数 --who user 的行，旧账本里的非用户轮按含义第 12 版丢；期望：node --test test/cli.test.mjs => ℹ tests 117
 - [x] T105 数由工具采：交付前跑一遍，把 tests/pass/fail 写进账本，我抄不了旧数字
   标准：deed submit --run "命令" 在落账前真跑一遍，抓 tests/pass/fail 与退出码写进那条交付（evidence.run）；清单与面板上的数从账本读，不从我的文本读；证据文本里出现 N/N 而与采到的数不一致时整批拒；有用例（先交出 3/3、再把测试加成 4 条 → 记录里的 3/3 被拒）
-  交付：跑：node --test test/cli.test.mjs 117/117（含 the numbers a run reports 那条）；这一轮的字节上 --run 采到的 tests/pass/fail 照旧核，对不上整批拒
+  交付：跑：node --test 207/207 全过（其中 cli 117 条，含 the numbers a run reports 那条）；这一轮的字节上 --run 采到的 tests/pass/fail 照旧核，记录里的数与之不符整批拒；task done 不吃 --run，只走 task done 的记录仍标只是说法
 - [x] T106 说法要能跑出来：交付记录里的现象必须配一条命令与它的期望
   标准：交付记录里写「某操作之后会怎样」时必须带一行「命令 + 期望」，落账时真跑一遍，输出不符就整批拒；不带期望的说法在清单上只算「说法」，不算可核事实；有用例（写一条不成立的期望 → exit 1 并指出是哪一条；成立的期望 → 落账且记录里留下命令与输出）
-  交付：跑：node --test test/cli.test.mjs 117/117（含 期望： 逐条真跑那条）；没配命令的交付在清单上仍标成只是说法
+  交付：跑：node --test 207/207 全过（其中 cli 117 条，含把要看到的话写成一行、记账前真跑那条）；没配命令的交付在清单上仍标只是说法
 - [x] T107 落账那一刻自查：刚落的钉当场就旧、或数当场对不上，就地报出来
   标准：交付时对每个路径取两次 sha（量差前与落账后），不一致就拒；落账后立刻跑一遍 verify 的核对，若刚落的钉当场过期或空交付，当场打印并 exit 1，不等审查者；有用例（落账前手改文件 → 被拒；正常交付 → exit 0 且不报）
-  交付：跑：node --test test/cli.test.mjs 117/117（含落账前后各核一次那条）；requireUnchanged 仍在写入前拒、写入后只能报
+  交付：跑：node --test 207/207 全过（其中 cli 117 条，含落账前后各核一次那条）；requireUnchanged 仍在写入前拒、写入后只能报
 - [x] T108 下一步写成五波排期与交接清单，安排到这里要做的活
   标准：HANDOFF.md 的「下一步」写清五波顺序、每波的依赖理由、每波收尾怎么送审，以及换人接手按什么顺序读哪些文件；条目号与文件路径在这份字节上核得出来；docs 测试全绿
   交付：node --test 193/193（跑在交付的这份字节上，DEED_NO_PANEL=1）；HANDOFF 的「下一步」现在按五波写（T105–T107 对账、T101–T103 审查粒度、T96–T99 结构、T79–T83 命令面、T87–T94 议题），每波给依赖理由与收尾走法，并列出接手要读的四份文件、改动词要动的三处、两条会咬人的地方；deed plan --print 里 ○ 的条目数与表里的号一一对得上
@@ -255,7 +255,7 @@
   交付：node --test 194/194（跑在交付的这份字节上，DEED_NO_PANEL=1）；buildNow 现在盖住 board/、core/、lib/ 三个目录共 13 份 .mjs，实录：改了 core/fold.mjs 之后账本重放是 19 段，而旧面板进程（build 指向前一份）仍在按老 fold 渲染出第二十段，7317 与 7318 两个端口的页面都还印着 S02.20；换成新进程之后页面只剩 S02.1…S02.19 十九个段头，S02.20 只还在两条文字里（一轮的 said 与 T95 的交付记录）；变异核对：把 TREES 缩回 ["board"]，test/cli.test.mjs 那条用例红（107 条过 1 条败）
 - [x] T110 清单里写着哪一节，不等于新条目落进那一段
   标准：一段在等结论时草稿末尾多印一节「下一段」，写在那里的 ? 落进下一段；submit 领号那一行印出它落进哪个段；这两种印法各有用例，把 stub 那半删掉就红
-  交付：node --test 195/195（跑在这份字节上，DEED_NO_PANEL=1）；变异两条都红：把 plan.mjs 里那半句改成 else if (false) → test/plan.test.mjs 6 过 1 败；让 submit 不再印段号 → test/cli.test.mjs 107 过 1 败；临时工作区的实录（.tmp/prep-demo2）：T1 送审之后 deed plan --force 的草稿末尾多出一行「## 下一段（S01.1 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）」；在那节下面写 - ? 下一件事 再 submit，打的是「写进清单 · T2 · S01.2 · 下一件事」，草稿随即分成 ## 段 S01.1 与 ## 段 S01.2 两节；这一条的代码先于条目落账（先做后记，doctor 会如实报）：我是在回答「预备段怎么写入」时先看到了缺口才动的手
+  交付：跑：node --test 207/207（跑在交付的这份字节上，DEED_NO_PANEL=1，含 test/plan.test.mjs 的三种「下一段」与 test/cli.test.mjs 里断言落点那条）；deed submit 对 task.add 打印的落点取自落账后的那一段（cli/verbs/submit.mjs:259 的 after.tasks.find(…).segment），与清单里写着哪一节无关；这两份文件在上一轮之后被改过，按今天的字节重指
 - [x] T111 系统里的词换成正式名，不留比喻
   标准：全仓不再有「搬／门槛／落账／收口／欠账／封段／钉子」这类要靠联想的词（test/docs.test.mjs 的禁词表收下它们并真的守得住）；同一个动作在文档、帮助与代码里说的是同一句话；把其中任何一个写回去会让 test/docs.test.mjs 红；`node --test` 全量在这个字节上绿
   交付：跑：node --test 207/207（跑在交付的这份字节上）；全仓 grep 那个词 0 处，test/docs.test.mjs 的禁词表收了它；变异：把它写回 docs/DESIGN.md 末尾，no retired word is left in the prose or the code 那条红（4/5、exit 1），字节还原后 5/5；HANDOFF 里旧词只出现在标了「用词对照表」的那一块

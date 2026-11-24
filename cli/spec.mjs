@@ -21,6 +21,8 @@ export const SPEC = {
     usage: [
       'deed task add "<要做的事>" --criteria "<做完的标准>" [--files "src/a.mjs,docs/b.md"]',
       'deed task done <T1> --evidence "<命令与结果>" [--digest <路径> …] [--session S01]',
+      '                 这条只记账：记录里写的数不会被工具采，也不会跑记录里的「要看到的话」',
+      '                 要让数由工具采、话被真跑一遍，用 deed submit --run "<命令>"',
       'deed task undo <T1> --why "…"         收回最后那条交付（说错了话用它，别改写成对的）',
       'deed task defer|drop <T1> --why "…"',
     ],
