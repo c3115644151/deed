@@ -2111,5 +2111,6 @@ test("a sealed segment with no reason written says what it is, without empty bra
   const latest = fs.readdirSync(dir).filter((one) => one.startsWith("S01-all-") && !one.endsWith("-reviewer.md")).sort().pop();
   const text = fs.readFileSync(path.join(dir, latest), "utf8");
   assert.match(text, /免审封存 · agent/, "这一行照旧要露面");
-  assert.doesNotMatch(text, /（）/u, "没有理由就不该有括号");
+  // 理由缺的是 undefined 而不是空串：两种形状都不许露出来，否则守卫被删掉也没人知道
+  assert.doesNotMatch(text, /（）|undefined/u, "没有理由就不该有括号，也不该露出 undefined");
 });

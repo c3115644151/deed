@@ -2,7 +2,7 @@
  ".gitattributes": "b218e15ac52869e51d9b4eabf647853462d494f10e51cb1e97a271eb24616dda",
  ".gitignore": "699d22b5e19f87e5d25a4c2719ff63842e55ba04ac0ebac0cca40a4568e2f311",
  "AGENTS.md": "46a523786ce03186e919cd69d68304c60e2e927e062046f98932129998fd2b8f",
- "HANDOFF.md": "5fc955107d99ca1283e791ced87a8b359fa3914dd155cab88295cb67b72753ac",
+ "HANDOFF.md": "43abca88211cb51eff9418573a8bf514fdf8016ff558a84ff829ba366c8b0b62",
  "LICENSE": "c7f69f6dd51007fedbcd00a446d4994e7d4dfa919f26cbd57082c1544d432399",
  "README.md": "9487c14424ea4d631acf9e9fe66a357e8c49f4d359e1ea9703945eef84c332c9",
  "board/board.test.mjs": "10766f7da4c3c2d8d0f8b931be2cf245eb2b0f6b06434e7abafe47a237b24001",
@@ -55,11 +55,14 @@
  "lib/words.mjs": "22b1c1d9e523203441035fbf18ac16a8f1f357d2a575437cfd7ec58e7877a2c5",
  "package.json": "1db2ea6e922ddc46cd061adfd07ce61ed272525db21c4e26c01359709f019d74",
  "support/lib.mjs": "bd3b1119f7746197f774f784be1eca592b412337180046646202218b7d02a7ab",
- "test/cli.test.mjs": "3621f16dc6dbda08efb1b1c81a85c9301f364bd21601bec9a2ccf117e0bfc283",
+ "test/cli.test.mjs": "b3006d643d21fa17c232396259e0b64354513795a1b2b2dab03335aec09b15ef",
  "test/docs.test.mjs": "871739675af0435b3ddf81849d26ed61e032cc415c360699f69e62e0e1c52c67",
  "test/fold.test.mjs": "5f63c7a4d8cb3f30be1adbbcc049aca917b1c8aeda8a9dca2f782b449c74e4fb",
  "test/heartbeat.test.mjs": "d1fc0e0c83799664abedad6f6f27ed9a1bbaf7e647be449ad07a2754c6b032c4",
  "test/plan.test.mjs": "072cafd2893526e2b7edfb70704b6425cf446479122d88d355f28c85f4693f3f",
  "test/rules.test.mjs": "bd4128624ccdff0616023493a33c650cedb654068f20ca7091cbd4dd6aa4aa1e",
- "test/version.test.mjs": "4171555d438c11d7f4035cbfb9bde49ce18fd78a55bbc0d0c58a2c6b8ac13d28"
+ "test/version.test.mjs": "4171555d438c11d7f4035cbfb9bde49ce18fd78a55bbc0d0c58a2c6b8ac13d28",
+ "undefined/temp/deed-gate-ve6uhL/docs/a.md": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+ "undefined/temp/deed-r11/t69.ps1": "42e035068030717aac2dde9df7444d98927c97e4ca82cc8f999c2b65a901e153",
+ "undefined/temp/deed-r11/w-t69/a.mjs": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
 }
