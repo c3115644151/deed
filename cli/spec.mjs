@@ -13,7 +13,10 @@ export const SPEC = {
   },
   tick: {
     flags: ["who", "said", "did", "session", "by"],
-    usage: ['deed tick --who user|agent --said "…" [--did "…"] [--session S01]'],
+    usage: [
+      'deed tick --who user --said "…" [--did "…"] [--session S01]',
+      '                 轮次只记你和用户之间的一轮：我自己的进展写进交付记录或结论，不记成轮次',
+    ],
   },
   task: {
     flags: ["id", "title", "criteria", "session", "files", "evidence", "digest", "by", "why"],

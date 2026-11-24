@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { nextAction, sessionById } from "../../core/rules.mjs";
 import { changedPaths, rel, writeSnapshot } from "../../lib/store.mjs";
-import { movedSince, pinSet, requireUnchanged, weigh } from "../pins.mjs";
+import { auditDelivered, pinSet, requireUnchanged, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
 
@@ -232,18 +232,24 @@ export default function submit(argv) {
           // 工作区里那些改动就被它吃掉了——下一条交付看起来什么都没动。
           if (stamped.some((ev) => ev.k === "task.done")) writeSnapshot(ROOT, scanned.now);
           // 记账与落到磁盘之间还剩一条缝：重算一遍每条交付记下的路径。
-          // 变了不能当没发生——那条交付已经在账本里，只能撤回。
-          for (const ev of stamped) {
-            if (ev.k !== "task.done") continue;
-            for (const one of movedSince(ROOT, ev.files ?? [])) {
+          // 变了、或者压根没指着东西，都不能当没发生——那条交付已经在账本里，只能撤回。
+          const audited = stamped.filter((ev) => ev.k === "task.done").length;
+          for (const one of auditDelivered(ROOT, stamped)) {
+            if (one.empty) {
+              console.log("空交付 · " + one.id + " · 谁也没指着：账本上这一条核不了");
+              console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"这是一条空交付\"，重跑一遍再交");
+            } else {
               console.log(
-                "字节变了 · " + ev.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12) +
+                "字节变了 · " + one.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12) +
                   "，记账这一刻是 " + (one.now === null ? "文件不在了" : one.now.slice(0, 12)),
               );
-              console.log("  这条交付已经写进账本：deed task undo " + ev.id + " --why \"记账时字节变了\"，重跑一遍再交");
-              process.exitCode = 1;
+              console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"记账时字节变了\"，重跑一遍再交");
             }
+            process.exitCode = 1;
           }
+          // 核过就说一句：没有这一行，谁也不知道这一步真的跑过（删掉它，用例会红）。
+          if (audited > 0 && process.exitCode !== 1)
+            console.log("记账之后核对 · " + audited + " 条都对得上当时那份内容");
         },
       );
       // 落过账就把清单按账本重写一遍：新条目领到的号要写回去，不然下一次 submit

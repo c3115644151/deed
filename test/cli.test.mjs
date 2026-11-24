@@ -10,7 +10,7 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { movedSince, requireUnchanged } from "../cli/pins.mjs";
+import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 
 const CLI = path.join(import.meta.dirname, "..", "cli", "deed.mjs");
 // 面板默认关掉：每条命令都去拉一个后台服务，测试就成了端口和进程的集合。
@@ -1620,6 +1620,7 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
   const second = deed(cwd, "submit");
   assert.equal(second.status, 0, second.stderr);
   assert.match(second.stdout, /交付 · T1 · 写了 docs\/a.md/);
+  assert.match(second.stdout, /记账之后核对 · 1 条都对得上当时那份内容/, "记账之后要核一遍：没有这一句就没人知道它跑过");
   const done = readEvents(cwd).find((one) => one.k === "task.done" && one.id === "T1");
   assert.ok(done.files.some((one) => one.path === "docs/a.md"), "勾上就是交付：submit 按工作区自己称，记下动过的文件");
   assert.equal(done.evidence, "写了 docs/a.md", "交付记录就是清单上那一行");
@@ -2385,4 +2386,24 @@ test("a delivery is refused when a pinned path moved before it was written down"
   assert.doesNotThrow(() => requireUnchanged(cwd, [pin]), "没变的路径不该拦");
   fs.writeFileSync(path.join(cwd, "a.md"), "two");
   assert.throws(() => requireUnchanged(cwd, [pin]), /记账之前这些路径变了：a\.md/);
+});
+test("what a batch of deliveries points at is checked once the ledger has them", () => {
+  // 记账之后那一刻的核对：这条交付还指得到那份内容吗？变了要能分开说「变了」与「不在了」，
+  // 一条谁也没指着的交付要单独说成「空交付」——两种都不是可以放过去的样子。
+  const cwd = workspace("audit-delivered");
+  fs.writeFileSync(path.join(cwd, "a.md"), "one");
+  const pin = { path: "a.md", digest: createHash("sha256").update("one").digest("hex") };
+  const done = (files) => ({ k: "task.done", id: "T1", files });
+  assert.deepEqual(auditDelivered(cwd, [done([pin])]), [], "对得上就说没事");
+  assert.deepEqual(auditDelivered(cwd, [{ k: "task.add", id: "T2" }]), [], "不是交付的行不归它管");
+  fs.writeFileSync(path.join(cwd, "a.md"), "two");
+  const moved = auditDelivered(cwd, [done([pin])]);
+  assert.equal(moved.length, 1);
+  assert.equal(moved[0].id, "T1");
+  assert.equal(moved[0].path, "a.md");
+  assert.equal(moved[0].empty, false);
+  assert.equal(moved[0].now, createHash("sha256").update("two").digest("hex"));
+  const empty = auditDelivered(cwd, [done([])]);
+  assert.equal(empty.length, 1, "谁也没指着的交付也要说出来");
+  assert.equal(empty[0].empty, true);
 });

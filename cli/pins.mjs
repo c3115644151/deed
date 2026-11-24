@@ -81,3 +81,20 @@ export function requireUnchanged(root, files = []) {
       "；重跑一遍再交",
   );
 }
+
+// 记账那一刻的核对：刚落进账本的这些交付，现在还指得到那份内容吗？
+// 两件事在这一刻看得见：路径在写入之后又变了（外部进程正好撞上），或者这条交付
+// 谁也没指着（既没量到改动、也没点名文件）——都是"账已经记了、却核不了"的样子。
+// 它们不能当没发生：已经写进账本的那条只能撤回，所以这里只负责说出来。
+export function auditDelivered(root, events = []) {
+  const bad = [];
+  for (const ev of events) {
+    if (ev.k !== "task.done") continue;
+    const files = ev.files ?? (ev.digest && ev.digestPath ? [{ path: ev.digestPath, digest: ev.digest }] : []);
+    // 只删不改也记不到字节，但它确实动过那条路径：空交付说的是「谁也没指着」，不是「没有内容可指」。
+    const removed = Array.isArray(ev.changed) && ev.changed.length > 0;
+    if (files.length === 0 && !removed) bad.push({ id: ev.id, path: null, digest: null, now: null, empty: true });
+    for (const one of movedSince(root, files)) bad.push({ id: ev.id, ...one, empty: false });
+  }
+  return bad;
+}

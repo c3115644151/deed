@@ -9,6 +9,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { BLOCK } from "../lib/words.mjs";
+import { SPEC } from "../cli/spec.mjs";
+import { WHO } from "../core/events.mjs";
 
 const ROOT = path.join(import.meta.dirname, "..");
 
@@ -78,4 +80,16 @@ test("no retired word is left in the prose or the code", () => {
     for (const word of RETIRED) if (text.includes(word)) left.push(path.relative(ROOT, file) + " · " + word);
   }
   assert.deepEqual(left, [], "这些词已经不在名词表里了：「" + RETIRED.join("」「") + "」。改回通行词，别让两份词表并存");
+});
+// 同一个动作，帮助、文档、代码三处各说一句，读的人就会照着最松的那一句做事。
+// --who 就是踩过的：帮助写着 user|agent，文档写着只认 user，代码真拒。
+test("the help line about --who says what the docs and the code say", () => {
+  const usage = SPEC.tick.usage.join("\n");
+  assert.doesNotMatch(usage, /user\|agent/u, "帮助里不能再写 agent 也能开一轮：代码会拒（deed tick --who agent 实测 exit 1）");
+  assert.match(usage, /--who user(?!\|)/u, "帮助里要写 --who user：轮次只记你和用户之间的一轮");
+  assert.deepEqual(WHO, ["user"], "代码里只认用户那一轮");
+  for (const name of ["README.md", "AGENTS.md"]) {
+    const text = fs.readFileSync(path.join(ROOT, name), "utf8");
+    assert.match(text, /--who[^\n]*user/u, name + " 里要写清 --who 只认 user");
+  }
 });
