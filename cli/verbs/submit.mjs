@@ -157,8 +157,10 @@ export default function submit(argv) {
               fail(item.id + " 的标题和账本不一样：清单只做四件事（勾上、撤勾、~~、?），改标题不算其中");
             // 位置是能改的（标题与标准不行）：把行挪个地方再 submit，就落一条 task.order。
             // 位置在段内算，不跨段——同段里谁先做是一件事，跨段是另一件事。
-            const wanted = placeOf(plan.items, item);
-            if (wanted !== (task.order ?? null)) specs.push({ k: "task.order", s: one.id, id: item.id, order: wanted });
+            // 已封存的段里的条目不再改：那一段的事实已经定下来了，事后重排只是噪音。
+            const home = one.segments.find((seg) => seg.id === task.segment);
+            const wanted = home && home.closedAt === null ? placeOf(plan.items, item) : null;
+            if (wanted !== null && wanted !== (task.order ?? null)) specs.push({ k: "task.order", s: one.id, id: item.id, order: wanted });
             if (item.criteria && item.criteria !== task.criteria)
               fail(item.id + " 的标准和账本不一样：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做");
             if (item.box === "~") {

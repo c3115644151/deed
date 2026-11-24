@@ -7,6 +7,7 @@
 // the work was.
 
 import { awaitingVerdict } from "../core/fold.mjs";
+import { byOrder } from "../core/rules.mjs";
 
 export const HEAD = "# 这一期要做成什么";
 
@@ -136,7 +137,8 @@ const bullet = (task) => {
 export function draft(session) {
   const out = [HEAD, session.goal?.text ?? "（还没写：一句话说清这一期要做成什么）", ""];
   for (const segment of session.segments) {
-    const tasks = session.tasks.filter((one) => one.segment === segment.id);
+    // 印的顺序就是该做的顺序：账本里的位置（task.order），没排过的按写下的先后。
+    const tasks = byOrder(session.tasks.filter((one) => one.segment === segment.id));
     if (tasks.length === 0) continue;
     out.push("## 段 " + segment.id);
     for (const task of tasks) {
