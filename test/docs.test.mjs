@@ -49,6 +49,23 @@ function prose(root, found = []) {
 // place a retired word is allowed to stand.
 const dropTable = (text) => text.replace(/<!-- 用词对照表[\s\S]*?<!-- \/用词对照表 -->/g, "");
 
+// 「材料」是一句日常话（过程材料），也是一个被换掉的绰号。数它出现几次靠人眼，
+// 而写数的人自己就是被数的对象——改一次文档就把数目改一次。这条守卫代替计数：
+// 只有写成「过程材料」才算日常话，其余一律算绰号。
+test("「材料」只许写成「过程材料」", () => {
+  const left = [];
+  for (const file of prose(ROOT)) {
+    if (path.resolve(file) === path.resolve(import.meta.filename)) continue;
+    const text = dropTable(fs.readFileSync(file, "utf8"));
+    for (const hit of text.matchAll(/材料/gu)) {
+      if (text.slice(Math.max(0, hit.index - 2), hit.index) === "过程") continue;
+      const line = text.slice(0, hit.index).split("\n").length;
+      left.push(path.relative(ROOT, file) + " 第 " + line + " 行");
+    }
+  }
+  assert.deepEqual(left, [], "「材料」在这里是绰号：写成「过程材料」，或者换一句说清它是什么");
+});
+
 test("no retired word is left in the prose or the code", () => {
   const left = [];
   for (const file of prose(ROOT)) {
