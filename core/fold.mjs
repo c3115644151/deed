@@ -299,10 +299,14 @@ export function fold(events) {
         if (task.status === "todo" && task.evidence.length === 0 && (task.undone ?? []).length === 0) {
           const where = session.segments.findIndex((one) => one.id === task.segment);
           const before = where > 0 ? session.segments[where - 1] : null;
-          if (before && session.segments[where] === session.segments[session.segments.length - 1]) {
+          const left = session.segments[where] ?? null;
+          if (before && left === session.segments[session.segments.length - 1]) {
             task.segment = before.id;
             before.carried = true;
             task.touchedAt = ev.at;
+            // 它走空的那一段就是个只剩计划的地方：段由条目生出来，条目回来了，段也就不该在。
+            if (!session.tasks.some((one) => one.segment === left.id))
+              session.segments = session.segments.filter((one) => one !== left);
             break;
           }
         }

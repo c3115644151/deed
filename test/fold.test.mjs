@@ -427,3 +427,15 @@ test("an entry carries the order it was written with, and can be reordered later
   ]);
   assert.equal(after.sessions[0].tasks[0].order, 1);
 });
+
+// 撤回一条「改到下一段」时，被走空的那一段要跟着消失：段由条目生出来，不是计划。
+test("the segment a taken-back carry emptied disappears with it", () => {
+  const doc = fold([
+    turn(1), add(2, "T1"), add(3, "T2"), done(4, "T1"),
+    carry(5, "T2"),
+    { v: 16, at: T(6), k: "task.undo", s: null, id: "T2", why: "排错了", by: "agent" },
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.1");
+  assert.deepEqual(session.segments.map((one) => one.id), ["S01.1"], "只留下有条目的那一段");
+});
