@@ -230,6 +230,16 @@ export default function review(argv) {
       } else if (rework.length > 0) {
         fail("--rework 只跟 --verdict fail 一起用：pass 的意思是这一段过了，没有要退回的条目");
       }
+      // 上一份不合格点名的条目里，被放弃的那些没有交付可结清：结论不是"改好了"，
+      // 而是"这件事改主意不做了"。在落结论的地方说出来，下一个读账本的人才知道。
+      const standing = one.reviews.filter(
+        (one2) => one2.voidedAt === null && one2.scope === "segment" && one2.segment === seg.id,
+      ).slice(-1)[0];
+      const gaveUp = flags.verdict === "pass" && standing && standing.verdict === "fail"
+        ? (standing.rework ?? [])
+            .map((id) => one.tasks.find((one3) => one3.id === id))
+            .filter((one3) => one3 && one3.status === "dropped")
+        : [];
       const after = transact(flags, () => ({
         k: "review.log",
         s: one.id,
@@ -244,6 +254,8 @@ export default function review(argv) {
       if (flags.verdict === "pass") {
         console.log("审查通过 · " + seg.id + " · " + flags.by + " · 段已封存");
         console.log("  清单 " + handed.brief);
+        for (const one2 of gaveUp)
+          console.log("  被点名但已放弃 · " + one2.id + " · " + (one2.deferredWhy ?? "没写理由") + "（这条不合格没有交付可结清，结论落在它被放弃这件事上）");
         for (const one2 of findings) console.log("  发现 · " + one2);
         const step = nextAction(after, after.config);
         console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);

@@ -177,9 +177,12 @@ test("a standing fail outranks a later pass until the work it named is delivered
   const before = [turn(1), add(2, "T1"), done(3, "T1"), fail];
   // 没重新交付之前连结论都落不了：先交付，才轮得到"能不能判"。
   assert.throws(() => fold([...before, { ...pass, at: T(6) }]), /还有没交付的/u);
-  // 放弃了被点名的那条也不算结清：活没人做过，结论就还没到。
+  // 放弃是另一条落过的决定，它自己也带着理由：被点名的那条改主意不做了，
+  // 就没有交付等着结清，结论可以落下来（下一个审查者读得到它被放弃这件事）。
   const dropped = { v: 3, at: T(6), k: "task.drop", s: null, id: "T1", why: "不做了" };
-  assert.throws(() => fold([...before, dropped, pass]), /还没结清/u);
+  const noWork = fold([...before, dropped, pass]);
+  assert.equal(noWork.sessions[0].segments[0].verdict, "pass");
+  assert.equal(noWork.sessions[0].tasks[0].status, "dropped");
   const again = { v: 3, at: T(6), k: "task.done", s: null, id: "T1", evidence: "again", by: "agent" };
   const doc = fold([...before, again, pass]);
   assert.equal(doc.sessions[0].segments[0].verdict, "pass");

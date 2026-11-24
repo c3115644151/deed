@@ -629,6 +629,22 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   assert.match(after.stdout, /段已封存/);
 });
 
+// 被点名的活改主意不做了，交付就没有可结清的东西：结论落得下来，但它必须说出这件事。
+test("a named entry that was given up settles, and the verdict says so", () => {
+  const cwd = workspace("verdict-dropped");
+  deed(cwd, "init", "--said", "改重放函数");
+  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录").status, 0);
+  assert.equal(deed(cwd, "task", "drop", "T1", "--why", "这一期不做了：重放改到下一期").status, 0);
+  deed(cwd, "review", "--segment", "S01.1");
+  const after = deed(cwd, "review", "--segment", "S01.1", "--by", "qa2", "--verdict", "pass");
+  assert.equal(after.status, 0, after.stderr);
+  assert.match(after.stdout, /被点名但已放弃 · T1 · 这一期不做了/);
+  assert.match(after.stdout, /段已封存/);
+});
+
 test("a verdict cannot answer work that has not been delivered yet", () => {
   const cwd = workspace("verdict-early");
   deed(cwd, "init", "--said", "开始");

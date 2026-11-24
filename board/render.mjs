@@ -321,8 +321,13 @@ function segmentBlock(session, segment, index, config, zone) {
     '<span class="sidx">' + String(index).padStart(2, "0") + "</span>" +
     '<span class="sid">' + esc(segment.id) + "</span>" +
     '<span class="scount">' + count.total + " 条 · 未做 " + count.todo + " · 已交付 " + (count.done + count.accepted) + "</span>" +
-    '<span class="scost" title="这一段花了多少：清单出过几份、重交了几次">' +
-    (spent.briefs > 1 || spent.undos > 0 ? "清单 " + spent.briefs + (spent.undos > 0 ? " · 重交 " + spent.undos : "") : "") + "</span>" +
+    '<span class="scost" title="这一段花了多少：清单出过几份、重交了几次、开了多久">' +
+    [
+      spent.briefs > 1 ? "清单 " + spent.briefs : "",
+      spent.undos > 0 ? "重交 " + spent.undos : "",
+      spent.minutes !== null ? "开了 " + spent.minutes + " 分钟" : "",
+    ].filter(Boolean).join(" · ") +
+    "</span>" +
     '<span class="smeter2" title="' + (count.done + count.accepted) + " / " + count.total + '">' +
     '<span class="sfill" style="width:' + Math.round(((count.done + count.accepted) / Math.max(1, count.total)) * 100) + '%"></span></span>' +
     '<span class="swhen">' + when(segment.openedAt, zone) + (segment.closedAt ? " → " + when(segment.closedAt, zone) : "") + "</span>" +

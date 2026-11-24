@@ -353,7 +353,10 @@ export function fold(events) {
             ? named.filter((id) => session.segments.some((one) => one.id === id && one.closedAt === null))
             : named
                 .map((id) => taskOf(session, id))
-                .filter((task) => task.status !== "done" && task.status !== "accepted")
+                // 放弃也是一条落过的决定（它自己带着原因）：被点名的活改主意不做了，
+                // 就没有交付等着结清。剩下的判断交给下一次审查者——他要看得见这条被放弃了，
+                // 落结论时 review 会把它们逐个印出来。
+                .filter((task) => task.status !== "done" && task.status !== "accepted" && task.status !== "dropped")
                 .map((task) => task.id);
           if (named.length === 0)
             noway(
