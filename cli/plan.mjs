@@ -27,7 +27,7 @@ export const FORMAT = [
   "",
   "四件事：勾上 = 交付（必须写 交付：），取消勾选 = 撤回（必须写 理由：），",
   "? = 新条目（submit 时领号），~~ = 放弃（必须写 理由：）；把 ~~ 改回 - [ ] 就是撤回放弃（也要写 理由：）；",
-  "延后写一行 延后：为什么。路径与 sha256 不用写，submit 自己算。",
+  "延后写一行 延后：为什么。同段里谁先做，就是你在文件里排的先后：把条目上下挪一下，再 submit 一次。",
   "这一段已经有交过的活、正要送审时，没做的条目写一行 改到下一段： 它就真挪到下一段——",
   "它不是放弃，是换个段接着做；那一段自己从此不接新活。",
 ].join("\n");
@@ -47,6 +47,9 @@ export function parse(text) {
   const problems = [];
   const goal = [];
   let where = null;
+  // 节是条目排在哪里的依据：同一段里的先后按文件里的先后算，不按条目编号算。
+  // 条目一旦离开它那一节，位置就变了——这是这份文件唯一说「顺序」的地方。
+  let section = 0;
   let item = null;
   // 条目一出现，前面的散文就不再是「这一期要做成什么」了：那是写错位置的句子。
   let started = false;
@@ -61,26 +64,29 @@ export function parse(text) {
     if (heading) {
       where = heading[1].length === 1 ? "goal" : "segment";
       item = null;
-      if (where === "segment") started = true;
+      if (where === "segment") {
+        section += 1;
+        started = true;
+      }
       continue;
     }
     const check = CHECK.exec(line);
     if (check) {
-      item = { id: check[2] ?? null, title: check[3].trim(), box: check[1].toLowerCase() === "x" ? "x" : " ", at };
+      item = { id: check[2] ?? null, title: check[3].trim(), box: check[1].toLowerCase() === "x" ? "x" : " ", at, section };
       items.push(item);
       started = true;
       continue;
     }
     const fresh = FRESH.exec(line);
     if (fresh) {
-      item = { id: null, title: fresh[1].trim(), box: "?", at };
+      item = { id: null, title: fresh[1].trim(), box: "?", at, section };
       items.push(item);
       started = true;
       continue;
     }
     const dropped = DROPPED.exec(line);
     if (dropped) {
-      item = { id: dropped[1], title: dropped[2].trim(), box: "~", at };
+      item = { id: dropped[1], title: dropped[2].trim(), box: "~", at, section };
       items.push(item);
       started = true;
       continue;

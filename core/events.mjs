@@ -10,6 +10,8 @@ export const EVENT_KINDS = [
   "task.drop",
   // 一段送审之后就不再收新活：没做的条目靠这一行改到下一段（理由写在清单的 改到下一段： 里）。
   "task.carry",
+  // 清单上那张 先后： 也是一个事实：同段里谁先做。它只决定印出来的顺序。
+  "task.order",
   "ask.raise",
   "ask.resolve",
   "ask.withdraw",
@@ -35,7 +37,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 15;
+export const EVENT_VERSION = 17;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -51,6 +53,10 @@ export const MEANING = {
   // 撤回可以撤一条放弃：放弃不再是一锤子买卖，撤回来它就回到未做，能重新交付。
   // 以前这种撤回只会被当成「没有可撤回的交付」拒掉，所以旧行照旧按那一套读。
   dropBack: 15,
+  // 撤回一条「改到下一段」：段不是排期工具，挪出去只该发生在送审那一刻，挪错了能挪回来。
+  undoCarry: 16,
+  // 条目可以带一个「先后」：同段里谁先做。它只决定印出来的顺序，不进门也不进结论。
+  order: 17,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -107,6 +113,13 @@ export function validateEvent(ev, at) {
       need(ev, "id");
       need(ev, "title");
       need(ev, "criteria");
+      if (ev.order !== undefined && (!Number.isInteger(ev.order) || ev.order < 1))
+        throw new Error("task.add 的 order 要是不小于 1 的整数：清单上写 先后：1");
+      break;
+    case "task.order":
+      need(ev, "id");
+      if (!Number.isInteger(ev.order) || ev.order < 1)
+        throw new Error("task.order 的 order 要是不小于 1 的整数：清单上写 先后：1");
       break;
     case "task.done":
       need(ev, "id");

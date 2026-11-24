@@ -1,6 +1,6 @@
 import { currentSession, sessionById } from "../../core/rules.mjs";
 import { changedPaths, writeSnapshot } from "../../lib/store.mjs";
-import { namedPins, weigh } from "../pins.mjs";
+import { auditDelivered, namedPins, requireUnchanged, weigh } from "../pins.mjs";
 import { ROOT, parse, transact, nextId, fail, guard, undoesOf, split, list } from "../session.mjs";
 
 export default function task(argv) {
@@ -57,6 +57,9 @@ export default function task(argv) {
           flags,
           () => {
             const taken = scanned;
+            // 量差之后、记账之前再核一遍：这一处能真拒，一条事件都不落。
+            requireUnchanged(ROOT, pins);
+            if (pins.length > 0) console.log("记账之前再核一遍 · " + pins.length + " 条没有变");
             return {
               k: "task.done",
               s: flags.session ?? null,
@@ -70,7 +73,26 @@ export default function task(argv) {
               bytes: sizes,
             };
           },
-          () => writeSnapshot(ROOT, snapshotFiles),
+          (stamped) => {
+            writeSnapshot(ROOT, snapshotFiles);
+            // 记账之后立刻核一遍：刚落的那条还指得到那份内容吗？变了、或者空交付，
+            // 当场说出来并 exit 1——它已经在账本里，只能撤回。
+            const bad = auditDelivered(ROOT, [stamped]);
+            for (const one of bad) {
+              if (one.empty) {
+                console.log("空交付 · " + one.id + " · 谁也没指着：账本上这一条核不了");
+                console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"这是一条空交付\"，重跑一遍再交");
+              } else {
+                console.log(
+                  "字节变了 · " + one.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12) +
+                    "，记账这一刻是 " + (one.now === null ? "文件不在了" : one.now.slice(0, 12)),
+                );
+                console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"记账时字节变了\"，重跑一遍再交");
+              }
+              process.exitCode = 1;
+            }
+            if (bad.length === 0) console.log("记账之后核对 · 1 条都对得上当时那份内容");
+          },
         );
         console.log(
           "交付 · " + id + " · 交付记录：" + flags.evidence +

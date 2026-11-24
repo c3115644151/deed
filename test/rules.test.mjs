@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
+  byOrder,
   edges,
   needsWhole,
   needsReview,
@@ -427,4 +428,14 @@ test("a decision can carry a border and an abandoned thing, and both are read of
   assert.equal(got[0].id, "A1");
   assert.equal(fold([turn(1), ask(2)]).sessions[0].asks.length, 1);
   assert.deepEqual(edges(fold([turn(1), ask(2)]).sessions[0]), [], "没裁过的题没有结论可读");
+});
+
+// 清单、state 与面板印的是同一个顺序：先按 先后，没写的排后面。
+test("tasks are read in the order they were given, and the ones without one come after", () => {
+  const tasks = [
+    { id: "T3", order: 2 },
+    { id: "T1", order: null },
+    { id: "T2", order: 1 },
+  ];
+  assert.deepEqual(byOrder(tasks).map((one) => one.id), ["T2", "T3", "T1"]);
 });

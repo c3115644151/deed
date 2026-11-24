@@ -224,6 +224,8 @@ export function fold(events) {
           undone: [],
           // 撤回过的放弃：放弃错了撤回来，这条任务要能说清它走过那一遭。
           revived: [],
+          // 同段里谁先做。它不进门也不进结论，只决定印出来的顺序。
+          order: ev.order ?? null,
           changed: [],
           sizes: {},
           deferredWhy: null,
@@ -291,6 +293,19 @@ export function fold(events) {
           task.deferredWhy = null;
           break;
         }
+        // 撤回也可以是撤回一条「改到下一段」：段不是排期工具，把活挪进下一段只该发生在
+        // 「这一段要送审了」那一刻。挪错了得能挪回来，否则账本里会留下一个只为计划而生
+        // 的段，而计划不是事实（事件含义第 16 版）。
+        if (task.status === "todo" && task.evidence.length === 0 && (task.undone ?? []).length === 0) {
+          const where = session.segments.findIndex((one) => one.id === task.segment);
+          const before = where > 0 ? session.segments[where - 1] : null;
+          if (before && session.segments[where] === session.segments[session.segments.length - 1]) {
+            task.segment = before.id;
+            before.carried = true;
+            task.touchedAt = ev.at;
+            break;
+          }
+        }
         const last = task.evidence[task.evidence.length - 1];
         if (!last) noway("任务 " + task.id + " 没有可撤回的交付");
         task.evidence.pop();
@@ -341,6 +356,15 @@ export function fold(events) {
         else task.segment = nextSegment(session, ev.at, true).id;
         task.touchedAt = ev.at;
         settle(session);
+        break;
+      }
+      // 清单上给一条已经写下的活排个先后：乱序不是错，但读的人得看得见顺序。
+      case "task.order": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        editable(session, task);
+        task.order = ev.order;
+        task.touchedAt = ev.at;
         break;
       }
       case "task.defer":

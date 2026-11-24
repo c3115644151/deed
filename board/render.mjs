@@ -5,6 +5,7 @@
 // they are how the answer is computed, not what the reader came for.
 
 import {
+  byOrder,
   costOf,
   countIn,
   edges,
@@ -263,6 +264,7 @@ function taskRow(task, zone) {
     (batched ? '<span class="tbatch">同批</span>' : "") +
     ((task.undone && task.undone.length > 0) ? '<span class="tundone">撤 ' + task.undone.length + "</span>" : "") +
     ((task.revived && task.revived.length > 0) ? '<span class="trevived">撤回过放弃</span>' : "") +
+    (task.order === null || task.order === undefined ? "" : '<span class="torder">先 ' + task.order + "</span>") +
     "</span>" +
     '<span class="tfiles">' + esc(files) + "</span>" +
     "</summary>" +
@@ -315,7 +317,7 @@ function segmentBlock(session, segment, index, config, zone) {
     segment.verdict === "pass" ? tag("pass", "判过") :
     segment.verdict === "exempt" ? tag("quiet", "免审") :
     segment.verdict === "rework" ? tag("fail", "打回") : tag(state === "pass" ? "quiet" : "grit", STAMP[state] ?? "要审");
-  const tasks = session.tasks.filter((task) => task.segment === segment.id);
+  const tasks = byOrder(session.tasks.filter((task) => task.segment === segment.id));
   return (
     '<article class="seg' + (here ? " here" : "") + '" id="' + esc(segment.id) + '">' +
     '<div class="segbar">' +
@@ -788,6 +790,7 @@ html[data-theme="light"] body {
 .led.deferred { background: transparent; border: 1px dashed var(--dim); }
 .led.dropped { background: transparent; border: 1px solid var(--fail); }
 .trevived { font-size: 11px; color: var(--warn, #d8a657); }
+.torder { font-size: 11px; color: var(--dim); }
 .tid { font-family: var(--mono); font-size: 9.5px; color: var(--dim); letter-spacing: .1em; }
 .ttitle { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task[data-status="dropped"] .ttitle { color: var(--dim); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--fail) 60%, transparent); }

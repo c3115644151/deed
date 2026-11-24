@@ -49,8 +49,13 @@ export const sessionById = (doc, id) => doc.sessions.find((one) => one.id === id
 
 export const openSegment = (session) => session?.segments.find((one) => one.closedAt === null) ?? null;
 
+// 清单、状态与面板印的顺序是同一件事：先按条目自己写的「先后」，没写的排在后面，
+// 其余的按写下的次序。顺序只是读起来的样子，它不进门、也不进结论。
+export const byOrder = (tasks) =>
+  [...tasks].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+
 export const tasksIn = (session, segment) =>
-  session.tasks.filter((one) => (segment ? one.segment === segment.id : true));
+  byOrder(session.tasks.filter((one) => (segment ? one.segment === segment.id : true)));
 
 export function countIn(session, segment) {
   const tasks = tasksIn(session, segment);

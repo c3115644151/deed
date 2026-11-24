@@ -787,7 +787,11 @@ test("evidence that starts with -- is a missing quote, not a word", () => {
   assert.equal(bare.status, 1);
   assert.match(bare.stderr, /--evidence/);
   assert.equal(kinds(cwd).filter((one) => one === "task.done").length, 0, "被拒的交付一个字节也没写进去");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence=--dry-run 跑了 3 条").status, 0, "写成 --k=v 就说得清");
+  assert.equal(
+    deed(cwd, "task", "done", "T1", "--evidence=--dry-run 跑了 3 条", "--digest", proof(cwd)).status,
+    0,
+    "写成 --k=v 就说得清",
+  );
 });
 
 test("a digest only names a plain file inside the workspace", () => {
@@ -1134,10 +1138,17 @@ test("a delivery that pointed at nothing is reported even after a later one cove
   const cwd = workspace("bare-history");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写一份东西", "--criteria", "东西在");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "写了，但没指任何文件").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "这次指上了", "--digest", proof(cwd)).status, 0);
   deed(cwd, "task", "add", "再写一份", "--criteria", "第二份也在");
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "说到底写了什么，没指东西").status, 0);
+  // 一条谁也不指的交付现在进不了账本（entry 当场就报），所以这种历史只能造出来：
+  // 旧账本里真有过这种行，verify 还得读得懂它们。
+  const bare = (id, words) => {
+    const file = path.join(cwd, ".deed", "log", "9999-01.jsonl");
+    const line = { at: new Date().toISOString(), k: "task.done", s: null, id, evidence: words, by: "agent" };
+    fs.appendFileSync(file, JSON.stringify(line) + "\n", "utf8");
+  };
+  bare("T1", "写了，但没指任何文件");
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "这次指上了", "--digest", proof(cwd)).status, 0);
+  bare("T2", "说到底写了什么，没指东西");
   assert.equal(deed(cwd, "task", "undo", "T2", "--why", "那条什么也没记下").status, 0);
   assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交，指上了", "--digest", proof(cwd, "two.txt")).status, 0);
   const run = deed(cwd, "verify");
@@ -1452,7 +1463,7 @@ test("the word --help inside evidence is evidence", () => {
   const cwd = workspace("help-in-words");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  const done = deed(cwd, "task", "done", "T1", "--evidence", "跑过 review --help 与 task --help，都只打用法");
+  const done = deed(cwd, "task", "done", "T1", "--evidence", "跑过 review --help 与 task --help，都只打用法", "--digest", proof(cwd));
   assert.equal(done.status, 0, "交付记录里出现 --help 不该被当成在问用法");
   assert.match(done.stdout, /交付 · T1/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 1);
@@ -2450,4 +2461,41 @@ test("a drop can be taken back in the plan, and then the entry can be delivered 
     ["task.add", "task.drop", "task.undo", "task.done"],
     "撤回来之后再交一次，账本里是两个事实、不是改写",
   );
+});
+
+// 顺序只有一个来源：条目在清单里的位置。把它上下挪一下，再 submit，账本落一条 task.order，
+// state、deed plan --print 与面板印出来的次序跟着变——不按条目编号排。
+test("the order of the rows is the order the work happens in", () => {
+  const cwd = workspace("plan-order");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "排活");
+  const first = ["- ? 先做的事", "  标准：做第一件", "- ? 后做的事", "  标准：做第二件"];
+  writePlan(cwd, ["# 这一期要做成什么", "排活。", "", ...first].join("\n"));
+  const added = deed(cwd, "submit");
+  assert.equal(added.status, 0, added.stderr);
+  assert.match(added.stdout, /下一步 · agent · 交付：T1 · 先做的事/u, "下一步挑清单上头一条");
+
+  const draft = deed(cwd, "plan", "--print");
+  assert.match(draft.stdout, /- \[ \] T1 先做的事/u);
+  assert.ok(
+    draft.stdout.indexOf("- [ ] T1 先做的事") < draft.stdout.indexOf("- [ ] T2 后做的事"),
+    "草稿按账本里的位置印，不按编号印",
+  );
+
+  // 把两行换个位置：账本里落一条 task.order，最后那条交付先做。
+  const before = "- [ ] T1 先做的事\n  标准：做第一件\n- [ ] T2 后做的事\n  标准：做第二件";
+  const swappedBlock = "- [ ] T2 后做的事\n  标准：做第二件\n- [ ] T1 先做的事\n  标准：做第一件";
+  const now = readPlan(cwd);
+  assert.ok(now.includes(before), "草稿里两块是挨着的，换位置要整块换");
+  writePlan(cwd, now.replace(before, swappedBlock));
+  const reordered = deed(cwd, "submit");
+  assert.equal(reordered.status, 0, reordered.stderr);
+  assert.equal(kinds(cwd).filter((one) => one === "task.order").length, 2, "两条都换了位置，各落一条 task.order");
+  const after = deed(cwd, "state");
+  assert.ok(
+    after.stdout.indexOf("T2 后做的事") < after.stdout.indexOf("T1 先做的事"),
+    "state 的次序跟着清单里的位置走",
+  );
+  const step = deed(cwd, "state");
+  assert.match(step.stdout, /下一步 · agent · 交付：T2 · 后做的事/u);
 });

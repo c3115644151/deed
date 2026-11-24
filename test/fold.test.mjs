@@ -409,3 +409,21 @@ test("a delivery taken back still reads the way it always did", () => {
   assert.equal(task.revived.length, 0, "这一条撤的是交付，不是放弃");
   assert.equal(task.undone.length, 1);
 });
+
+// 先后只是印出来的顺序：它不进门、不进结论，改了它不算这一段被动过。
+test("an entry carries the order it was written with, and can be reordered later", () => {
+  const doc = fold([
+    turn(1),
+    { v: 17, at: T(2), k: "task.add", s: null, id: "T1", title: "后做", criteria: "c", files: [], order: 2 },
+    { v: 17, at: T(3), k: "task.add", s: null, id: "T2", title: "先做", criteria: "c", files: [], order: 1 },
+  ]);
+  const [first, second] = doc.sessions[0].tasks;
+  assert.equal(first.order, 2);
+  assert.equal(second.order, 1);
+  const after = fold([
+    turn(1),
+    { v: 17, at: T(2), k: "task.add", s: null, id: "T1", title: "后做", criteria: "c", files: [] },
+    { v: 17, at: T(3), k: "task.order", s: null, id: "T1", order: 1 },
+  ]);
+  assert.equal(after.sessions[0].tasks[0].order, 1);
+});
