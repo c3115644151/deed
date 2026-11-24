@@ -27,6 +27,6 @@ export default function plan(argv) {
       ensureDirs(ROOT);
       fs.writeFileSync(file, text + "\n", "utf8");
       console.log("清单 · " + rel(ROOT, file) + " · " + one.id + " · " + one.tasks.length + " 条");
-      console.log("  勾上 = 交付（写一行 交付：）；取消勾选 = 撤回（写一行 理由：）；? = 新条目；~~ = 放弃（写一行 理由：）；延后：= 延后");
+      console.log("  勾上 = 交付（写一行 交付：）；取消勾选 = 撤回（写一行 理由：）；? = 新条目；~~ = 放弃（写一行 理由：）；把 ~~ 改回 - [ ] 就是撤回一条放弃（也要一行 理由：）；延后：= 延后");
     });
 };

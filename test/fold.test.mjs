@@ -379,3 +379,33 @@ test("a whole-period verdict names segments, and a task id is refused in the led
   assert.equal(older.supersededBy, newer.id, "被整体审作废的结论记下顶掉它的那一条结论号");
   assert.match(older.supersededBy, /^R\d+$/, "记的是结论号，不是段号");
 });
+
+// 第 15 版起撤回也能撤一条放弃：账本只追加，撤的是它此刻的效力。放弃错了却只能新开
+// 一条，等于让错口径一直挂在账本里，而新开的那条说的又是同一件事。
+const drop = (n, id, why = "不做了") => ({ v: 15, at: T(n), k: "task.drop", s: null, id, why });
+const undo15 = (n, id, why = "放弃错了") => ({ v: 15, at: T(n), k: "task.undo", s: null, id, why, by: "user" });
+
+test("a drop that was taken back returns to todo, and the task says it walked that way", () => {
+  const doc = fold([turn(1), add(2, "T1"), drop(3, "T1", "与另一条重复"), undo15(4, "T1", "其实不重复")]);
+  const task = doc.sessions[0].tasks[0];
+  assert.equal(task.status, "todo");
+  assert.equal(task.deferredWhy, null);
+  assert.equal(task.revived.length, 1);
+  assert.equal(task.revived[0].from, "dropped");
+  assert.equal(task.revived[0].why, "其实不重复");
+});
+
+test("taking back a drop is not taking back a delivery: a task with nothing delivered still refuses", () => {
+  assert.throws(
+    () => fold([turn(1), add(2, "T1"), { v: 15, at: T(3), k: "task.undo", s: null, id: "T1", why: "撤掉什么" }]),
+    /没有可撤回的交付/u,
+  );
+});
+
+test("a delivery taken back still reads the way it always did", () => {
+  const doc = fold([turn(1), add(2, "T1"), done(3, "T1"), { v: 15, at: T(4), k: "task.undo", s: null, id: "T1", why: "说错了话", by: "agent" }]);
+  const task = doc.sessions[0].tasks[0];
+  assert.equal(task.status, "todo");
+  assert.equal(task.revived.length, 0, "这一条撤的是交付，不是放弃");
+  assert.equal(task.undone.length, 1);
+});

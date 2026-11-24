@@ -354,7 +354,11 @@ export function printState() {
       if (tail.length) console.log("    花了 · " + tail.join(" · "));
       for (const task of tasksIn(open, shown)) {
         const mark = { todo: "○", done: "●", accepted: "✓", deferred: "…", dropped: "×" }[task.status];
-        console.log("    " + mark + " " + task.id + " " + task.title + "  ·  " + task.criteria);
+        console.log(
+          "    " + mark + " " + task.id + " " + task.title +
+            ((task.revived ?? []).length > 0 ? "（撤回过放弃）" : "") +
+            "  ·  " + task.criteria,
+        );
       }
       const review = reviewOf(open, shown);
       if (review) {

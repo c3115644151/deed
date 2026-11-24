@@ -170,11 +170,17 @@ export default function submit(argv) {
               specs.push({ k: "task.carry", s: one.id, id: item.id });
               continue;
             }
+            // 放弃过的条目能撤回：撤回是一条新事实（task.undo），撤回来它回到未做，
+            // 同一批再勾上就是重新交付。没有 理由： 的撤回转不成一条能读的事实。
+            if (task.status === "dropped") {
+              if (!item.why)
+                fail(item.id + " 已经放弃过：要撤回来接着做，就在这一行下面写一条 理由：——撤回一条放弃得说清为什么");
+              specs.push({ k: "task.undo", s: one.id, id: item.id, why: item.why, by });
+            }
             if (item.box === "x") {
               // 判过（accepted）的条目在清单里也是勾着的：它已经交过、也有人判过，
               // 再交一次既没有意义，也会撞上「已关闭的段不能再改」。
               if (task.status === "done" || task.status === "accepted") continue;
-              if (task.status === "dropped") fail(item.id + " 已经放弃过：要接着做就新开一条");
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
               // 一条交付总要指着点什么：既没量到改动、也没有文件可指时，写下去就是一条谁也核不了的空话。
               // 只删不改也算动了——那时 pins 是空的，但 changed 里有那条走了的路径，得放行。
@@ -265,7 +271,10 @@ export default function submit(argv) {
             "写进清单 · " + ev.id + " · " + (after.tasks.find((t) => t.id === ev.id)?.segment ?? "") + " · " + ev.title,
           );
         if (ev.k === "task.done") console.log("交付 · " + ev.id + " · " + ev.evidence);
-        if (ev.k === "task.undo") console.log("撤回 · " + ev.id + " · " + ev.why);
+        if (ev.k === "task.undo") {
+          const walked = after.tasks.find((t) => t.id === ev.id)?.revived?.some((one) => one.at === ev.at);
+          console.log((walked ? "撤回放弃 · " : "撤回 · ") + ev.id + " · " + ev.why);
+        }
         if (ev.k === "task.defer") console.log("延后 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.drop") console.log("放弃 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.carry")

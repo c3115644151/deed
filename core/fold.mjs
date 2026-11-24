@@ -222,6 +222,8 @@ export function fold(events) {
           status: "todo",
           evidence: [],
           undone: [],
+          // 撤回过的放弃：放弃错了撤回来，这条任务要能说清它走过那一遭。
+          revived: [],
           changed: [],
           sizes: {},
           deferredWhy: null,
@@ -280,6 +282,15 @@ export function fold(events) {
         const task = taskOf(session, ev.id);
         editable(session, task);
         task.touchedAt = ev.at;
+        // 撤回也可以是撤回一条放弃/延后：账本只追加，撤的是它此刻的效力，不是那一行
+        // 记录。放弃错了却只能新开一条，等于让账本里的错口径一直挂着，而新开的那条
+        // 与旧的说的又是同一件事（事件含义第 15 版）。
+        if (task.status === "dropped" || task.status === "deferred") {
+          task.revived.push({ from: task.status, why: ev.why, by: ev.by ?? "agent", at: ev.at });
+          task.status = "todo";
+          task.deferredWhy = null;
+          break;
+        }
         const last = task.evidence[task.evidence.length - 1];
         if (!last) noway("任务 " + task.id + " 没有可撤回的交付");
         task.evidence.pop();

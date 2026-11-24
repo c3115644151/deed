@@ -2407,3 +2407,47 @@ test("what a batch of deliveries points at is checked once the ledger has them",
   assert.equal(empty.length, 1, "谁也没指着的交付也要说出来");
   assert.equal(empty[0].empty, true);
 });
+
+// 放弃错了只有新开一条，账本里的错口径就永远挂着；撤回一条放弃是一条新事实，
+// 撤回来它就回到未做，同一批再勾上就是重新交付。
+test("a drop can be taken back in the plan, and then the entry can be delivered again", () => {
+  const cwd = workspace("plan-undrop");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "tick", "--who", "user", "--said", "写一份说明");
+  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
+  writePlan(cwd, ["# 这一期要做成什么", "- ? 写一份说明", "  标准：docs/a.md 有一句话"].join("\n"));
+  assert.equal(deed(cwd, "submit").status, 0);
+
+  writePlan(cwd, readPlan(cwd).replace("- [ ] T1 写一份说明", "~~ T1 写一份说明").replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  理由：过时的活"));
+  assert.equal(deed(cwd, "submit").status, 0);
+
+  // 撤回来却没写理由：账本里会留下一条谁也读不出原因的事实，先拒。
+  writePlan(cwd, readPlan(cwd).replace("~~ T1 写一份说明", "- [ ] T1 写一份说明").replace("\n  理由：过时的活", ""));
+  const bare = deed(cwd, "submit");
+  assert.equal(bare.status, 1);
+  assert.match(bare.stderr, /已经放弃过：要撤回来接着做，就在这一行下面写一条 理由：/u);
+
+  writePlan(cwd, readPlan(cwd).replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  理由：其实还得做"));
+  const back = deed(cwd, "submit");
+  assert.equal(back.status, 0, back.stderr);
+  assert.match(back.stdout, /撤回放弃 · T1 · 其实还得做/u);
+
+  const shown = deed(cwd, "state");
+  assert.match(shown.stdout, /○ T1 写一份说明（撤回过放弃）/u);
+
+  writePlan(
+    cwd,
+    readPlan(cwd)
+      .replace(/^- \[ \] T1 .*$/mu, "- [x] T1 写一份说明")
+      .replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写了 docs/a.md"),
+  );
+  const again = deed(cwd, "submit");
+  assert.equal(again.status, 0, again.stderr);
+  assert.match(again.stdout, /交付 · T1 · 写了 docs\/a.md/u);
+  assert.deepEqual(
+    kinds(cwd).filter((one) => one.startsWith("task.")),
+    ["task.add", "task.drop", "task.undo", "task.done"],
+    "撤回来之后再交一次，账本里是两个事实、不是改写",
+  );
+});

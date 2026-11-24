@@ -262,6 +262,7 @@ function taskRow(task, zone) {
     (pins === 0 ? "" : '<span class="tpins">' + pins + " 份" + "</span>") +
     (batched ? '<span class="tbatch">同批</span>' : "") +
     ((task.undone && task.undone.length > 0) ? '<span class="tundone">撤 ' + task.undone.length + "</span>" : "") +
+    ((task.revived && task.revived.length > 0) ? '<span class="trevived">撤回过放弃</span>' : "") +
     "</span>" +
     '<span class="tfiles">' + esc(files) + "</span>" +
     "</summary>" +
@@ -786,6 +787,7 @@ html[data-theme="light"] body {
 .led.accepted { background: var(--signal); opacity: .45; }
 .led.deferred { background: transparent; border: 1px dashed var(--dim); }
 .led.dropped { background: transparent; border: 1px solid var(--fail); }
+.trevived { font-size: 11px; color: var(--warn, #d8a657); }
 .tid { font-family: var(--mono); font-size: 9.5px; color: var(--dim); letter-spacing: .1em; }
 .ttitle { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task[data-status="dropped"] .ttitle { color: var(--dim); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--fail) 60%, transparent); }

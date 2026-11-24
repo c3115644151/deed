@@ -132,6 +132,11 @@ function taskBlock(task, batches = new Map()) {
         (proof.run || (proof.expects ?? []).length > 0 ? "" : "\n  - 只是说法：这条没配命令核过")
       );
     }),
+    // 撤回过的放弃：清单要看得见这条走过那一遭，不然「未做」与「一直没做」分不出。
+    ...(task.revived ?? []).map(
+      (one) =>
+        "- 撤回过的放弃：" + one.why + "（" + one.by + " · " + stamp0(one.at) + "）· 它回到未做，可以重新交付",
+    ),
     ...(task.undone ?? []).map(
       (one) =>
         "- 撤回的交付：" +
