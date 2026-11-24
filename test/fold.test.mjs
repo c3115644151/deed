@@ -66,6 +66,20 @@ test("a segment waiting for a verdict takes no new work: the next entry opens a 
   assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
 });
 
+test("there is one prep segment, and every batch that moves in lands in it", () => {
+  // 送审的那一批不再收活，接下来的活全进同一个预备段：第二批搬进来不该再开一个新段。
+  const doc = fold([
+    turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
+    add11(5, "T2"), carry(6, "T2"), add11(7, "T3"), carry(8, "T3"), add11(9, "T4"),
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(session.segments.length, 2, "预备段只有一个：搬几次都还是它");
+  assert.equal(session.segments[1].carried, true);
+  for (const id of ["T2", "T3", "T4"]) {
+    assert.equal(session.tasks.find((one) => one.id === id).segment, "S01.2", id + " 该在预备段里");
+  }
+});
+
 test("a delivery does not move: 搬 is for work not yet done", () => {
   assert.throws(() => fold([turn(1), add(2, "T1"), done(3, "T1"), carry(4, "T1")]), /只有没做的能搬到下一段/u);
 });

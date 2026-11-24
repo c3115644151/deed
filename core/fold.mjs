@@ -75,7 +75,7 @@ function sessionOf(doc, ev) {
 // 还在等结论，它不再收东西，搬出来的条目和新写的条目都往下走。
 function nextSegment(session, at, carried = false) {
   const segment = {
-    // 这一段是搬出来的条目开的：下一次搬还往里放，别为每一条开一个新段。
+    // 这一段是搬出来的条目开的：它就是预备段，别为每一条开一个新段。
     carried,
     id: `${session.id}.${session.segments.length + 1}`,
     openedAt: at,
@@ -96,13 +96,40 @@ function nextSegment(session, at, carried = false) {
 const awaits = (session, segment) =>
   session.briefs.some((one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null);
 
+// 预备段只有一个：已经接着活的那个就是它，后来搬的、新写的都往里放。
+// 「搬出来的条目」若每次都开一个新段，一次讨论搬三批就成了三段，等结论期间谁也说不清
+// 下一批活算哪一段的。
+const livePrep = (session) =>
+  session.segments.find(
+    (one) =>
+      one.closedAt === null &&
+      one.carried &&
+      // 预备段一旦自己也送了审，它就不再是预备段：它是又一批在等结论的活。
+      !awaits(session, one) &&
+      session.tasks.some((task) => task.segment === one.id),
+  ) ?? null;
+
+// 空着的预备段不是一个段：它是某次搬运开出来又没接住活的格子，留着会让下一条新活落进
+// 一个谁也没打算做的段。
+const settle = (session) => {
+  session.segments = session.segments.filter(
+    (one) =>
+      !(one.carried && one.closedAt === null && one.verdict === null) ||
+      session.tasks.some((task) => task.segment === one.id) ||
+      session.briefs.some((brief) => brief.segment === one.id),
+  );
+};
+
 // 这条判断从账本含义第 11 版起生效，之前的行按当时的样子重放：
 // 老账本里没有这个规矩，拿今天的规矩重排，会把这些行里写死的段号（比如一次打回说
 // 「T8 退回 S01.1」）判成坏账——整本账再也重放不动，而那并不是当初写错。
 function segmentOf(session, at, v = 1) {
+  settle(session);
   const last = session.segments.filter((one) => one.closedAt === null).at(-1);
   if (!last) return nextSegment(session, at);
-  return v >= 11 && awaits(session, last) ? nextSegment(session, at) : last;
+  if (v < 11 || !awaits(session, last)) return last;
+  // 等结论时新写的活进预备段：送审的那一批不再收东西，但只有一处预备。
+  return livePrep(session) ?? nextSegment(session, at, true);
 }
 
 // 任务碰过哪些路径、各多大，只由还在的交付说得算。交付退回（撤回，或者审查者点名
@@ -272,13 +299,12 @@ export function fold(events) {
         editable(session, task);
         if (task.status !== "todo")
           noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能搬到下一段`);
-        // 一批搬运会连着写好几十行：新开的那一段还没接过活，就接着往里放，
-        // 不然十三条未做的条目会开出十三个各含一条的段。
-        const newest = session.segments
-          .filter((one) => one.closedAt === null && one.id !== task.segment)
-          .at(-1);
-        task.segment = (newest?.carried ? newest : nextSegment(session, ev.at, true)).id;
+        // 一批搬运会连着写好几十行：预备段接过活就接着往里放，
+        // 不然十三条未做的条目会开出十三个各含一条的段；第二批又开一个新的，就成了两个预备段。
+        const prep = livePrep(session) ?? nextSegment(session, ev.at, true);
+        task.segment = prep.id;
         task.touchedAt = ev.at;
+        settle(session);
         break;
       }
       case "task.defer":

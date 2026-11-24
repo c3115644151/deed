@@ -176,7 +176,7 @@
 ## 段 S02.18
 - [x] T67 命令面一动词一个文件，开关只留一张表：拼错的开关被拒
   标准：cli/verbs/ 里每个动词一个文件；cli/spec.mjs 是唯一那张表，解析与 --help 都从它出；不认的开关 exit 1 并猜最接近的一个；全量测试全绿
-  交付：这一份字节上按命令行跑：node --test → 177/177，exit 0。TEMP 里新建一个工作区（init --said 起点、tick、task add T1）：deed task done T1 --evidence x --digset a.md → exit 1，打印「deed: deed task 不认 --digset 这个开关：是不是 --digest？」；同一个工作区跑 deed task --digset a.md → exit 1，同一句。变异：把 cli/verbs/task.mjs 里先让开关表认一遍的那句改成 false，test/cli.test.mjs 的「a flag one letter off…」立刻红（1 fail），还原后 100/100。上一份记录里的「99 条来自 test/cli.test.mjs，其余 77」是抄下来的旧数，这一份不写那种分解。
+  交付：重钉：cli/spec.mjs 自上一轮之后没有再改，这条钉子把被整期审退回时失去覆盖的字节重新盖上。当场能复核的三句：deed task --digset a.md → exit 1，stderr「deed: deed task 不认 --digset 这个开关：是不是 --digest？」；deed state --digset → exit 1「deed: deed state 不认 --digset 这个开关；deed state 不收开关」；deed verify --nope → exit 1「deed: deed verify 不认 --nope 这个开关；deed verify 不收开关」
 - [x] T68 事件含义变成一张表，写盘时带 v：没带 v 的旧行按第 1 版读
   标准：MEANING 与 meaningOf 在 core/events.mjs；写盘方显式带 v；doctor 逐行检查仍按每行自己的版本；有用例钉住旧行按旧标准读
   交付：node --test 175/175；这一份字节上重跑 test/version.test.mjs 5/5（旧行按它当年那版读，含义超前时说「升级 deed」）；写盘时版本号只有一处给：cli/session.mjs:104 与 :140 的 validateEvent({... , v: EVENT_VERSION })。
@@ -208,21 +208,22 @@
   交付：讨论屏回到轮次为主轴：五条轮次平铺在主轴上（一条不折），开着的题在右栏、把窗口里用户说的话攒在自己名下（用例断言「攒到 1 句」），裁过的题收成一行。node --test board/board.test.mjs → tests 13 / pass 13 / fail 0。
 - [x] T77 声明的端口长期被占时，退回的那一格算得出来，重启后地址不变
   标准：声明端口被占时退到它 +1、+2…的第一格空号；停了再起仍落同一格；号让出来之后搬回声明号；三条都有用例。
-  交付：面板的退回号算得出来：7433 被占时退到 7434 并由拉起它的命令说清；panel --stop 后再起仍落 7434；7433 让开后下一条命令搬回 7433；面板代码指纹对不上时换进程但端口不变；刚停掉旧进程的 TIME_WAIT 先等 900ms 再判。node --test test/cli.test.mjs → tests 102 / pass 102 / fail 0。
+  交付：面板的落点算得出来、也守得住：board/serve.mjs 撞上 EADDRINUSE 就挨着往后试（+1、+2…最多九格），不再抽一个系统号；cli/panel.mjs 用 listen 探号（TIME_WAIT 里 connect 不上去但占不住），声明号空不出来就守住这个工作区上一次在听的那一格。跑的是这一份字节：node --test → tests 190 / pass 190 / fail 0；test/cli.test.mjs 107/107。变异：把 serve 的挨格走查删掉、跑同一条用例 → tests 1 / pass 0 / fail 1；还原。用例的起点号每跑一次现挑一格，不再写死 7433。
 - [x] T78 放弃也算结清：被点名的条目改主意不做了，pass 落得下来，并且落的时候点名说它被放弃、理由是什么
   标准：旧账本里在案 fail 点名的条目若被 drop，pass 能落；落时 stdout 印出该条目与原因；panel 段头对已封段印「开了 N 分钟」、对开着的段不印；node --test 全绿
-  交付：跑的是这一份字节：node --test → tests 183 / pass 183 / fail 0；test/cli.test.mjs 与 test/fold.test.mjs 合跑 127 条，board+fold 37 条。放弃结清：fold 里被点名条目 status 为 dropped 时 stuck 为空，pass 落得下来（a standing fail outranks a later pass 用例里那条断言从「抛还没结清」改成「段 verdict=pass」）；落 pass 时 review 印「被点名但已放弃 · T1 · 这一期不做了」（新用例 a named entry that was given up settles, and the verdict says so）。段头：已封段印「开了 N 分钟」、开着不印（board 用例 the turns… 之外那条 a segment that took more than one brief says so on its head 里断言 doesNotMatch 与 match 两半）。
+  交付：重钉：board/render.mjs 在被整期审退回之后没有再改，这条钉子把段重开时失去覆盖的字节重新盖上。这一份字节上 node --test 188/188，其中 board/board.test.mjs 13/13 里有「段开了多久只在封了的段印」的断言，test/fold.test.mjs 26/26 里有「被点名但已放弃的条目算结清」的用例
 - [x] T84 T84 放弃的结清看得见也留得下
   标准：pass 落下来时把放弃的条目与理由记进 review.log（gaveUp），不再只在当场 stdout；段清单里 dropped 条目印出理由；下一步在「被点名的都放弃了」时指向审查者的 pass 而不是 judge --overturn；有用例断言这三处
   交付：落 pass 时带着理由进账本（review.log 的 gaveUp）；段清单里 dropped 印 状态：dropped · 理由：…；fail 之后被点名的都放弃时，state 给「它们改主意不做了」与 deed review --segment … --by（不再指 judge --overturn）。node --test test/cli.test.mjs → 104/104（跑的是这一份字节）
 - [x] T85 T85 免审段在整期清单里印出自己为什么免审
   标准：整期与段清单里免审段那行印出账本里写下的理由（sealedWhy）；reason 为空时不印空括号；有用例
-  交付：免审段在整期清单里印出账本写下的理由（sealedWhy）；新增用例 a segment nobody reviewed says in the brief why it was not reviewed（两段都 seal 后 review --all）。node --test test/cli.test.mjs → 104/104
+  交付：空理由不印括号，而且用例真看着它：上一份交付里的变异说法在这些字节上不成立——把 cli/brief.mjs 的守卫改成无条件拼括号，输出是「（undefined）」，旧断言只拦「（）」所以照样绿。现在断言同时拦「（）」与「undefined」，同一变异 → tests 1 / pass 0 / fail 1；还原后 pass 1。这一份字节上 node --test → tests 190 / pass 190 / fail 0。
 - [x] T86 T86 交接文件与账本一致
   标准：HANDOFF 的条目数、测试条数、在案结论、没做的清单（含删旧命令）与这一份字节一致；docs 的禁词检查通过
-  交付：本文件的数按账本重写：20 条、整期审 R33 退回 S02.18、184/184 与 104/104、没做的列出删旧命令。node --test → 184/184（跑的是这一份字节）；改完本文件之后 test/docs.test.mjs → 5/5
-- [ ] T95 清单上能写一行 搬：，没做的条目搬到下一段
+  交付：交接文件与这一份字节对齐：测试条数 190/190 与单文件 107/107、在案结论（reviewer:s2-r10 退回 T77/T85，两条已重交）、层级口径（S02.18 就是那一段，这份审查即整体审，不另起整期审）、以及不再在文里抄会变的清单序号。改完本文件之后 node --test → 190/190、test/docs.test.mjs → 5/5。
+- [x] T95 清单上能写一行 搬：，没做的条目搬到下一段
   标准：这一段送审之后不再收新活；十三条没做的条目一次搬进 S02.19，一批搬运只开一段；交付过的条目写 搬： 被拒；test/fold.test.mjs 与 test/cli.test.mjs 各有一条删掉它就红的用例
+  交付：node --test 189/189（fold 27 · cli 106 · rules 25 · board 13 · plan 6 · docs 5 · version 5 · heartbeat 2）；清单发出后追加一条再 deed submit → fold(readEvents) 读到它在 S01.2、S01.1 仍 closedAt null（第 11 版起生效，行上 v=11 才走这条规矩）；对已交付条目写 搬： submit exit 1「已经交过（done）」；deed --help 里已无 deed say 行；deed doctor 对 505 条真账本重放，exit 0。
 
 ## 段 S02.19
 - [ ] T79 T79 一轮只记一句话：deed say 取代 tick
@@ -251,5 +252,13 @@
   标准：单段会话的 state 不印「目的 · 还没有」；多段且要整期审时印成「整期审的尺子 · …」；deed --help 与 DESIGN 里 goal 的说法同步（T81 删掉 goal 动词之后，那句话只指清单第一行）；有用例
 - [ ] T94 有清单的段不再收新条目：送审之后新活开下一段
   标准：一段一旦发过清单，就不再接收新条目（后来加的活开下一段，段号自己往上走）；在案的那份清单不因后来加的条目而作废，只有这一段自己被动过（撤回、改写）才算旧；state 在段等结论时先给「落结论」而不是「写新条目」；整期审打回一段只重开那一段，点名的条目回未做、其余保持交付，之后新加的活仍开下一段；有用例覆盖上面四条，把 core/fold.mjs 的这条判断改回去就红
+- [ ] T96 出清单前先算要不要审：免审就不出清单，直接把下一步指到封存或签收
+  标准：deed review --segment 与 deed review --all 出清单之前先算门槛（needsReview／needsWhole）；算下来不用审时不写账本、不生成清单与角色包，打印「门槛说这一段不用审」并把下一步指到 deed seal（段）或签收（整期），exit 0；要审时行为与现在一样；有用例断言免审段调用后账本没有新的 review.brief、目录里没有新文件
+- [ ] T97 整期审的范围在发出那一刻固定：预备段里后来的活不让它过期
+  标准：整期结论的过期只看它发出那一刻已经存在的段；之后预备段里新加的任务、新的交付不让它过期；被点名退回的段重新打开时它照旧过期；有用的用例（发出整期清单之后在下一段加一条任务并交付，整期结论仍算数）
+- [ ] T98 打回的返工只重开被点名的条目，其余交付不重判
+  标准：review fail 之后只有 --rework 点到的条目回到未做；段里其余已交付条目保持、不复位；重审的那份清单只写被点名与之后改动的条目；有用例（fail 点名 T1 之后 T2 仍是已交付，清单里不再出现 T2）
+- [ ] T99 段能在规划时拆成子段：逐个子段审，全部审完再对整段审一次
+  标准：清单里能把一段写成若干子段（各带自己的标准与条目）；deed review 只回答一个子段，结论落在子段上；子段全有结论之后才轮到整段的结论；state 与面板显示子段进度；没拆子段的段行为不变；有用例覆盖拆、逐个子段审、整段结论在子段齐了之后才可落
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->
