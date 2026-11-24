@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
+  edges,
   needsWhole,
   needsReview,
   nextAction,
@@ -406,4 +407,24 @@ test("a segment says what it cost: briefs handed out, deliveries taken back, min
   const session = doc.sessions[0];
   // 这些数只回答"为什么慢"：从账本算，不读时钟，也不参与任何门。
   assert.deepEqual(costOf(session, session.segments[0]), { tasks: 2, briefs: 2, undos: 1, minutes: 8 });
+});
+
+test("a decision can carry a border and an abandoned thing, and both are read off the words", () => {
+  // 结论块不另立事件、不加字段：这两个行是从那句裁定里读出来的，
+  // 所以同一句话里的其它内容不会被误当边界。
+  const doc = fold([
+    turn(1),
+    ask(2),
+    { v: 1, at: T(3), k: "ask.raise", s: null, id: "A2", text: "还没定的一条", reading: "x", why: "y" },
+    {
+      v: 1, at: T(4), k: "ask.resolve", s: null, id: "A1", by: "user", why: "就这么定",
+      decision: "按第一种读法办\n边界：文档里不再写「黑话」这个词\n边界: 半角冒号也认\n弃：那套导出格式不做了\n补充一句不是边界的话",
+    },
+  ]);
+  const got = edges(doc.sessions[0]);
+  assert.deepEqual(got.map((one) => one.kind), ["border", "border", "abandon"], "两行边界、一件不做；开着的题不参与");
+  assert.deepEqual(got.map((one) => one.text), ["文档里不再写「黑话」这个词", "半角冒号也认", "那套导出格式不做了"]);
+  assert.equal(got[0].id, "A1");
+  assert.equal(fold([turn(1), ask(2)]).sessions[0].asks.length, 1);
+  assert.deepEqual(edges(fold([turn(1), ask(2)]).sessions[0]), [], "没裁过的题没有结论可读");
 });

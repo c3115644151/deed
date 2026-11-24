@@ -13,7 +13,7 @@ import { digest } from "../core/digest.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
-import { costOf, countIn, currentSession, debt, goalOf, needsWhole, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn } from "../core/rules.mjs";
+import { costOf, edges, countIn, currentSession, debt, goalOf, needsWhole, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
 import { auditEvidence, staleEvidence } from "./audit.mjs";
@@ -47,7 +47,10 @@ export function parse(argv, verb) {
     const name = equals > 0 ? body.slice(0, equals) : body;
     if (!spec.flags.includes(name)) {
       const guess = closest(name, spec.flags);
-      throw new Error("deed " + verb + " 不认 --" + name + " 这个开关" + (guess ? "：是不是 --" + guess + "？" : "；它认的是 --" + spec.flags.join("、--")));
+      throw new Error(
+        "deed " + verb + " 不认 --" + name + " 这个开关" +
+          (guess ? "：是不是 --" + guess + "？" : spec.flags.length === 0 ? "；deed " + verb + " 不收开关" : "；它认的是 --" + spec.flags.join("、--")),
+      );
     }
     if (equals > 0) {
       put(name, body.slice(equals + 1));
@@ -363,6 +366,9 @@ export function printState() {
     const owed = debt(open);
     if (owed.deferred.length + owed.dropped.length > 0)
       console.log("  欠着 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
+    const settled = edges(open);
+    for (const one of settled)
+      console.log("  " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
     const blockers = signBlockers(doc, open, config);
     console.log("  签收 " + (blockers.length === 0 ? "可行" : "差：" + blockers.join("；")));
     const watch = pressure(open);

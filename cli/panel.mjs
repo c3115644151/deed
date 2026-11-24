@@ -45,7 +45,27 @@ const waitFor = async (root, ms) => {
 
 export async function startPanel(root) {
   const asked = portOf(root);
-  const child = spawn(process.execPath, [entry, "serve", "--port", String(asked)], {
+  // 声明的号被别的程序长期占着时，退到哪一格要算是出来的，不是抽出来的：
+  // 挨着的下一个空号（声明号 + 1、+2…）。地址才收藏得住，也不需要在磁盘上记一行。
+  // 声明号空出来之后，ensurePanel 会把面板搬回去。
+  // 刚停掉旧进程的那一下，号还在 TIME_WAIT 里没让干净：先等它一小会儿，
+  // 别把"正在退"当成"被别人占着"，否则换进程就等于给自己换一条地址。
+  const clears = async (port, ms) => {
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      if (!(await answers(port))) return true;
+      await new Promise((step) => setTimeout(step, 60));
+    }
+    return false;
+  };
+  let want = asked;
+  if (!(await clears(asked, 900))) {
+    want = 0;
+    for (let step = 1; step <= 9; step += 1) {
+      if (!(await answers(asked + step))) { want = asked + step; break; }
+    }
+  }
+  const child = spawn(process.execPath, [entry, "serve", "--port", String(want)], {
     cwd: root,
     detached: true,
     stdio: "ignore",

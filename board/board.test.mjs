@@ -262,9 +262,9 @@ test("a port somebody else already holds does not take the panel down with it", 
   }
 });
 
-test("the discussion screen groups turns under the question they belong to, and keeps answered ones", () => {
-  // 一条题 = 它的开与关，加上这段时间落在会话上的轮次；时间窗重叠的轮次只出现一次。
-  // 裁定过的题不下屏——拍板的文本跟着题一起留着。
+test("the turns are the axis, and a question collects the words that came in while it was open", () => {
+  // 讨论屏的主轴是轮次：谁在什么时候说了什么。题在右边，是还没发出去的档案——
+  // 它只在自己的窗口里攒用户说的话，不复制主轴上的轮次。
   const events = [
     ...configEvents,
     { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先说两句" },
@@ -272,14 +272,34 @@ test("the discussion screen groups turns under the question they belong to, and 
     { v: 1, at: T(3), k: "turn", s: null, who: "user", said: "第一个问题接着问" },
     { v: 1, at: T(4), k: "ask.raise", s: null, id: "A2", text: "第二个问题", reading: "当成那样", why: "也得你定" },
     { v: 1, at: T(5), k: "turn", s: null, who: "user", said: "两个都谈谈" },
-    { v: 1, at: T(6), k: "ask.resolve", s: null, id: "A1", decision: "按第一个办", by: "user", why: "就这么定" },
+    { v: 1, at: T(6), k: "ask.resolve", s: null, id: "A1", decision: "按第一个办\n边界：不许再问一遍", by: "user", why: "就这么定" },
     { v: 1, at: T(7), k: "turn", s: null, who: "agent", said: "记下了" },
   ];
   const html = renderBoard(fold(events), config, { zone, events: 7 });
-  assert.match(html, /data-state="resolved"[\s\S]{0,300}A1/, "裁定过的题还在屏上");
-  assert.match(html, /按第一个办/, "结论跟着题一起留着");
-  assert.match(html, /data-state="pending"[\s\S]{0,300}A2/, "还开着的题标成等你定");
-  assert.match(html, /A1[\s\S]{0,160}2 轮/, "题头写它那段时间里有几轮");
-  assert.equal((html.match(/两个都谈谈/gu) ?? []).length, 1, "重叠的轮次只出现一次，不复制");
-  assert.match(html, /还没成题 · 1 轮/, "成不了题的轮次单独一段");
+  const main = html.slice(html.indexOf('<div class="col logs">'), html.indexOf('<aside class="side">'));
+  assert.equal((main.match(/class="turn /gu) ?? []).length, 4, "四条轮次都摊在主轴上，一条不折");
+  assert.match(main, /先说两句/, "没成题的轮次也在主轴上，不用先成题才能出现");
+  assert.match(html, /data-state="pending"[\s\S]{0,400}A2/, "还开着的题标成等你定");
+  assert.match(html, /deed ask resolve A2/, "等它定的时候给出那条命令");
+  assert.match(html, /class="clues"[\s\S]{0,400}两个都谈谈/, "开着的题把窗口里你说的话攒在自己名下");
+  assert.match(html, /攒到 1 句/, "题头说清它攒到了几句");
+  assert.match(html, /class="qdone">按第一个办</, "卡里的结论只留当场那句话，边界行另算");
+  assert.match(html, /已经定下的[\s\S]{0,400}A1/, "裁过的题收进右边那组，不占主轴");
+  assert.ok(html.indexOf("两个都谈谈") < html.indexOf('<aside class="side">'), "主轴在前，题在后");
+});
+
+test("the accept screen lists the borders a decision drew", () => {
+  // 签收前要看得见这一期定过哪些不许做的事；它不是任务，所以不在执行屏上。
+  const events = [
+    ...configEvents,
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做重放" },
+    { v: 1, at: T(2), k: "ask.raise", s: null, id: "A1", text: "文档要不要一起改", reading: "只改代码", why: "两种都说得通" },
+    { v: 1, at: T(3), k: "ask.resolve", s: null, id: "A1", by: "user", why: "先这样", decision: "只改代码\n边界：文档里不再新增旧词\n弃：导出不做了" },
+  ];
+  const html = renderBoard(fold(events), config, { zone, events: 3 });
+  assert.match(html, /定过的边界与不做/);
+  assert.match(html, /文档里不再新增旧词/);
+  assert.match(html, /导出不做了/);
+  assert.match(html, /<span class="ekind">边界</);
+  assert.match(html, /<span class="ekind">弃</);
 });

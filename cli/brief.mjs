@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { digest } from "../core/digest.mjs";
-import { tasksIn } from "../core/rules.mjs";
+import { tasksIn,
+  edges,
+} from "../core/rules.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 
@@ -224,6 +226,8 @@ export function planWhole(root, session, at) {
       ),
   );
   const waiting = session.asks.filter((one) => one.resolvedAt === null);
+  // 这一期定过的边界与不做：整期审的尺子不只有目的那句话，还有拍板时划下的线。
+  const lines = edges(session).map((one) => "- " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
   const text = [
     "# 整体审清单 · " + session.id,
     "",
@@ -239,6 +243,10 @@ export function planWhole(root, session, at) {
     "",
     ...session.segments.map(segLine),
     ...findings,
+    "",
+    "## 这一期定过的边界与不做",
+    "",
+    ...(lines.length > 0 ? lines : ["- 没有划下过边界，也没有谈定不做的事"]),
     "",
     "## 段的结论之外，还留在这一期里的",
     "",

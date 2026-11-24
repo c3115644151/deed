@@ -10,7 +10,8 @@ import { wordsNotice } from "../../lib/words.mjs";
 import { hookNotice, silenceNotice } from "../../lib/heartbeat.mjs";
 import { ROOT, parse, load, lateWork, fail, guard, split } from "../session.mjs";
 
-export default function doctor() {
+export default function doctor(argv) {
+    parse(argv, "doctor");
     guard(() => {
       const p = paths(ROOT);
       if (!fs.existsSync(p.log)) {

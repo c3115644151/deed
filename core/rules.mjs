@@ -61,6 +61,28 @@ export function countIn(session, segment) {
 
 export const pendingAsks = (session) => session.asks.filter((one) => one.state === "pending");
 
+// 结论块：一句裁定里能带两种行——边界（以后不许这么干）与弃（这件事不做了）。
+// 它们是从那句话算出来的，不另立事件、不加字段：账本里那句原话就是唯一的记录。
+const EDGE_LINE = /^(边界|弃)\s*[:：]\s*(.*)$/u;
+export const edges = (session) => {
+  const out = [];
+  for (const ask of session.asks ?? []) {
+    if (ask.state !== "resolved") continue;
+    for (const raw of (ask.decision ?? "").split("\n")) {
+      const hit = raw.trim().match(EDGE_LINE);
+      if (!hit) continue;
+      out.push({
+        kind: hit[1] === "边界" ? "border" : "abandon",
+        text: hit[2].trim(),
+        id: ask.id,
+        at: ask.closedAt,
+        by: ask.by,
+      });
+    }
+  }
+  return out;
+};
+
 // The newest conclusion about a segment that still stands. A reworked delivery
 // voids the old verdict, so reviews are filtered rather than overwritten.
 export const reviewOf = (session, segment) => {

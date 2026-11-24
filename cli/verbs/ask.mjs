@@ -10,6 +10,9 @@ export default function ask(argv) {
         if (!id) fail("ask " + verb + " 要点名待裁项");
         if (verb === "resolve" && !flags.decision) fail("ask resolve 要写清裁定：--decision \"…\"");
         if (verb === "withdraw" && !flags.why) fail("ask withdraw 要说清为什么撤回：--why \"…\"");
+        const cut = verb === "resolve" ? (flags.decision.match(/^(边界|弃)\s*[:：]\s*.*$/gmu) ?? []) : [];
+        for (const one of cut)
+          if (!/[:：]\s*\S/u.test(one)) fail("裁定里的「" + one.trim() + "」没写内容：边界要写清不许做什么，弃要写清哪件事不做了");
         transact(flags, () => ({
           k: verb === "resolve" ? "ask.resolve" : "ask.withdraw",
           s: flags.session ?? null,
@@ -19,6 +22,7 @@ export default function ask(argv) {
           by: signer(flags, verb === "resolve" ? "裁定" : "撤回待裁"),
         }));
         console.log((verb === "resolve" ? "裁定" : "撤回") + " · " + id + " · " + (flags.decision ?? flags.why));
+        if (cut.length) console.log("  记下 · " + cut.length + " 条（边界与弃跟着这句话留在这期的账里，不进清单）");
         return;
       }
       const text = verb && verb !== "raise" ? [verb, ...words].join(" ") : words.join(" ");

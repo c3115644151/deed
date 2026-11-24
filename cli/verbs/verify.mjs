@@ -4,9 +4,10 @@ import { configDrift } from "../../core/rules.mjs";
 import { readConfigFile } from "../../lib/store.mjs";
 import { auditBriefs, auditEvidence, bareEvidence, bareHistory, briefTrouble } from "../audit.mjs";
 import { stamp0 } from "../../lib/format.mjs";
-import { ROOT, load, fail, guard } from "../session.mjs";
+import { ROOT, load, fail, guard, parse } from "../session.mjs";
 
-export default function verify() {
+export default function verify(argv) {
+    parse(argv, "verify");
     guard(() => {
       const { doc } = load();
       if (!doc.config) {

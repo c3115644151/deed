@@ -176,19 +176,32 @@
 ## 段 S02.18
 - [x] T67 命令面一动词一个文件，开关只留一张表：拼错的开关被拒
   标准：cli/verbs/ 里每个动词一个文件；cli/spec.mjs 是唯一那张表，解析与 --help 都从它出；不认的开关 exit 1 并猜最接近的一个；全量测试全绿
-  交付：node --test 170/170（97 条来自 CLI，其余 73 条）；拼错的开关当场被拒：deed task done T1 --evidence x --digset a.md → exit 1「deed task 不认 --digset 这个开关：是不是 --digest？」；review --help 只打自己那几行
+  交付：这一份字节上按命令行跑：node --test → 177/177，exit 0。TEMP 里新建一个工作区（init --said 起点、tick、task add T1）：deed task done T1 --evidence x --digset a.md → exit 1，打印「deed: deed task 不认 --digset 这个开关：是不是 --digest？」；同一个工作区跑 deed task --digset a.md → exit 1，同一句。变异：把 cli/verbs/task.mjs 里先让开关表认一遍的那句改成 false，test/cli.test.mjs 的「a flag one letter off…」立刻红（1 fail），还原后 100/100。上一份记录里的「99 条来自 test/cli.test.mjs，其余 77」是抄下来的旧数，这一份不写那种分解。
 - [x] T68 事件含义变成一张表，写盘时带 v：没带 v 的旧行按第 1 版读
   标准：MEANING 与 meaningOf 在 core/events.mjs；写盘方显式带 v；doctor 逐行检查仍按每行自己的版本；有用例钉住旧行按旧标准读
-  交付：node --test 170/170；test/version.test.mjs 5/5（旧行按旧标准读、含义超前说「升级」）；deed doctor 逐行检查按每行自己的版本，账本 exit 0
+  交付：node --test 175/175；这一份字节上重跑 test/version.test.mjs 5/5（旧行按它当年那版读，含义超前时说「升级 deed」）；写盘时版本号只有一处给：cli/session.mjs:104 与 :140 的 validateEvent({... , v: EVENT_VERSION })。
 - [x] T69 删掉迁移壳、按名字落账、把自造词换掉
   标准：judge 只剩 --overturn，--pass/--rework 不认；ask resolve/withdraw 走 signer；仓库与文档里不再有「材料」这个绰号（「过程材料」除外）
-  交付：node --test 170/170；deed judge --pass → exit 1（judge 不认 --pass）；deed ask resolve … 从管道里跑缺 --by 被拒；全仓 grep「材料」只剩「过程材料」三处（AGENTS、docs/README、docs/research）
+  交付：node --test 177/177（这一份字节上跑出来的总��）；单文件复跑：test/cli.test.mjs 100/100、board/board.test.mjs 11/11、test/docs.test.mjs 5/5。judge --pass／--rework exit 1 且报「它认的是 --overturn、--why、--by」；ask resolve 从管道里缺 --by 被拒、写了 --by user 通过。「材料」作为绰号 0 处；守卫改成先把「过程材料」整句抹掉再看剩几处——豁免不再挂在正则上：/材料/gu 换成 /材料/g 仍然全绿，把 docs\README.md 第 28 行的「过程材料」改成「材料」立刻红并报那一行。上一份记录写「99 条来自 test/cli.test.mjs」是抄来的旧数，这一份不写那种分解，只写这几个当场跑出来的数。
 - [x] T70 面板守住工作区写的端口，代码换过就自己换进程，不必有人记得重启
   标准：端口取自门槛（默认 7317）；被占时退回系统给的号并说清；记号里带面板代码的指纹，对不上就换进程；地址在重启前后一致
-  交付：node --test test/cli.test.mjs 98/98（新增条：端口取自门槛、停掉再起同一地址、指纹对不上就换进程且端口不变）；node --test board/board.test.mjs 9/9
-- [ ] T71 一段的成本看得见：几条任务、几份清单、几次重交、开了多久
+  交付：panel 端口与回落这条线在现行字节上重交一次：board/render.mjs 这一轮改过（讨论屏）。回落与搬回的行为在 cli/panel.mjs:63-71 与 cli/deed.mjs:59，用例在 test/cli.test.mjs 的「a panel says when the declared port was taken, and goes back to it when the port is free」。
+- [x] T71 一段的成本看得见：几条任务、几份清单、几次重交、开了多久
   标准：数从账本算（不读时钟，封段时刻减开段时刻）；state 的段行与面板的段头都显示；不参与任何门
-- [ ] T72 出清单时说清这是这一段的第几份，第 3 份起提醒先看前一份哪里不够
+  交付：core/rules.mjs 的 costOf 给出 {tasks, briefs, undos, minutes}，minutes 是封段时刻减开段时刻（读账本不读时钟，只回答为什么慢，不参与任何门）；test/rules.test.mjs 断言 {tasks:2,briefs:2,undos:1,minutes:8}；这一份字节上 deed state 在 S02.18 段行下印「花了 · 重交 6 次」（0 份清单不印）；跑 test/rules.test.mjs+test/cli.test.mjs+board/board.test.mjs+test/docs.test.mjs 138/138。
+- [x] T72 出清单时说清这是这一段的第几份，第 3 份起提醒先看前一份哪里不够
   标准：deed review 出清单时打印序号；第 3 份起多一句提醒；不拦、不要求解释
+  交付：node --test 175/175；演示账本上连出三份清单：第一份印「S01.1 的第 1 份」，第二份「的第 2 份」且没有提醒，第三份「的第 3 份」并多一句「先看上一份的审查者点了哪几条」；整期同理印「这一期的第 N 份」；只打印，不拦。
+- [x] T73 讨论屏按题分组：一条题带着它那段时间的轮次、状态与结论下屏
+  标准：讨论屏按题分组渲染，题头写状态与轮数，组里是它那段时间的轮次，组尾是结论；重叠的轮次只出现一次；裁定过、撤过的题仍在屏上；成不了题的轮次单独一段；board 测试有用例断言这五件事
+  交付：node --test (DEED_NO_PANEL=1) → tests 178 / pass 178 / fail 0，exit 0；node --test board/board.test.mjs → tests 12 / pass 12 / fail 0；新用例把一份账本渲成 HTML，断言「裁定过的题仍在屏上」「结论跟着题留着」「还开着的题标成等你定」「题头写 2 轮」「重叠的一轮只出现一次」「还没成题 · 1 轮」，删掉 shown 去重那一行该用例即红。
+- [ ] T74 结论块：ask resolve 的裁定里认「边界：」「弃：」两行，落成账本原来就有的那句话，不进清单也不进任何门
+  标准：ask resolve 接受裁定文本里的「边界：…」「弃：…」行并当场报记下几条；空内容的行 exit 1 并说清；这些行从账本算出来（不新增事件、不加字段），state 与验收屏、整期审清单都列得出来；rules 与 board 与 cli 各有用例
+- [ ] T75 state / verify / doctor 也过开关表：拼错的开关一样 exit 1
+  标准：这三个动词带任何不认的开关都 exit 1 并猜最接近的一个（与其余动词同一句文案）；有用例覆盖
+- [ ] T76 讨论屏回到轮次为主轴，题在右边攒线索
+  标准：轮次平铺在主轴（一条不折、不过滤）；开着的题在右边，把窗口里用户说的话攒在自己名下；裁过的题收成一行；这条屏由用例管住。
+- [ ] T77 声明的端口长期被占时，退回的那一格算得出来，重启后地址不变
+  标准：声明端口被占时退到它 +1、+2…的第一格空号；停了再起仍落同一格；号让出来之后搬回声明号；三条都有用例。
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

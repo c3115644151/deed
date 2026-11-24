@@ -7,6 +7,7 @@
 import {
   costOf,
   countIn,
+  edges,
   currentSession,
   goalOf,
   needsReview,
@@ -159,66 +160,71 @@ function screenHead(index, name, note, meter) {
 
 function discussScreen(session, zone, on) {
   const turns = session ? session.turns : [];
-  const asks = session ? session.asks ?? [] : [];
-  const open = session ? pendingAsks(session) : [];
-  const shown = new Set();
-  const inside = (turn, ask) => {
-    const at = Date.parse(turn.at);
-    const to = ask.closedAt ? Date.parse(ask.closedAt) : Infinity;
-    return at >= Date.parse(ask.at) && at <= to;
-  };
-  const row = (turn, first) =>
-    '<li class="turn ' + turn.who + (first ? " first" : "") + '">' +
+  const asks = session ? (session.asks ?? []) : [];
+  const open = asks.filter((one) => one.state === "pending");
+  const settled = asks.filter((one) => one.state !== "pending");
+  const row = (turn) =>
+    '<li class="turn ' + turn.who + '">' +
     '<span class="tclock">' + when(turn.at, zone) + "</span>" +
     '<span class="twho">' + (turn.who === "user" ? "你" : "agent") + "</span>" +
     '<p class="tsaid">' + esc(turn.said) + "</p>" +
     (turn.did ? '<p class="tdid">' + esc(turn.did) + "</p>" : "") +
     "</li>";
+  // 这一屏的主轴是轮次：谁在什么时候说了什么。题在右边，是还没发出去的档案——
+  // 它不占主轴，只在窗口里自己攒你说的线索，攒到你说清为止。
+  const clues = (ask) => {
+    const from = Date.parse(ask.at);
+    const to = ask.closedAt ? Date.parse(ask.closedAt) : Infinity;
+    return turns.filter((turn) => {
+      const at = Date.parse(turn.at);
+      return turn.who === "user" && at >= from && at <= to;
+    });
+  };
   const WORD = { pending: "等你定", resolved: "已裁", withdrawn: "已撤" };
-  // 一条题就是它自己的开与关，加上这段时间里落在会话上的轮次：
-  // 一个轮次可以同时裁掉几条题（裁定按题落、不按轮落），所以题不记「我答了哪轮」；
-  // 时间窗会重叠，同一轮只出现在先成的那条题里，不复制一遍。
-  const blocks = asks
-    .map((ask) => {
-      const mine = turns.filter((turn) => !shown.has(turn.at) && inside(turn, ask));
-      for (const turn of mine) shown.add(turn.at);
-      return (
-        '<article class="qa" data-state="' + esc(ask.state) + '">' +
-        '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
-        '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span>" +
-        '<span class="qmeta">' + mine.length + " 轮 · 起于 " + when(ask.at, zone) + "</span></div>" +
-        '<p class="atext">' + esc(ask.text) + "</p>" +
-        '<p class="areading"><span class="k">当成</span>' + esc(ask.reading) + "</p>" +
-        '<p class="areading"><span class="k">为什么得你定</span>' + esc(ask.why) + "</p>" +
-        (mine.length
-          ? '<details class="qthread"><summary>这段里的 ' + mine.length + ' 轮</summary><ol class="turns">' + mine.map((turn) => row(turn, false)).join("") + "</ol></details>"
-          : "") +
-        (ask.state === "resolved"
-          ? '<p class="qdone"><span class="k">结论</span>' + esc(ask.decision) + '<span class="qby">' + esc(ask.by ?? "") + " · " + when(ask.closedAt, zone) + "</span></p>"
-          : ask.state === "withdrawn"
-            ? '<p class="qdone"><span class="k">撤</span>' + esc(ask.why2 ?? "") + "</p>"
-            : cmd('deed ask resolve ' + ask.id + ' --decision "…"')) +
-        "</article>"
-      );
-    })
-    .join("");
-  const rest = turns.filter((turn) => !shown.has(turn.at));
+  const card = (ask) => {
+    const got = clues(ask);
+    return (
+      '<li class="qa" data-state="' + esc(ask.state) + '">' +
+      '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
+      '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span>" +
+      '<span class="qmeta">' + when(ask.at, zone) + (got.length ? " · 攒到 " + got.length + " 句" : "") + "</span></div>" +
+      '<p class="atext">' + esc(ask.text) + "</p>" +
+      (got.length
+        ? '<ol class="clues">' + got.map((turn) =>
+            '<li class="clue"><span class="cclock">' + when(turn.at, zone) + "</span>" + esc(turn.said) + "</li>",
+          ).join("") + "</ol>"
+        : "") +
+      (ask.state === "resolved"
+        ? '<p class="qdone">' + esc((ask.decision ?? "").split("\n").filter((one) => one.trim() && !/^(边界|弃)\s*[:：]/u.test(one))[0] ?? "") + "</p>"
+        : ask.state === "withdrawn"
+          ? '<p class="qdone quiet">撤 · ' + esc(ask.why2 ?? "") + "</p>"
+          : '<p class="areading"><span class="k">当成</span>' + esc(ask.reading) + "</p>" + cmd('deed ask resolve ' + ask.id + ' --decision "…"')) +
+      '<p class="qfoot">' + esc(ask.by ?? "") + (ask.closedAt ? " · " + when(ask.closedAt, zone) : "") + "</p>" +
+      "</li>"
+    );
+  };
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="discuss" id="screen-discuss">' +
-    screenHead("01", "讨论", "说过的话，一句都没改", asks.length + " 题 · " + turns.length + " 轮") +
-    '<div class="cols"><div class="col logs">' +
-    (blocks || '<p class="quiet">还没有成题的讨论</p>') +
-    (rest.length
-      ? '<h3 class="colh">还没成题 · ' + rest.length + ' 轮</h3><ol class="turns">' + rest.map((turn, index) => row(turn, index === 0)).join("") + "</ol>"
+    screenHead("01", "讨论", "你说的每一句，和还没定下的那些", turns.length + " 轮 · " + open.length + " 条等你定") +
+    '<div class="cols">' +
+    '<div class="col logs">' +
+    (turns.length ? '<ol class="turns">' + turns.map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
+    "</div>" +
+    '<aside class="side">' +
+    '<h3 class="colh">等你定</h3>' +
+    (open.length ? '<ol class="qlist">' + open.map(card).join("") + "</ol>" : '<p class="quiet">没有等你的题</p>') +
+    (settled.length
+      ? '<h3 class="colh">已经定下的</h3><ul class="qlist">' + settled.map((ask) =>
+          '<li class="qa quiet" data-state="' + esc(ask.state) + '">' +
+          '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
+          '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span></div>" +
+          '<p class="qdone">' + esc((ask.decision ?? ask.text ?? "").split("\n")[0]) + "</p></li>",
+        ).join("") + "</ul>"
       : "") +
-    '</div><aside class="col side">' +
-    (open.length
-      ? '<h3 class="colh">等你定 · ' + open.length + "</h3>" + open.map((ask) => '<p class="quiet">' + esc(ask.id) + " · " + esc(ask.text) + "</p>").join("")
-      : '<h3 class="colh">等你定</h3><p class="quiet">没有悬着的问题</p>') +
-    "</aside></div></section>"
+    "</aside>" +
+    "</div></section>"
   );
 }
-
 function taskRow(task, zone) {
   const pins = task.evidence.length === 0 ? 0 : pinsOf(task.evidence[task.evidence.length - 1]).length;
   const proofs = task.evidence
@@ -401,6 +407,7 @@ function acceptScreen(doc, session, config, zone, on) {
   const goal = session ? goalOf(session) : null;
   const wholeReview = session ? sessionReview(session) : null;
   const whole = session ? wholeState(session) : null;
+  const settled = session ? edges(session) : [];
   const wholeWord = !needsWhole(config, session ?? { segments: [] })
     ? null
     : whole === "pass" ? { ok: true, label: "这一期整体审过", why: wholeReview ? wholeReview.by + " · " + when(wholeReview.at, zone) : "" }
@@ -426,6 +433,12 @@ function acceptScreen(doc, session, config, zone, on) {
     '<div class="cols">' +
     '<div class="col">' +
     '<h3 class="colh">结论</h3>' + (wholeCard + cards || '<p class="quiet">还没有审查结论</p>') +
+    (settled.length
+      ? '<h3 class="colh">定过的边界与不做</h3><ul class="edges">' +
+        settled.map((one) => '<li class="edge"><span class="ekind">' + (one.kind === "border" ? "边界" : "弃") + "</span>" + esc(one.text) +
+          '<span class="ewho">' + esc(one.id) + (one.by ? " · " + esc(one.by) : "") + "</span></li>").join("") +
+        "</ul>"
+      : "") +
     "</div>" +
     '<aside class="col side">' +
     '<h3 class="colh">签收</h3>' +
@@ -686,21 +699,29 @@ html[data-theme="light"] body {
 .atext { margin: 8px 0 0; font-size: 14px; }
 .areading { margin: 6px 0 0; font-size: 11.5px; color: var(--dim); }
 .areading .k { display: inline; margin: 0 8px 0 0; letter-spacing: .2em; }
-// 讨论屏按题分组：题头一行写状态与代价，组里是它那段时间的轮次（重叠的只出现一次），
-// 组尾是结论。裁定过、撤过的题不下屏——拍板的文本跟着题一起留着。
-.qa { border: 1px solid var(--line2); background: var(--panel2); padding: 12px 13px; margin: 0 0 10px; }
+// 讨论屏：主轴是轮次，题在右边。题是还没发出去的档案，只在自己的窗口里攒你说的话。
+.qlist { list-style: none; margin: 0; padding: 0; }
+.clues { list-style: none; margin: 8px 0 0; padding: 7px 0 0; border-top: 1px dashed var(--line2); }
+.clue { display: grid; grid-template-columns: 46px minmax(0,1fr); gap: 8px; font-size: 11.5px; color: var(--dim); margin: 0 0 4px; overflow-wrap: anywhere; }
+.cclock { font-family: var(--mono); font-size: 8.5px; color: var(--dim); padding-top: 2px; }
+.qa.quiet { background: none; border-color: var(--line); padding: 8px 10px; }
+.side .colh:first-of-type { margin-top: 0; }
+.qa { border: 1px solid var(--line2); background: var(--panel2); padding: 11px 12px; margin: 0 0 8px; }
 .qa[data-state="pending"] { border-color: color-mix(in srgb, var(--warn) 40%, var(--line2)); background: color-mix(in srgb, var(--warn) 4%, var(--panel2)); }
-.qhead { display: flex; align-items: baseline; gap: 10px; }
-.qstate { font-family: var(--mono); font-size: 8.5px; letter-spacing: .22em; text-transform: uppercase; padding: 0 6px; border: 1px solid currentColor; color: var(--dim); }
+.qhead { display: flex; align-items: baseline; gap: 9px; }
+.qstate { font-family: var(--mono); font-size: 8.5px; letter-spacing: .2em; padding: 0 5px; border: 1px solid currentColor; color: var(--dim); }
 .qa[data-state="pending"] .qstate { color: var(--warn); }
 .qa[data-state="resolved"] .qstate { color: var(--signal); }
 .qmeta { margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--dim); white-space: nowrap; }
-.qthread { margin: 9px 0 0; }
-.qthread summary { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; color: var(--dim); cursor: pointer; }
-.qthread .turns { margin: 8px 0 0; padding: 0 0 0 10px; border-left: 1px solid var(--line); }
-.qdone { margin: 9px 0 0; font-size: 12px; }
-.qdone .k { display: inline; margin: 0 8px 0 0; letter-spacing: .2em; color: var(--signal); }
-.qby { display: block; margin-top: 4px; font-family: var(--mono); font-size: 9px; color: var(--dim); }
+.qa .atext { margin: 7px 0 0; font-size: 13.5px; }
+.qa .qdone { margin: 7px 0 0; font-size: 12.5px; color: var(--ink); }
+.qa .qdone.quiet { color: var(--dim); }
+.qfoot { margin: 7px 0 0; font-family: var(--mono); font-size: 8.5px; color: var(--dim); }
+.qfoot:empty { display: none; }
+.edges { list-style: none; margin: 8px 0 0; padding: 0; }
+.edge { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.ekind { font-family: var(--mono); font-size: 8.5px; letter-spacing: .12em; color: var(--warn); }
+.ewho { font-family: var(--mono); font-size: 8.5px; color: var(--dim); white-space: nowrap; }
 
 /* -------------------------------------------------------------- segments */
 .segs { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }

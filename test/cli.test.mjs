@@ -1178,11 +1178,16 @@ test("a panel says when the declared port was taken, and goes back to it when th
     const taken = run("tick", "--who", "user", "--said", "看看面板");
     assert.equal(taken.status, 0, taken.stderr);
     const fell = url(taken.stdout);
-    assert.notEqual(fell, 7433, "7433 被占着，面板只能退到别的号");
-    assert.match(taken.stdout, /端口 7433 被占着；面板改开在 \d+/, "退到哪儿要说出来，不是无声换掉一条地址");
+    assert.equal(fell, 7434, "7433 被占着，就挨着它退一格——退到哪儿是算出来的，不是抽出来的");
+    assert.match(taken.stdout, /端口 7433 被占着；面板改开在 7434/, "退到哪儿要说出来，不是无声换掉一条地址");
     assert.equal(record().port, fell, "记号里记的就是它实际在听的那个号");
     assert.match(String(record().build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
-    // 号让出来了：下一条命令要把它搬回门槛里写的那个地址——地址是用来收藏的。
+    // 停了再起：声明号还被占着，退回的地址也得是同一格，否则每次重启都要人重收一次书签。
+    run("panel", "--stop");
+    const restarted = run("state");
+    assert.equal(restarted.status, 0, restarted.stderr);
+    assert.equal(url(restarted.stdout), 7434, "重新起来还是那一格");
+        // 号让出来了：下一条命令要把它搬回门槛里写的那个地址——地址是用来收藏的。
     // 这里不先停下旧面板：活着的那个停在退回的号上，得由"号空出来了"这件事把它搬回去，
     // 否则它一辈子守着那个意外落点，声明过的地址就再也没人用过。
     await free();
@@ -1944,4 +1949,35 @@ test("a flag one letter off is refused, and the nearest name is guessed", () => 
   const upfront = deed(cwd, "task", "--digset", "proof.txt");
   assert.equal(upfront.status, 1, upfront.stdout);
   assert.match(upfront.stderr, /--digest/);
+});
+
+test("a verb that takes no flags still says so instead of ignoring them", () => {
+  // 只读动词以前不过开关表：拼错的开关被当成没写，命令照常 exit 0。
+  const cwd = workspace("readonly-flags");
+  deed(cwd, "init", "--said", "起点");
+  for (const verb of ["state", "verify", "doctor"]) {
+    const one = deed(cwd, verb, "--digset", "a.md");
+    assert.equal(one.status, 1, verb + " 带了不认的开关却说没事：" + one.stdout);
+    assert.match(one.stderr, /不认 --digset/);
+    assert.match(one.stderr, /不收开关/, verb + " 一个开关都不收，别去猜最接近的名字");
+  }
+});
+
+test("a settled decision keeps its border and what it gave up, and they are not tasks", () => {
+  const cwd = workspace("decision-edges");
+  deed(cwd, "init", "--said", "起点");
+  deed(cwd, "tick", "--who", "user", "--said", "先谈谈怎么收尾");
+  deed(cwd, "ask", "收尾要不要连文档一起改", "--reading", "只改代码", "--why", "两种都说得通");
+  const refused = deed(cwd, "ask", "resolve", "A1", "--decision", "边界：", "--by", "user");
+  assert.equal(refused.status, 1, "空边界要挡：写了个词根没写内容");
+  assert.match(refused.stderr, /没写内容/);
+  const settled = deed(cwd, "ask", "resolve", "A1", "--by", "user", "--decision", "只改代码\n边界：文档里的旧词不再新增\n弃：导出功能不做了");
+  assert.equal(settled.status, 0, settled.stderr);
+  assert.match(settled.stdout, /记下 · 2 条/);
+  const state = deed(cwd, "state");
+  assert.match(state.stdout, /边界 · 文档里的旧词不再新增（A1 · user）/);
+  assert.match(state.stdout, /弃 · 导出功能不做了（A1 · user）/);
+  // 它们不是任务：清单里没有多出条目，签收那一行的欠账也没变。
+  const plan = deed(cwd, "plan", "--print");
+  assert.doesNotMatch(plan.stdout, /文档里的旧词不再新增/);
 });
