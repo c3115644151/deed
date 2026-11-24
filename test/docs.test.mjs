@@ -56,9 +56,10 @@ test("「材料」只许写成「过程材料」", () => {
   const left = [];
   for (const file of prose(ROOT)) {
     if (path.resolve(file) === path.resolve(import.meta.filename)) continue;
-    const text = dropTable(fs.readFileSync(file, "utf8"));
+    // 先把「过程材料」整句抹掉，再看还剩几处：豁免写在替换里，不写在正则里——
+    // 正则一改，靠偏移判豁免的写法就会从「抓绰号」变成「抓所有过程材料」。
+    const text = dropTable(fs.readFileSync(file, "utf8")).replaceAll("过程材料", "");
     for (const hit of text.matchAll(/材料/gu)) {
-      if (text.slice(Math.max(0, hit.index - 2), hit.index) === "过程") continue;
       const line = text.slice(0, hit.index).split("\n").length;
       left.push(path.relative(ROOT, file) + " 第 " + line + " 行");
     }
