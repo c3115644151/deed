@@ -15,7 +15,7 @@ export default function verify(argv) {
         process.exitCode = 1;
         return;
       }
-      const { stale, outside, covered } = auditEvidence(ROOT, doc);
+      const { stale, outside, covered, historic } = auditEvidence(ROOT, doc);
       if (covered.length > 0)
         console.log("早先的交付 " + covered.length + " 条 · 已被后来的交付覆盖（" + covered.map((one) => one.id).join("、") + "；钉过的内容现在是什么不再核对）");
       const bare = bareEvidence(doc);
@@ -36,6 +36,17 @@ export default function verify(argv) {
       const drift = configDrift(doc.config, readConfigFile(ROOT));
       for (const one of drift)
         console.log("门槛对不上 · " + one.key + " · 账本里是 " + JSON.stringify(one.ledger) + "，磁盘上写的是 " + JSON.stringify(one.disk));
+      // 封了的段里字节变了：结论已经把它结清，它不挡放行，但得有人能看见。
+      if (historic.length > 0) {
+        const head = historic.slice(0, 5).map((one) => one.id + " · " + one.path + "（" + one.segment + "）");
+        console.log(
+          "封了的段里有 " +
+            historic.length +
+            " 条钉子的字节已经变了（不进 exit code）：" +
+            head.join("、") +
+            (historic.length > head.length ? "…" : ""),
+        );
+      }
       const wrong = stale.length + outside.length;
       // 历史上写过、后来被重交盖住的空交付：不挡门，但账本里那句话确实存在过。
       for (const one of past)

@@ -11,10 +11,6 @@ export const SPEC = {
       'deed init [--said "…"] [--review "src/**,…"] [--exempt "docs/**"] [--port 7317]',
     ],
   },
-  say: {
-    flags: ["who", "by", "session"],
-    usage: ['deed say "…" [--who user]      记一轮：这个人这一轮说了什么（做过的事记在清单里）'],
-  },
   tick: {
     flags: ["who", "said", "did", "session", "by"],
     usage: ['deed tick --who user|agent --said "…" [--did "…"] [--session S01]'],
@@ -86,7 +82,7 @@ export const SPEC = {
 };
 
 // 帮助里的顺序就是这里的顺序：帮助从 SPEC 出，不再有一份手抄的清单。
-export const ORDER = ["init", "say", "tick", "task", "ask", "goal", "plan", "submit", "review", "seal", "judge", "sign", "shelve", "state", "verify", "doctor", "gate", "serve", "panel"];
+export const ORDER = ["init", "tick", "task", "ask", "goal", "plan", "submit", "review", "seal", "judge", "sign", "shelve", "state", "verify", "doctor", "gate", "serve", "panel"];
 
 export const HEAD = ["deed · 一个工作区的放行协议", "", "deed --version                   打印这个程序自己的版本"];
 

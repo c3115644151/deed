@@ -40,6 +40,11 @@ test("a segment exists only once a task arrives, and a judged one never reopens 
 });
 
 const carry = (n, id) => ({ v: 1, at: T(n), k: "task.carry", s: null, id });
+const brief = (n, segment) => ({
+  v: 1, at: T(n), k: "review.brief", s: null, segment, brief: "b.md", briefDigest: "a".repeat(64), guideDigest: "c".repeat(64),
+});
+// 第 11 版起：手上那份清单还在等结论时，新活自己开下一段。这条规矩按写它的版本重放。
+const add11 = (n, id) => ({ ...add(n, id), v: 11 });
 
 test("an entry not yet done moves to the next segment, and that segment takes what comes after it", () => {
   const doc = fold([
@@ -52,6 +57,13 @@ test("an entry not yet done moves to the next segment, and that segment takes wh
   assert.equal(session.tasks.find((one) => one.id === "T3").segment, "S01.2");
   assert.equal(session.tasks.find((one) => one.id === "T4").segment, "S01.2", "新写的条目也跟着最新那一段走");
   assert.equal(session.segments[0].closedAt, null, "原来那一段没被封：它只是不再收东西");
+});
+
+test("a segment waiting for a verdict takes no new work: the next entry opens a segment", () => {
+  const doc = fold([turn(1), add11(2, "T1"), add11(5, "T2"), done(3, "T1"), brief(4, "S01.1")].sort((a, b) => a.at.localeCompare(b.at)));
+  const session = doc.sessions[0];
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2", "清单发出去了还在等结论，新活落到下一段");
+  assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
 });
 
 test("a delivery does not move: 搬 is for work not yet done", () => {

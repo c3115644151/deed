@@ -22,8 +22,9 @@ export function auditEvidence(root, doc, sessionId) {
       for (const proof of task.evidence)
         for (const file of filesOf(proof)) pins.push({ at: proof.at, path: file.path, digest: file.digest });
 
-  // 封了的段：那一段的结论就是它那些钉子的结局。之后文件被谁改过是别人的事，
-  // 而封了的段里没人能再交付——拿今天的字节去追旧钉子，只会留一笔永远清不掉的债。
+  // 封了的段：那一段的结论就是它那些钉子的结局，所以它不再挡放行——但照核不误，
+  // 变了记进 historic 报出来。整条跳过会让"字节变了"变成没人看的一格：一段封了之后
+  // 有人不经交付就改它钉过的文件，verify 说有效，谁也不知道那份字节已经换了人。
   const shut = new Map();
   for (const one of doc.sessions)
     for (const segment of one.segments) shut.set(one.id + "/" + segment.id, segment.closedAt !== null);
@@ -31,10 +32,11 @@ export function auditEvidence(root, doc, sessionId) {
   const stale = [];
   const outside = [];
   const covered = [];
+  const historic = [];
   for (const one of doc.sessions) {
     if (sessionId && one.id !== sessionId) continue;
     for (const task of one.tasks) {
-      if (shut.get(one.id + "/" + task.segment) === true) continue;
+      const shutTask = shut.get(one.id + "/" + task.segment) === true;
       const claim = task.evidence[task.evidence.length - 1];
       for (const proof of task.evidence) {
         for (const file of filesOf(proof)) {
@@ -54,12 +56,12 @@ export function auditEvidence(root, doc, sessionId) {
           // right is their claim to answer, not the earlier one's.
           const later = pins.some((pin) => pin.path === file.path && pin.at > proof.at);
           if (later) covered.push({ id: task.id, path: file.path, digest: file.digest });
-          else stale.push({ id: task.id, path: file.path, digest: file.digest });
+          else (shutTask ? historic : stale).push({ id: task.id, path: file.path, digest: file.digest, segment: task.segment });
         }
       }
     }
   }
-  return { stale, outside, covered };
+  return { stale, outside, covered, historic };
 }
 
 export const staleEvidence = (root, doc, sessionId) => auditEvidence(root, doc, sessionId).stale;

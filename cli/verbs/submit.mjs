@@ -59,9 +59,17 @@ export default function submit(argv) {
               continue;
             }
             // 这一段送审之后不再收活：没做的条目写一行 搬： 就落到下一段。
-            if (item.carry && item.box !== "x") {
+            // 这里不能看清单画的那个勾：清单给自己交过的条目画的就是 [x]，按勾判会让
+            // 这一行被当成"没变化"静默吞掉——用户写了 搬：，得到的却是一句"没有要落的改动"。
+            // 搬只对还没动手的条目成立。
+            if (item.carry) {
               if (task.status !== "todo")
-                fail(item.id + " 不是还没动手的条目（" + task.status + "）：只有没做的能搬到下一段");
+                fail(
+                  item.id +
+                    " 已经交过（" +
+                    task.status +
+                    "）：交付过的条目不能搬到下一段——要重做就在这一段重交，要换说法就新开一条",
+                );
               specs.push({ k: "task.carry", s: one.id, id: item.id });
               continue;
             }

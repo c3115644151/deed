@@ -1039,7 +1039,7 @@ test("a failed review hands the named work back, and nobody is asked to sign off
 });
 
 // 4) a task added after the brief is handed out makes that paper old
-test("a task added after the brief is handed out makes that brief old news", () => {
+test("new work waits for the verdict in the next segment, and a brief only ages when its own segment moves", () => {
   const cwd = workspace("brief-task-drift");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "第一条", "--criteria", "做到", "--files", "proof.txt");
@@ -1048,29 +1048,22 @@ test("a task added after the brief is handed out makes that brief old news", () 
   const first = deed(cwd, "review", "--segment", "S01.1");
   assert.equal(first.status, 0);
 
+  // 清单发出去了还在等结论：这一段不再收新活，新条目自己落到下一段——
+  // 旧清单没被这一条顶掉，这一段从发出去到现在确实没变过。
   deed(cwd, "task", "add", "又想起一条", "--criteria", "也得做到", "--files", "proof.txt");
-  const open = deed(cwd, "review", "--segment", "S01.1");
-  assert.equal(open.status, 1, "还有没交付的条目，清单先别发");
-  assert.match(open.stderr, /还有没交付的（T2）/);
+  const session = fold(readEvents(cwd)).sessions[0];
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2", "送审之后的新活开下一段");
+  assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
+
+  const pass = deed(cwd, "review", "--segment", "S01.1", "--by", "reviewer:x", "--verdict", "pass");
+  assert.equal(pass.status, 0, pass.stderr);
+  assert.match(pass.stdout, /段已封存/);
 
   deed(cwd, "task", "done", "T2", "--evidence", "也做了", "--digest", pinned);
-  const again = deed(cwd, "review", "--segment", "S01.1");
-  assert.equal(again.status, 0);
-  assert.match(again.stdout, /另出一份/, "交付把旧清单顶掉了，重出一份");
-  const pass = deed(cwd, "review", "--segment", "S01.1", "--by", "reviewer:x", "--verdict", "pass");
-  assert.equal(pass.status, 0);
-
-  // 放行把这一段封了：再想起一条就落在下一段，不会把刚下的结论顶旧。
-  deed(cwd, "task", "add", "第三条", "--criteria", "第三件", "--files", "proof.txt");
-  assert.match(deed(cwd, "state").stdout, /S01\.2/);
-  const early = deed(cwd, "review", "--segment", "S01.2");
-  assert.equal(early.status, 1, "还有没交付的条目，清单先别发");
-  assert.match(early.stderr, /还有没交付的/);
-  deed(cwd, "task", "done", "T3", "--evidence", "也做了", "--digest", pinned);
   assert.equal(deed(cwd, "review", "--segment", "S01.2").status, 0);
   // 清单发出去之后又交了一遍：清单上写的不是这一版，结论回答不了它。
-  deed(cwd, "task", "done", "T3", "--evidence", "又做了一遍", "--digest", pinned);
-  const older = deed(cwd, "review", "--segment", "S01.2", "--by", "reviewer:x", "--verdict", "fail", "--rework", "T3", "--why", "再看法");
+  deed(cwd, "task", "done", "T2", "--evidence", "又做了一遍", "--digest", pinned);
+  const older = deed(cwd, "review", "--segment", "S01.2", "--by", "reviewer:x", "--verdict", "fail", "--rework", "T2", "--why", "再看法");
   assert.equal(older.status, 1);
   assert.match(older.stderr, /又动过/, "清单上没有这一版，结论回答不了它");
 });
@@ -1337,7 +1330,7 @@ test("an older delivery is history, not a claim that keeps going stale", () => {
   assert.match(stale.stdout, /交付记录过期 · T1/);
 });
 
-test("a pin in a closed segment stops being checked: nobody there can deliver again", () => {
+test("a pin in a closed segment stops blocking, but it still gets reported", () => {
   const cwd = workspace("shut-pins");
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
   deed(cwd, "init", "--said", "开始");
@@ -1350,6 +1343,7 @@ test("a pin in a closed segment stops being checked: nobody there can deliver ag
   const after = deed(cwd, "verify");
   assert.equal(after.status, 0, after.stdout + after.stderr);
   assert.doesNotMatch(after.stdout, /交付记录过期 · T1/, "封了的段里没人能再交付，追旧钉子只会留一笔清不掉的债");
+  assert.match(after.stdout, /封了的段里有 1 条钉子的字节已经变了/, "跳过整条会让「字节变了」变成没人看的一格");
 });
 
 test("a file pinned again by a later delivery is covered, not stale", () => {
@@ -2040,13 +2034,16 @@ test("an entry still to be done is carried to the next segment from the plan", (
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
 
   // 交付过的条目搬不动：那等于把一条交付换个段说话，账本里没有这件事的位置。
-  fs.writeFileSync(
-    plan,
-    ["# 这一期要做成什么", "开始。", "", "## 段 S01.1", "- [ ] T1 先做这一件", "  标准：能跑", "  搬：换个段", "", "## 段 S01.2", "- [ ] T2 下一段再做", "  标准：也做完", "  搬：这一段已经送审，下一段接着做"].join("\n") + "\n",
-  );
+  // 这一条要按清单自己画出来的形状写——交过的条目画的是 [x] + 交付：，
+  // 按勾判会让这一行被当成"没有要落的改动"吞掉，用户只得到一句和 搬： 无关的话。
+  deed(cwd, "plan", "--force");
+  const drawn = fs.readFileSync(plan, "utf8");
+  assert.match(drawn, /- \[x\] T1 先做这一件/u, "清单自己把交过的条目画成勾着的");
+  fs.writeFileSync(plan, drawn.replace(/(  交付：跑了 1\/1\n)/u, "$1  搬：换个段\n"));
   const refused = deed(cwd, "submit");
-  assert.equal(refused.status, 1);
-  assert.match(refused.stderr, /不是还没动手的条目（done）/u);
+  assert.equal(refused.status, 1, "写了 搬： 却 exit 0，等于静默吞掉");
+  assert.match(refused.stderr, /已经交过（done）/u);
+  assert.doesNotMatch(refused.stderr, /没有要落的改动/u);
 });
 
 test("a segment nobody reviewed says in the brief why it was not reviewed", () => {

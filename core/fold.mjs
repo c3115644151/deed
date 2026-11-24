@@ -91,8 +91,18 @@ function nextSegment(session, at, carried = false) {
   return segment;
 }
 
-function segmentOf(session, at) {
-  return session.segments.filter((one) => one.closedAt === null).at(-1) ?? nextSegment(session, at);
+// 这一段手上那份清单还没人回答，它就是"{等结论}"的状态：新活不再往里放，自己开下一段。
+// 决定收不收活的地方必须在这一层——只在 submit 里挡，重放出来的段仍会多出一条任务。
+const awaits = (session, segment) =>
+  session.briefs.some((one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null);
+
+// 这条判断从账本含义第 11 版起生效，之前的行按当时的样子重放：
+// 老账本里没有这个规矩，拿今天的规矩重排，会把这些行里写死的段号（比如一次打回说
+// 「T8 退回 S01.1」）判成坏账——整本账再也重放不动，而那并不是当初写错。
+function segmentOf(session, at, v = 1) {
+  const last = session.segments.filter((one) => one.closedAt === null).at(-1);
+  if (!last) return nextSegment(session, at);
+  return v >= 11 && awaits(session, last) ? nextSegment(session, at) : last;
 }
 
 // 任务碰过哪些路径、各多大，只由还在的交付说得算。交付退回（撤回，或者审查者点名
@@ -165,7 +175,7 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         if (taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了`);
         session.ids.add(ev.id);
-        const segment = segmentOf(session, ev.at);
+        const segment = segmentOf(session, ev.at, ev.v ?? 1);
         session.tasks.push({
           id: ev.id,
           title: ev.title,

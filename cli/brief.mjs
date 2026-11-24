@@ -208,7 +208,8 @@ export function planWhole(root, session, at) {
     if (segment.sealedBy)
       return (
         "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " +
-        stamp0(segment.closedAt) + " · " + count + " 条 · 门槛说这一段不用审（" + (segment.sealedWhy ?? "") + "）"
+        stamp0(segment.closedAt) + " · " + count + " 条 · 门槛说这一段不用审" +
+        (segment.sealedWhy ? "（" + segment.sealedWhy + "）" : "")
       );
     return "- " + segment.id + " · 没有段审 · " + count + " 条";
   };
