@@ -5196,7 +5196,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <div class="pulse-dot"></div>
         <h1>deed：三种状态，一屏说完</h1>
       </div>
-      <p class="subtitle">每一列是一个状态：上面是已经发生的事实，中间是状态本身，下面是等你或别人动的那一格</p>
+      <p class="subtitle">每一列是一个状态：上面是已经发生的事实，中间是状态本身，下面是等你或别人动的那一格；底部是这四样怎么算出来的</p>
     </div>
 
 
@@ -5204,9 +5204,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / PLATE 04">
-      <svg viewBox="0 0 910 548" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-animation="trace" data-preset="classic" data-quality-profile="showcase" data-node-ui="" data-reader-fit="intrinsic-height" data-reader-min-text="7.5" data-reader-primary-text="14">
+      <svg viewBox="0 0 910 640" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-animation="trace" data-preset="classic" data-quality-profile="showcase" data-node-ui="" data-reader-fit="intrinsic-height" data-reader-min-text="7.5" data-reader-primary-text="14">
         <title id="archify-diagram-title">deed：三种状态，一屏说完</title>
-        <desc id="archify-diagram-description">每一列是一个状态：上面是已经发生的事实，中间是状态本身，下面是等你或别人动的那一格</desc>
+        <desc id="archify-diagram-description">每一列是一个状态：上面是已经发生的事实，中间是状态本身，下面是等你或别人动的那一格；底部是这四样怎么算出来的</desc>
         <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -5251,7 +5251,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" data-composition-frame-label="背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它" x="10" y="374" width="860" height="106" rx="12" class="c-region" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" data-composition-frame-label="背后：账本 + 目录快照 → 重放 → 体检 / 规则" x="10" y="374" width="860" height="198" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
         <g data-graph-role="automatic-crossover" style="--step:0">
@@ -5291,12 +5291,28 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <path data-edge-from="log" data-edge-to="fold" data-edge-key="8" data-edge-id="log-fold" data-composition-points="260,432;330,432" data-composition-crossover="halo" data-composition-independent="true" d="M 260 432 L 330 432" class="a-default" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         </g>
         <g data-graph-role="automatic-crossover" style="--step:9">
-          <path data-graph-role="automatic-crossover-underlay" d="M 550 432 L 620 432" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="fold" data-edge-to="rules" data-edge-key="9" data-edge-id="fold-rules" data-composition-points="550,432;620,432" data-composition-crossover="halo" data-composition-independent="true" d="M 550 432 L 620 432" class="a-default" data-animate="edge" style="--step:9" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+          <path data-graph-role="automatic-crossover-underlay" d="M 550 432 L 566 432 Q 574 432 574 440 L 574 464 Q 574 472 582 472 L 708 472 Q 716 472 716 480 L 716 496" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
+          <path data-edge-from="fold" data-edge-to="rules" data-edge-key="9" data-edge-id="fold-rules" data-composition-points="550,432;574,432;574,472;716,472;716,496" data-composition-crossover="halo" data-composition-independent="true" d="M 550 432 L 566 432 Q 574 432 574 440 L 574 464 Q 574 472 582 472 L 708 472 Q 716 472 716 480 L 716 496" class="a-default" data-animate="edge" style="--step:9" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         </g>
         <g data-graph-role="automatic-crossover" style="--step:10">
-          <path data-graph-role="automatic-crossover-underlay" d="M 730 404 L 730 354" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
-          <path data-edge-from="rules" data-edge-to="signed" data-edge-label="能不能判" data-edge-key="10" data-edge-id="rules-signed" data-composition-points="730,404;730,354" data-composition-crossover="halo" data-composition-independent="true" d="M 730 404 L 730 354" class="a-default" data-animate="edge" style="--step:10" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+          <path data-graph-role="automatic-crossover-underlay" d="M 840 524 L 856 524 Q 864 524 864 516 L 864 324 Q 864 316 856 316 L 840 316" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
+          <path data-edge-from="rules" data-edge-to="signed" data-edge-key="10" data-edge-id="rules-signed" data-composition-points="840,524;864,524;864,316;840,316" data-composition-crossover="halo" data-composition-independent="true" d="M 840 524 L 856 524 Q 864 524 864 516 L 864 324 Q 864 316 856 316 L 840 316" class="a-default" data-animate="edge" style="--step:10" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        </g>
+        <g data-graph-role="automatic-crossover" style="--step:11">
+          <path data-graph-role="automatic-crossover-underlay" d="M 440 460 L 440 496" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
+          <path data-edge-from="fold" data-edge-to="checks" data-edge-key="11" data-edge-id="fold-checks" data-composition-points="440,460;440,496" data-composition-crossover="halo" data-composition-independent="true" d="M 440 460 L 440 496" class="a-default" data-animate="edge" style="--step:11" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        </g>
+        <g data-graph-role="automatic-crossover" style="--step:12">
+          <path data-graph-role="automatic-crossover-underlay" d="M 620 432 L 593 432 Q 585 432 585 440 L 585 509 Q 585 517 577 517 L 550 517" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
+          <path data-edge-from="tree" data-edge-to="checks" data-edge-key="12" data-edge-id="tree-checks" data-composition-points="620,432;585,432;585,517;550,517" data-composition-crossover="halo" data-composition-independent="true" d="M 620 432 L 593 432 Q 585 432 585 440 L 585 509 Q 585 517 577 517 L 550 517" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        </g>
+        <g data-graph-role="automatic-crossover" style="--step:13">
+          <path data-graph-role="automatic-crossover-underlay" d="M 330 524 L 260 524" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
+          <path data-edge-from="checks" data-edge-to="project" data-edge-key="13" data-edge-id="checks-project" data-composition-points="330,524;260,524" data-composition-crossover="halo" data-composition-independent="true" d="M 330 524 L 260 524" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        </g>
+        <g data-graph-role="automatic-crossover" style="--step:14">
+          <path data-graph-role="automatic-crossover-underlay" d="M 550 531 L 620 531" fill="none" stroke="var(--mask)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>
+          <path data-edge-from="checks" data-edge-to="rules" data-edge-label="诊断" data-edge-key="14" data-edge-id="checks-rules" data-composition-points="550,531;620,531" data-composition-crossover="halo" data-composition-independent="true" d="M 550 531 L 620 531" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         </g>
 
         <!-- Components -->
@@ -5386,15 +5402,15 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="150" y="330" class="t-muted" font-size="9" text-anchor="middle">我的理解 · 为什么得你定</text>
         </g>
 
-        <g id="node-delivered" data-node-id="delivered" data-node-label="交付与记录" tabindex="0" role="button" aria-label="Focus 交付与记录, 做了哪些 · 记下那一刻的 sha256, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="做了哪些 · 记下那一刻的 sha256" data-node-context="Architecture component">
-          <title>交付与记录 · 做了哪些 · 记下那一刻的 sha256 · Architecture component</title>
+        <g id="node-delivered" data-node-id="delivered" data-node-label="交付与记录" tabindex="0" role="button" aria-label="Focus 交付与记录, 做了哪些 · 动了哪些路径, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="做了哪些 · 动了哪些路径" data-node-context="Architecture component">
+          <title>交付与记录 · 做了哪些 · 动了哪些路径 · Architecture component</title>
           <rect x="330" y="278" width="220" height="76" rx="8" class="c-mask"/>
           <rect x="330" y="278" width="220" height="76" rx="8" class="c-backend" data-animate="node" style="--step:5" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(336 284) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="440" y="314" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">交付与记录</text>
-        <text data-detail="context" x="440" y="330" class="t-muted" font-size="9" text-anchor="middle">做了哪些 · 记下那一刻的 sha256</text>
+        <text data-detail="context" x="440" y="330" class="t-muted" font-size="9" text-anchor="middle">做了哪些 · 动了哪些路径</text>
         </g>
 
         <g id="node-signed" data-node-id="signed" data-node-label="判决与签收" tabindex="0" role="button" aria-label="Focus 判决与签收, 判没判过 · 原话是什么, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="判没判过 · 原话是什么" data-node-context="Architecture component">
@@ -5408,8 +5424,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="730" y="330" class="t-muted" font-size="9" text-anchor="middle">判没判过 · 原话是什么</text>
         </g>
 
-        <g id="node-log" data-node-id="log" data-node-label="账本追加" tabindex="0" role="button" aria-label="Focus 账本追加, .deed/log · 只加不改, 背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它" aria-pressed="false" data-node-kind="database" data-node-sublabel=".deed/log · 只加不改" data-node-context="背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它">
-          <title>账本追加 · .deed/log · 只加不改 · 背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它</title>
+        <g id="node-log" data-node-id="log" data-node-label="账本追加" tabindex="0" role="button" aria-label="Focus 账本追加, .deed/log · 只加不改, 背后：账本 + 目录快照 → 重放 → 体检 / 规则" aria-pressed="false" data-node-kind="database" data-node-sublabel=".deed/log · 只加不改" data-node-context="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <title>账本追加 · .deed/log · 只加不改 · 背后：账本 + 目录快照 → 重放 → 体检 / 规则</title>
           <rect x="40" y="404" width="220" height="56" rx="8" class="c-mask"/>
           <rect x="40" y="404" width="220" height="56" rx="8" class="c-database" data-animate="node" style="--step:8" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(46 410) scale(0.6875)">
@@ -5420,8 +5436,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="150" y="446" class="t-muted" font-size="9" text-anchor="middle">.deed/log · 只加不改</text>
         </g>
 
-        <g id="node-fold" data-node-id="fold" data-node-label="重放" tabindex="0" role="button" aria-label="Focus 重放, 从头放一遍 · 纯函数, 背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它" aria-pressed="false" data-node-kind="backend" data-node-sublabel="从头放一遍 · 纯函数" data-node-context="背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它">
-          <title>重放 · 从头放一遍 · 纯函数 · 背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它</title>
+        <g id="node-fold" data-node-id="fold" data-node-label="重放" tabindex="0" role="button" aria-label="Focus 重放, 从头放一遍 · 纯函数, 背后：账本 + 目录快照 → 重放 → 体检 / 规则" aria-pressed="false" data-node-kind="backend" data-node-sublabel="从头放一遍 · 纯函数" data-node-context="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <title>重放 · 从头放一遍 · 纯函数 · 背后：账本 + 目录快照 → 重放 → 体检 / 规则</title>
           <rect x="330" y="404" width="220" height="56" rx="8" class="c-mask"/>
           <rect x="330" y="404" width="220" height="56" rx="8" class="c-backend" data-animate="node" style="--step:9" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(336 410) scale(0.6875)">
@@ -5431,15 +5447,48 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="440" y="446" class="t-muted" font-size="9" text-anchor="middle">从头放一遍 · 纯函数</text>
         </g>
 
-        <g id="node-rules" data-node-id="rules" data-node-label="规则" tabindex="0" role="button" aria-label="Focus 规则, 三种状态与下一步 · 一处算, 背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它" aria-pressed="false" data-node-kind="backend" data-node-sublabel="三种状态与下一步 · 一处算" data-node-context="背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它">
-          <title>规则 · 三种状态与下一步 · 一处算 · 背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它</title>
+        <g id="node-rules" data-node-id="rules" data-node-label="规则" tabindex="0" role="button" aria-label="Focus 规则, 三种状态与下一步 · 一处算, 背后：账本 + 目录快照 → 重放 → 体检 / 规则" aria-pressed="false" data-node-kind="backend" data-node-sublabel="三种状态与下一步 · 一处算" data-node-context="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <title>规则 · 三种状态与下一步 · 一处算 · 背后：账本 + 目录快照 → 重放 → 体检 / 规则</title>
+          <rect x="620" y="496" width="220" height="56" rx="8" class="c-mask"/>
+          <rect x="620" y="496" width="220" height="56" rx="8" class="c-backend" data-animate="node" style="--step:10" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(626 502) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="730" y="522" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">规则</text>
+        <text data-detail="context" x="730" y="538" class="t-muted" font-size="9" text-anchor="middle">三种状态与下一步 · 一处算</text>
+        </g>
+
+        <g id="node-tree" data-node-id="tree" data-node-label="目录快照" tabindex="0" role="button" aria-label="Focus 目录快照, 盘上的目录与 import, 背后：账本 + 目录快照 → 重放 → 体检 / 规则" aria-pressed="false" data-node-kind="backend" data-node-sublabel="盘上的目录与 import" data-node-context="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <title>目录快照 · 盘上的目录与 import · 背后：账本 + 目录快照 → 重放 → 体检 / 规则</title>
           <rect x="620" y="404" width="220" height="56" rx="8" class="c-mask"/>
-          <rect x="620" y="404" width="220" height="56" rx="8" class="c-backend" data-animate="node" style="--step:10" stroke-width="1.5"/>
+          <rect x="620" y="404" width="220" height="56" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(626 410) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="730" y="430" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">规则</text>
-        <text data-detail="context" x="730" y="446" class="t-muted" font-size="9" text-anchor="middle">三种状态与下一步 · 一处算</text>
+          <text data-node-label="" data-detail-anchor="" x="730" y="430" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">目录快照</text>
+        <text data-detail="context" x="730" y="446" class="t-muted" font-size="9" text-anchor="middle">盘上的目录与 import</text>
+        </g>
+
+        <g id="node-checks" data-node-id="checks" data-node-label="体检" tabindex="0" role="button" aria-label="Focus 体检, 有序检查表 · 纯函数, 背后：账本 + 目录快照 → 重放 → 体检 / 规则" aria-pressed="false" data-node-kind="backend" data-node-sublabel="有序检查表 · 纯函数" data-node-context="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <title>体检 · 有序检查表 · 纯函数 · 背后：账本 + 目录快照 → 重放 → 体检 / 规则</title>
+          <rect x="330" y="496" width="220" height="56" rx="8" class="c-mask"/>
+          <rect x="330" y="496" width="220" height="56" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(336 502) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="440" y="522" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">体检</text>
+        <text data-detail="context" x="440" y="538" class="t-muted" font-size="9" text-anchor="middle">有序检查表 · 纯函数</text>
+        </g>
+
+        <g id="node-project" data-node-id="project" data-node-label="项目状态" tabindex="0" role="button" aria-label="Focus 项目状态, 未声明 / k/n / 已认可, 背后：账本 + 目录快照 → 重放 → 体检 / 规则" aria-pressed="false" data-node-kind="backend" data-node-sublabel="未声明 / k/n / 已认可" data-node-context="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <title>项目状态 · 未声明 / k/n / 已认可 · 背后：账本 + 目录快照 → 重放 → 体检 / 规则</title>
+          <rect x="40" y="496" width="220" height="56" rx="8" class="c-mask"/>
+          <rect x="40" y="496" width="220" height="56" rx="8" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(46 502) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="150" y="522" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">项目状态</text>
+        <text data-detail="context" x="150" y="538" class="t-muted" font-size="9" text-anchor="middle">未声明 / k/n / 已认可</text>
         </g>
 
         <!-- Connection labels -->
@@ -5459,31 +5508,35 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </g>
 
 
-        <g data-detail="context" data-edge-from="rules" data-edge-to="signed" data-edge-label="能不能判" data-edge-key="10" data-edge-id="rules-signed">
-          <rect x="705.8" y="384" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="730" y="394" class="t-edge-default" font-size="8" text-anchor="middle">能不能判</text>
+
+
+
+
+        <g data-detail="context" data-edge-from="checks" data-edge-to="rules" data-edge-label="诊断" data-edge-key="14" data-edge-id="checks-rules">
+          <rect x="570" y="541" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="585" y="551" class="t-edge-default" font-size="8" text-anchor="middle">诊断</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="region" data-composition-frame-label="背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它">
-          <rect data-graph-role="structural-frame-label-mask" x="14" y="384" width="377.2" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="18" y="397" class="t-cloud" font-size="9" font-weight="600">背后：账本 → 重放 → 规则 —— 三种状态和下一步都从这里算，你不用打开它</text>
+        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="region" data-composition-frame-label="背后：账本 + 目录快照 → 重放 → 体检 / 规则">
+          <rect data-graph-role="structural-frame-label-mask" x="14" y="384" width="236.79999999999998" height="16" rx="3" class="c-mask"/>
+          <text data-boundary-label="" x="18" y="397" class="t-cloud" font-size="9" font-weight="600">背后：账本 + 目录快照 → 重放 → 体检 / 规则</text>
         </g>
 
         <!-- Legend -->
         <g data-legend="" data-legend-bridge="">
-          <text x="40" y="512" class="t-primary" font-size="12" font-weight="650">Legend</text>
-          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="532" data-legend-width="93">
-            <rect x="40" y="523" width="16" height="10" rx="2.5" class="c-frontend" stroke-width="1"/>
-            <text x="62" y="532" class="t-muted" font-size="10" font-weight="500">Frontend</text>
+          <text x="40" y="604" class="t-primary" font-size="12" font-weight="650">Legend</text>
+          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="624" data-legend-width="93">
+            <rect x="40" y="615" width="16" height="10" rx="2.5" class="c-frontend" stroke-width="1"/>
+            <text x="62" y="624" class="t-muted" font-size="10" font-weight="500">Frontend</text>
           </g>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="155" data-legend-baseline="532" data-legend-width="87">
-            <rect x="155" y="523" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
-            <text x="177" y="532" class="t-muted" font-size="10" font-weight="500">Backend</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="155" data-legend-baseline="624" data-legend-width="87">
+            <rect x="155" y="615" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
+            <text x="177" y="624" class="t-muted" font-size="10" font-weight="500">Backend</text>
           </g>
-          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="264" data-legend-baseline="532" data-legend-width="93">
-            <rect x="264" y="523" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
-            <text x="286" y="532" class="t-muted" font-size="10" font-weight="500">Database</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="264" data-legend-baseline="624" data-legend-width="93">
+            <rect x="264" y="615" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
+            <text x="286" y="624" class="t-muted" font-size="10" font-weight="500">Database</text>
           </g>
         </g>
       </svg>
@@ -5670,7 +5723,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>讨论：会话刚开，还没有一条任务——这里只有你说的话，和你还没裁的问题</li>
-          <li>执行：有任务、没判过——每条任务带「做完的标准」，每次交付带一句做了什么和它记下的 sha256</li>
+          <li>执行：有任务、没判过——每条任务带「做完的标准」，每次交付带一句做了什么、动了哪些路径</li>
           <li>验收：这一段判过了——剩审查发现原文、判决、等你签收的那句话</li>
           <li>没有切状态的按钮：账本长一条，状态自己变</li>
         </ul>
@@ -5721,6 +5774,19 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <li>没有手动切状态：状态是账本算出来的，不是人标的</li>
           <li>没有项目总览：这个工作区之外的事，deed 不管</li>
           <li>没有规格文档那一层：它管「凭什么算过去了」，不管「该做成什么样」</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>没登记的机制不算系统的一部分</h3>
+        </div>
+        <ul>
+          <li>体检表是一张有序的登记：每条写清依赖哪些事实、怎么判、不过时跑哪一步、通过后解锁什么能力</li>
+          <li>没登记的机制不进这张表：机制再多，全貌仍在一张表上，而不是散在代码里</li>
+          <li>未通过不挡三种状态：它只说这个工作区还算不算一个项目、差几条</li>
+          <li>底部那条带子：账本 + 目录快照 → 重放 → 体检 / 规则；体检的诊断回到规则，下一步才说得出「先补哪一条」</li>
         </ul>
       </div>
     </div>
