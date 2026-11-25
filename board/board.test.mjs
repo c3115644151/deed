@@ -237,26 +237,7 @@ test("a broken ledger makes the panel say so instead of vanishing", async () => 
   }
 });
 
-test("a segment that took more than one brief says so on its head", () => {
-  const brief = (n) => ({ v: 1, at: T(n), k: "review.brief", s: null, segment: "S01.1", brief: "b" + n + ".md", briefDigest: "a".repeat(64) });
-  const events = [
-    ...configEvents,
-    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做重放" },
-    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["core/x.mjs"] },
-    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test 1/1", by: "agent" },
-    brief(4),
-    brief(5),
-  ];
-  const busy = fold(events);
-  const html = renderBoard(busy, config, { zone, events: 6 });
-  assert.match(html, /<span class="scost"[^>]*>清单 2</, "出过两份清单就写在段头上");
-  assert.doesNotMatch(html, /开了 \d+ 分钟/, "还开着的段没有这个数，就不印");
-  assert.match(html, /\.scost \{/, "那一枚有它自己的样式");
-  // 封过的段开了多久算得出来（不读时钟）：清单出在第 4、5 分钟，结论落在第 6 分钟。
-  const shut = fold([...events, { v: 3, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b5.md" }]);
-  assert.equal(shut.sessions[0].segments[0].closedAt, T(6));
-  assert.match(renderBoard(shut, config, { zone, events: 7 }), /开了 \d+ 分钟/);
-});
+
 
 test("a port somebody else already holds does not take the panel down with it", async () => {
   // 面板的意义是"随时能看"：号被占了就换一个号继续开，并在页面上说清它开在哪。

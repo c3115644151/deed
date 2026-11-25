@@ -13,7 +13,7 @@ import { digest } from "../core/digest.mjs";
 import { fold, frozenFor } from "../core/fold.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
-import { costOf, edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
+import { edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
 import { auditEvidence, staleEvidence } from "./audit.mjs";
@@ -386,18 +386,11 @@ export function printState() {
       console.log("  还没有段：范围说完就写第一条任务");
     } else {
       const count = countIn(open, shown);
-      const spent = costOf(open, shown);
       console.log(
         "  段 " + shown.id + " · 开于 " + stamp0(shown.openedAt) + " · " + count.total + " 条（未做 " + count.todo + " · 已交付 " + (count.done + count.accepted) + "）· " + (shown.closedAt
           ? (shown.verdict === "exempt" ? "免审 · " : "判过 · ") + stamp0(shown.closedAt)
           : REVIEW_LABEL[reviewState(config, open, shown)]),
       );
-      // 花了多少：慢要看得见，才谈得上省。这是账本里现成的数，不挡任何一步。
-      const tail = [];
-      if (spent.briefs > 1) tail.push(spent.briefs + " 份清单");
-      if (spent.undos > 0) tail.push("重交 " + spent.undos + " 次");
-      if (spent.minutes !== null) tail.push("开了 " + spent.minutes + " 分钟");
-      if (tail.length) console.log("    花了 · " + tail.join(" · "));
       for (const task of tasksIn(open, shown)) {
         const mark = { todo: "○", done: "●", accepted: "✓", deferred: "…", dropped: "×" }[task.status];
         console.log(

@@ -7,7 +7,6 @@
 import {
   byOrder,
   groupsOf,
-  costOf,
   countIn,
   edges,
   currentSession,
@@ -310,7 +309,6 @@ function pathsOf(session, segment) {
 
 function segmentBlock(session, segment, index, config, zone) {
   const count = countIn(session, segment);
-  const spent = costOf(session, segment);
   const state = reviewState(config, session, segment);
   const review = reviewOf(session, segment);
   // 收活的那一段才叫"手上这一段"；清单排在后头的段在这儿是"等前面"。
@@ -328,12 +326,6 @@ function segmentBlock(session, segment, index, config, zone) {
     '<span class="sidx">' + String(index).padStart(2, "0") + "</span>" +
     '<span class="sid">' + esc(segment.id) + "</span>" +
     '<span class="scount">' + count.total + " 条 · 未做 " + count.todo + " · 已交付 " + (count.done + count.accepted) + "</span>" +
-    '<span class="scost" title="这一段花了多少：清单出过几份、重交了几次、开了多久">' +
-    [
-      spent.briefs > 1 ? "清单 " + spent.briefs : "",
-      spent.undos > 0 ? "重交 " + spent.undos : "",
-      spent.minutes !== null ? "开了 " + spent.minutes + " 分钟" : "",
-    ].filter(Boolean).join(" · ") +
     "</span>" +
     '<span class="smeter2" title="' + (count.done + count.accepted) + " / " + count.total + '">' +
     '<span class="sfill" style="width:' + Math.round(((count.done + count.accepted) / Math.max(1, count.total)) * 100) + '%"></span></span>' +
@@ -765,8 +757,6 @@ html[data-theme="light"] body {
 .seg.here .segbar { box-shadow: inset 2px 0 0 var(--signal); }
 .sid { font-family: var(--mono); font-size: 11.5px; letter-spacing: .12em; color: var(--signal); }
 .scount, .swhen { font-family: var(--mono); font-size: 9.5px; color: var(--dim); letter-spacing: .08em; }
-.scost { font-family: var(--mono); font-size: 9px; color: var(--warn); letter-spacing: .04em; white-space: nowrap; }
-.scost:empty { display: none; }
 .smeter2 { display: block; height: 3px; background: var(--line2); position: relative; }
 .sfill { display: block; height: 100%; background: var(--signal); box-shadow: 0 0 7px color-mix(in srgb, var(--signal) 65%, transparent); }
 .swhen { justify-self: end; }
