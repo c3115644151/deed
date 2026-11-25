@@ -551,7 +551,8 @@ export function fold(events) {
           note: one.note ?? null,
           files: (one.files ?? []).map((file) => ({ path: file.path, digest: file.digest })),
         }));
-        if (meaning >= MEANING.perItem && ev.verdict === "pass") {
+        // 按条判定说的是段：期审判的是这一期做成的样子，没有"每条标准"这回事。
+        if (meaning >= MEANING.perItem && ev.verdict === "pass" && segment) {
           const judged = new Set(results.map((one) => one.id));
           const bare = inScope
             .filter((one) => one.status !== "dropped" && one.status !== "deferred")

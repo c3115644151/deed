@@ -1,4 +1,5 @@
 // rules: the questions a projection asks about the document. No clock, no IO.
+import { MEANING } from "./events.mjs";
 // If a rule here disagrees with what fold allows, fold wins and this file is
 // wrong -- these functions explain a state, they never permit one.
 
@@ -274,6 +275,62 @@ const voidedReview = (session, segment) => {
   return ever.length > 0 && ever.every((one) => one.voidedAt !== null);
 };
 
+
+// ---- 期审：段全关之后，这一期做成的样子还要有人判 --------------------------------------
+// 段审判「这一段对不对」，期审判「这一期做成的样子对不对、各段之间说不说得通」。
+// 两者不是同一件事的两次：期审不重判段里的条目，它判的是目的与跨段的一致性。
+export const lastPeriodBrief = (session) =>
+  session.briefs.filter((one) => one.scope === "session").at(-1) ?? null;
+
+// 只有第 20 版起的整期结论算期审：更早那些行回答的是当年那道"签收核对"，
+// 一个已经不是今天这层问题的问题。它们照读成历史，不给签收添门，也不当成期审。
+export const periodReviewOf = (session) =>
+  session.reviews
+    .filter((one) => one.scope === "session" && one.voidedAt === null && (one.v ?? 1) >= MEANING.periodReview)
+    .at(-1) ?? null;
+
+// 什么时候该期审：段都关了，没有未做、没有已交付未判。没开过段的一期不需要。
+export const needsPeriodReview = (session) => {
+  if (!session || session.segments.length === 0) return false;
+  if (session.tasks.some((one) => one.status === "todo" || one.status === "done")) return false;
+  return session.segments.every((one) => one.closedAt !== null);
+};
+
+// 期审的清单旧了没有：它发出之后，任何一段又落了结论或又被打开，它就答的不是这一期了。
+export const stalePeriod = (session) => {
+  const brief = lastPeriodBrief(session);
+  if (!brief) return false;
+  if (brief.withdrawnAt !== undefined) return false;
+  return session.reviews.some((one) => one.scope === "segment" && one.at > brief.at) ||
+    session.segments.some((one) => one.closedAt !== null && one.closedAt > brief.at && one.sealedByReview !== undefined);
+};
+
+export function periodState(session) {
+  if (!needsPeriodReview(session)) return "missing";
+  const review = periodReviewOf(session);
+  if (review?.verdict === "fail") return "fail";
+  if (review?.verdict === "pass") return stalePeriod(session) ? "stale" : "pass";
+  return "missing";
+}
+
+// 期审清单发出去了、还没人回答。
+export const periodFresh = (session) => {
+  const brief = lastPeriodBrief(session);
+  return Boolean(brief) && brief.answeredBy === null && brief.withdrawnAt === undefined;
+};
+
+// 这一期的段审用过哪些手：期审要换一双新的。段审自己则一直用同一双手——
+// 前一次判过这一段的人，下一次还是他：同一段的判断不该每次换个人从头摸一遍。
+// 一段交给谁判：这一段的清单第一次写了谁，之后就是他。下一步的命令照它印。
+export const handOf = (session, segmentId) =>
+  session.briefs.filter((one) => one.scope === "segment" && one.segment === segmentId && one.by).at(-1)?.by ?? null;
+
+export const segmentReviewers = (session) =>
+  [...new Set(session.briefs.filter((one) => one.scope === "segment" && one.by).map((one) => one.by))];
+
+export const periodReviewers = (session) =>
+  [...new Set(session.briefs.filter((one) => one.scope === "session" && one.by).map((one) => one.by))];
+
 // Signing is a session-level judgement, so it looks at the whole session, not
 // just the segment that happens to be open.
 export function signBlockers(doc, session, config = null) {
@@ -302,6 +359,20 @@ export function signBlockers(doc, session, config = null) {
     blockers.push(`还有 ${undelivered.length} 条已交付但没判（${undelivered.map((one) => one.id).join("、")}）`);
   const asks = pendingAsks(session);
   if (asks.length > 0) blockers.push(`还有 ${asks.length} 条待裁（${asks.map((one) => one.id).join("、")}）`);
+  // 段都关了还不算这一期过完：要有人判「这一期做成的样子」。签收压在期审后面。
+  if (needsPeriodReview(session)) {
+    const state = periodState(session);
+    const live = periodReviewOf(session);
+    if (state === "missing")
+      blockers.push(session.id + " 还没有期审：各段都关了，但这一期做成的样子还没有人判（deed review --all）");
+    if (state === "stale")
+      blockers.push(session.id + " 的期审结论早于之后的段变动：那份结论回答的不是这一期现在的事（deed review --all 另出一份）");
+    if (state === "fail")
+      blockers.push(
+        session.id + " 的期审不合格还在案（" + (live?.by ?? "谁") + "）：" +
+          ((live?.rework ?? []).length > 0 ? (live.rework).join("、") + " 得先重新判过" : "要改判先由人推翻那条结论"),
+      );
+  }
   if (config) {
     const bare = session.segments
       .filter((segment) => needsReview(config, session, segment))
@@ -364,7 +435,7 @@ export function nextAction(doc, config) {
       who: "reviewer",
       what: "落结论",
       text: `${open.id} 的清单交出去了、还没人回答（${countIn(session, open).total} 条）：判完落结论，这一段才动得了；要改这一段就先撤回这份清单`,
-      command: `deed review --segment ${open.id} --by "你是谁" --verdict pass --result T1=met`,
+      command: `deed review --segment ${open.id} --by "${handOf(session, open.id) ?? "你是谁"}" --verdict pass --result T1=met`,
     };
   })();
   const asks = pendingAsks(session);
@@ -388,6 +459,41 @@ export function nextAction(doc, config) {
   }
   const segment = openSegment(session) ?? session.segments[session.segments.length - 1];
   const count = countIn(session, segment);
+  // 段都关了：还没人判这一期做成的样子时，下一步是期审，不是签收。
+  if (segment.closedAt !== null && needsPeriodReview(session) && periodState(session) !== "pass") {
+    const state = periodState(session);
+    if (periodFresh(session)) {
+      const handed = lastPeriodBrief(session);
+      return {
+        who: "reviewer",
+        what: "落期审结论",
+        text: session.id + " 的期审清单交出去了、还没人回答：" + handed.brief + "（这一期 " + session.segments.length + " 段都关了）",
+        command: `deed review --all --by "你是谁" --verdict pass`,
+      };
+    }
+    if (state === "stale") {
+      return {
+        who: "reviewer",
+        what: "重判这一期",
+        text: session.id + " 的期审结论早于之后的段变动：那一次判的不是这一期现在的样子；期审要换一双手",
+        command: `deed review --all --by "你是谁"`,
+      };
+    }
+    if (state === "fail") {
+      return {
+        who: "agent",
+        what: "结清期审点名的那几段",
+        text: session.id + " 的期审不合格还在案：点名的段判过才能签收；判不了就由人推翻那条结论",
+        command: `deed state`,
+      };
+    }
+    return {
+      who: "reviewer",
+      what: "期审",
+      text: session.id + " 的各段都关了（" + session.segments.length + " 段）：这一期做成的样子还没有人判；期审换一双手，别用判过段的人",
+      command: `deed review --all --by "你是谁"`,
+    };
+  }
   if (segment.closedAt !== null) {
     const blockers = signBlockers(doc, session, config);
     return {
@@ -415,13 +521,13 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的结论早于最后一次交付，新的一份清单已经交出去了：${fresh.brief}`,
-        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
+        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
       };
     return {
       who: "reviewer",
       what: "重审",
       text: `${segment.id} 的结论早于最后一次交付：它回答的是旧内容`,
-      command: `deed review --segment ${segment.id}`,
+      command: `deed review --segment ${segment.id}${handOf(session, segment.id) ? ' --by "' + handOf(session, segment.id) + '"' : ''}`,
     };
   }
   if (state !== "fail" && needsReview(config, session, segment)) {
@@ -444,14 +550,14 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的清单与角色包已经交出去了：${handed.brief}（${count.total} 条都交付了）`,
-        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
+        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
       };
     }
     return {
       who: "reviewer",
       what: voidedReview(session, segment) ? "重审" : "审这一段",
       text: `${segment.id} 的 ${count.total} 条都交付了，要一份独立结论`,
-      command: `deed review --segment ${segment.id}`,
+      command: `deed review --segment ${segment.id}${handOf(session, segment.id) ? ' --by "' + handOf(session, segment.id) + '"' : ''}`,
     };
   }
   if (state === "fail") {
@@ -485,7 +591,7 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的不合格（${review.by}）还在案；新的一份清单已经交出去了：${handed.brief}`,
-        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
+        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
       };
     // 旧账本里有点名之前写下的不合格：没有可结清的条目，只能由人推翻。
     if (named.length === 0)
@@ -502,13 +608,13 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的不合格（${review.by}）点名了 ${gave.map((one) => one.id).join("、")}，它们改主意不做了：没有活可以重交，放行会把放弃与理由记进账本`,
-        command: `deed review --segment ${segment.id} --by "你是谁" --verdict pass`,
+        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
       };
     return {
       who: "reviewer",
       what: "重审",
       text: `${segment.id} 的不合格（${review.by}）还在案，被点名的已经重新交付：另出一份清单再审`,
-      command: `deed review --segment ${segment.id}`,
+      command: `deed review --segment ${segment.id}${handOf(session, segment.id) ? ' --by "' + handOf(session, segment.id) + '"' : ''}`,
     };
   }
   // 走到这里只剩一种：审查设置说这一段不用审，而它还没封。免审就是不用审，所以不再

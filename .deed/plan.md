@@ -231,7 +231,7 @@
   理由：和 T103 是同一条：都要求出清单前先算要不要审。重复登记，按 T103 做，这条不单独立项。
 - [x] T100 审查者说那条没人看着的分支，其实是一条死路：删掉它，而不是给它补用例
   标准：core/fold.mjs 的 segmentOf 在等结论时不查 livePrep（预备段就是最末那个开段，查也查不到第二处）；这条删除有用例看着——把搬运改回每次开新段，test/fold.test.mjs 的预备段用例仍红；全量测试全绿；HANDOFF 的「下一步」不再写已经做完的事
-  交付：core/fold.mjs:138-146 的 segmentOf 只问最末那个开段是否在等结论，不再问 livePrep——那是同一个判断的第二处，预备段就是最末那个开段，问也问不出第二个答案；test/fold.test.mjs 的预备段用例照旧看着这条判断；HANDOFF 的「现在到哪一步」只剩一句指向 deed state 与 deed plan --print，五波表已经不在那份文件里
+  交付：core/fold.mjs:142-150 的 segmentOf 只问最末开段是否在等结论，全文无 livePrep（审查者复跑：变异「每次都开新段」→ fold 36 过 2 败）；HANDOFF.md:81-89 的「现在到哪一步」不再列条目，只指 deed state 与 deed plan --print；另外按第 7 份清单第 6 条发现，把 HANDOFF.md:6 那句「10 条已交付、T96 与 T107 放弃」改成它当时的样子并点出 T107 后来重交
 - [ ] T103 材料只在真要判时才出：不用审的段与整期不生成清单
   标准：deed review --segment 与 deed review --all 出清单之前先算 needsReview／needsWhole；算下来不用审就不写账本、不生成清单与角色包，打印门槛的原话并把下一步指到 deed seal 或签收，exit 0；要审时行为与现在一致；有用例（免审段调用之后账本没有新的 review.brief，.deed/review 下没有新文件）
 - [x] T104 轮次只算你和用户的一轮：我自己的进展不进轮次
@@ -277,8 +277,12 @@
 - [x] T126 送审即冻结只挡交付与撤回交付：记录层面的照旧，落结论不比字节
   标准：清单发出去、还没被回答的这段时间，这一段拒收交付与撤回一条交付（新活落进下一段）；记轮次、写题、延后、放弃、改到下一段照收，它们是决定不是文件；`deed review --segment S0x.N --withdraw --why "…"` 是唯一出路，撤回后这一段回到执行态、可以继续改，旧清单记一条 review.withdraw 并留下撤回的人与理由；落结论前只问交付记录有没有指到工作区外面，不再比字节——盘上被别的进程改了是 `deed verify` 该报的账；有用例（交付与撤回交付被拒并说清出路、tick／ask／drop／carry 放行、撤回要 --by、字节变了 verdict 仍落得下来）
   交付：跑：node --test 215/215（test/cli.test.mjs 的 a frozen segment refuses…、verify reports evidence pinned…and does not hold the judgement 两条）；core/fold.mjs 的 frozenFor 只挡交付与撤回一条交付，defer／drop／carry 放行，undo 只在条目已交付时拦；cli/session.mjs 的 auditSegment 只查交付有没有指到工作区外面，不再比字节；cli/verbs/review.mjs 删掉 drifted 那段；docs/DESIGN.md 规则 12 与 §1.1 的段审／期审行、lib/words.mjs 与 README／AGENTS 的冻结行改成同一句「交付与撤回交付不收；记轮次、写题、放弃、改到下一段照旧」
-- [ ] T127 一段结束后段审，全段结束后期审，签收在期审之后
+- [x] T127 一段结束后段审，全段结束后期审，签收在期审之后
   标准：`deed review --segment S0x.N` 判这一段（照旧）；`deed review --all` 作为期审判整期，回答的是这一期的目的与跨段一致性，不是另一道签收；期审的清单与结论成对（review.brief 与 review.log 记 scope:"session"），旧账本里早先的 session 结论仍只作历史、不挡签收；每一段都有结局、无未做、无已交付未判之后才出期审清单，期审 pass 才轮到签收，fail 点名哪一段就重开那一段；`deed state` 在段全关之后先给「出期审清单／落期审结论」，面板同步；EVENT_VERSION 升 1、旧行照读；有用例（段没关全不出发期审清单；期审 pass 之后签收可行；期审 fail 点名一段则那一段重新打开）
+  交付：跑：node --test 219/219（全量，数由 --run 采）；`deed review --all` 以期审的身份回来（cli/verbs/review.mjs 的 --all 分支），清单与角色包由 cli/brief.mjs 的 planWhole 生成：列目的、各段结局、这一期定下的边界与弃、还挂着的东西，不列段里的条目；core/rules.mjs 新增 needsPeriodReview／periodState／stalePeriod／periodFresh／segmentReviewers／periodReviewers，signBlockers 多一条「这一期的期审没通过」，nextAction 在段全关之后先给期审；期审 pass 才轮到签收，fail 点名段号则那一段重新打开（fold 的 session-scope fail 分支）；EVENT_VERSION 20 / MEANING.periodReview，更早的 session 结论只作历史；清单写明交给谁（review.brief.by），段审同一双手、期审换手，只有人推翻过的段才允许换手；变异：把 signBlockers 里的期审那道门注掉 → rules 里两条用例红（0 过 2 败）
+- [x] T132 段审一直用同一双手：清单写明交给谁，结论由他落；只有人推翻过的段才换手
+  标准：`deed review --segment S0x.N` 出清单时必须写清交给谁（`review.brief.by`），交给的人由清单本身记住；这一段的清单此后都写同一个人，换一个名字出清单或落结论都被拒并说清出路（先由人 `deed judge --overturn` 推翻那一段的结论）；人推翻过之后允许换手；角色包里写明「这一段一直由同一个人判」与这是第几份；`deed state` 印的审清单命令带着那一双手；期审相反，每次都换一双手（判过段的人不判这一期）；有用例覆盖（换人出清单被拒、换人落结论被拒、推翻之后允许换、期审拒同一双手、下一步的命令带 `--by`）
+  交付：跑：node --test 219/219（全量，数由 --run 采）；`deed review --segment` 出清单时必须写 `--by`，清单记下 `review.brief.by` 并在控制台印「交给 …」；再出清单或落结论时换名字被拒（两种说法分开：自己交付过的段判不了；不是自己交付的，这一段的判断归原来那双手），只有人 `deed judge --overturn` 推翻过那一段的结论才允许换手（cli/verbs/review.mjs 的 maySwitch）；角色包写明「这一段一直由同一个人判」与这是第几份（cli/brief.mjs 的 guideText）；core/rules.mjs 的 handOf 让下一步印的命令带着那一双手；用例 test/cli.test.mjs 的 one segment keeps one hand, and the period review takes a fresh one 与 a period verdict that names a segment reopens it, and the same hand judges it again
 - [x] T128 一段发过多份清单时，只有最后那份算还在等结论
   标准：`awaitingVerdict` 只看这一段手上的最后一份清单（scope:segment 的最后一条 review.brief）；前一份没人回答不再让这一段继续冻结、也不再让新活自己开段；再出一份、被回答之后这一段回到执行态，冻结算的是同一句；旧账本照读；有用例（同一段发过两份、第一份没人回答、第二份被判 → 段不再等结论、新活落回这一段；把判断改回「有任何一份没被回答」即红）
   交付：core/fold.mjs:98-105 的 awaitingVerdict 只看这一段最后那一份清单：前一份没人回答不再让这一段继续冻结、也不再让新活自己开段；冻结算的是同一句；新增 test/fold.test.mjs 的 a second brief supersedes the first one nobody answered，变异把判断改回 some 时那条红（fold 37 过 1 败），还原后 fold 38/38；这一条走 task done，全量 216/216 是同一份字节上跑过的，但没被 --run 采进账本
@@ -287,7 +291,7 @@
   交付：跑：node --test 217/217（全量，数由 --run 采）；core/fold.mjs 的 task.done／task.undo／task.order 三处不再为冻结抛错，改由 cli/session.mjs 的 refuseFrozen 在落盘前一刻拦（task.done 与「撤回一条已交付」两类），措辞与原来一致；新增 test/fold.test.mjs 的 a line that landed while the segment was frozen still replays；test/cli.test.mjs 的 a frozen segment refuses… 仍红着盯住写的一侧；面板重启后 7317 出的是正常页（461349 字节）
 - [x] T130 记账之前那一次核对，收据由核对的函数自己印：接线掉了用例就红
   标准：`requireUnchanged` 核过时自己印「记账之前再核一遍 · N 条没有变」，调用处不再另印一句（印在调用处的收据只能证明调用处那行还在，证明不了核对真跑过）；`deed submit` 与 `deed task done` 两条路都有 CLI 用例盯住这一行；把两处 `requireUnchanged(ROOT, pins)` 任意一处注掉，对应用例当场红；有用例覆盖（本段实测：注掉两处后 one delivery pins every file 与 a plan lands as one batch 两条都红）
-  交付：跑：node --test 217/217（全量，数由 --run 采）；收据挪进 cli/pins.mjs 的 requireUnchanged 自己印（记账之前再核一遍 · N 条没有变），cli/verbs/submit.mjs 与 cli/verbs/task.mjs 不再另印一句；test/cli.test.mjs 的 one delivery pins every file 与 a plan lands as one batch 各加一条断言；变异：把两处 requireUnchanged(ROOT, pins) 注掉 → 那两条用例都红（pass 0 / fail 2），还原后两条都绿
+  交付：cli/pins.mjs 的 requireUnchanged 核过时自己印「记账之前再核一遍 · N 条没有变」，cli/verbs/submit.mjs 与 cli/verbs/task.mjs 不再另印一句；test/cli.test.mjs 的 one delivery pins every file 与 a plan lands as one batch 各加一条断言；变异：把两处 requireUnchanged(ROOT, pins) 注掉 → 那两条用例 0 过 2 败，还原后两条都绿。全量 217/217 跑过但这一批没量到改动、没被 --run 采进账本
 - [ ] T131 这一段自己的交付记录不许是「只是说法」：六条按今天的字节重交，数由 --run 采
   标准：`S02.19` 的清单上不再有「只是说法：这条没配命令核过」；`T100`／`T104`／`T107`／`T109`／`T110`／`T112` 六条撤回后按当天字节重交，记录里的数与 `--run` 采到的一致；清单上那三个 207/207 不再出现在现行交付里；重出清单后由审查者复核
 - [x] T122 撤回一条「改到下一段」，走空的段跟着消失

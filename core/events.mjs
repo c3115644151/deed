@@ -39,7 +39,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 19;
+export const EVENT_VERSION = 20;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -69,6 +69,10 @@ export const MEANING = {
   freeze: 19,
   // 撤回一份还没被回答的清单：它作废、段回到执行态，账本上留着谁、为什么。
   withdraw: 19,
+  // 期审回来：段全关之后还要有人判「这一期做成的样子对不对、各段之间说不说得通」，
+  // 签收压在它后面。它记的不是"各段结论的汇总"，是另一层问题，所以要一双手去判。
+  // 同时这一段起，清单要写明交给谁：段审一直用同一双手，期审每次都换一双新的。
+  periodReview: 20,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -232,10 +236,14 @@ export function validateEvent(ev, at) {
     case "review.brief":
       // 审查只在段里做：清单必须说清是哪一段的。整期清单是第 17 版之前的写法，
       // 旧账本里读得出来，新行不再产生。
-      if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview)
-        throw new Error("审查清单落在段上：整期上不再出清单（签收只看各段的结论与条件）");
+      // 第十 8 版起清单只落在段上；第 20 版把期审装回来，整期重新有清单——但那不是
+      // 一次「汇总」，是另一个问题（这一期做成的样子、各段之间说不说得通）。
+      if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview && meaningOf(ev) < MEANING.periodReview)
+        throw new Error("审查清单落在段上：那一版里整期上不出清单（签收只看各段的结论与条件）");
       if (ev.scope === "session") need(ev, "goal");
       else need(ev, "segment");
+      // 清单是交给某一双手的：没写交给谁，事后没人说得清这一份是谁在读。
+      if (meaningOf(ev) >= MEANING.periodReview) need(ev, "by");
       need(ev, "brief");
       if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
         throw new Error("review.brief 的 briefDigest 要是清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
@@ -247,8 +255,8 @@ export function validateEvent(ev, at) {
       }
       break;
     case "review.log":
-      if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview)
-        throw new Error("审查结论落在段上：整期上不再有第二份结论（签收只看各段的结论与条件）");
+      if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview && meaningOf(ev) < MEANING.periodReview)
+        throw new Error("审查结论落在段上：那一版里整期上没有第二份结论（签收只看各段的结论与条件）");
       if (ev.scope !== "session") need(ev, "segment");
       need(ev, "by");
       need(ev, "verdict");

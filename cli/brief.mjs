@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { digest } from "../core/digest.mjs";
-import { tasksIn } from "../core/rules.mjs";
+import { edges, tasksIn } from "../core/rules.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 
@@ -11,13 +11,20 @@ import { fileStamp, stamp0 } from "../lib/format.mjs";
 
 // 角色包：清单说"审什么"，这一份说"怎么审"。它和清单一起交出去，也一起
 // 记下 sha256——换掉其中任何一份，结论就落不下来。
-function guideText(subject, target, briefName, scratch) {
+function guideText(subject, target, briefName, scratch, hand = null, nth = 1) {
   const verdict = "deed review --segment " + target;
   return [
     "# 审查者 · " + subject,
     "",
     "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。",
     "清单在同目录（" + briefName + "）。你判的是清单上那几条，不是整个项目。",
+    "",
+    "## 这一段一直由同一个人判",
+    "",
+    (nth > 1
+      ? "这是这一段的第 " + nth + " 份清单，前几份也是同一个人在看：先找出上一份点过哪几条，"
+      : "这是这一段的第一份清单：这一段的清单此后都会交给你，不换人。") +
+      "同一段的判断不该每轮换个人从头摸一遍——换手会把「这一段到底行不行」变成「今天谁在看」。",
     "",
     "## 先读标准，再读代码",
     "",
@@ -222,7 +229,128 @@ export function planBrief(root, open, segment, at) {
     n += 1;
     file = base(n) + ".md";
   }
-  const guide = guideText("段 " + segment.id, segment.id, path.basename(file), scratch);
+  const nth = open.briefs.filter((one) => one.scope === "segment" && one.segment === segment.id).length + 1;
+  const hand = open.briefs.filter((one) => one.scope === "segment" && one.segment === segment.id).at(-1)?.by ?? null;
+  const guide = guideText("段 " + segment.id, segment.id, path.basename(file), scratch, hand, nth);
+  return {
+    file,
+    text,
+    digest: digest(text),
+    guideFile: base(n) + "-reviewer.md",
+    guideText: guide,
+    guideDigest: digest(guide),
+  };
+}
+
+
+// 期审的角色包：它判的不是一条条标准（那些在段里已经判过），是这一期做成的样子。
+function periodGuideText(session, briefName, scratch) {
+  return [
+    "# 审查者 · 这一期 " + session.id,
+    "",
+    "你要回答的不是「这一段对不对」，而是两件更高一层的事：",
+    "这一期**做成的样子**对不对得上它自己写的目的；**各段之间**说不说得通。",
+    "清单在同目录（" + briefName + "）。段里每条标准的判定已经做过、结论在案，不必重判——",
+    "重判一遍等于把别人的工作重做，也让「谁判了什么」变成两处都能改的事。",
+    "",
+    "## 你判什么",
+    "",
+    "1. 目的那句在账本上成立吗：这一期真的做成了它写的那件事，还是只把条目勾完了？",
+    "2. 各段之间一致吗：同一件事在两段里是不是两种做法、留下两套说法；后面段的取舍推翻了前面段的结论？",
+    "3. 欠下的东西说清了吗：放弃有理由、延后有原因、待裁不悬着；有没有一段的结论本身就建立在一个已经不成立的前提上。",
+    "",
+    "## 你怎么动手",
+    "",
+    "可以在仓库外的临时区（" + scratch + "）里造夹具、复制整个工作区做破坏性实验；",
+    "仓库内一个字节都不要改：不改源码、不改测试、不改账本、不提交。",
+    "每条结论都要配复现路径：命令 + 实际输出，或 文件:行。",
+    "",
+    "## 你怎么落结论",
+    "",
+    "- 通过：deed review --all --by \"<你是谁>\" --verdict pass",
+    "- 不合格：deed review --all --by \"<你是谁>\" --verdict fail --rework S02.7,S02.9 --why \"一句话总结\"",
+    "  点名的是段号：哪一段的前提不成立了，就退回那一段——段里的条目由那一段的审查者点名。",
+    "- 具体问题写成 --finding，逐条带位置。",
+    "",
+    "期审每次换一双手：同一期里判过段的人不能判这一期（段审一直用同一双手，期审每次都新开）。",
+    "",
+  ].join("\n");
+}
+
+// 期审清单：列的是这一期的目的、各段结局、当期定下的边界与弃、还挂着的东西。
+export function planWhole(root, session, at) {
+  const p = ensureDirs(root);
+  const scratch = path.join(p.tmp, "period-" + session.id + "-" + fileStamp(at));
+  fs.mkdirSync(scratch, { recursive: true });
+  const verdicts = new Map(
+    session.reviews.filter((one) => one.voidedAt === null && one.scope !== "session").map((one) => [one.segment, one]),
+  );
+  const segLine = (segment) => {
+    const review = verdicts.get(segment.id) ?? null;
+    const count = tasksIn(session, segment).length;
+    if (review)
+      return "- " + segment.id + " · " + (review.verdict === "pass" ? "审查通过" : "审查不合格") + " · " + review.by + " · " +
+        stamp0(review.at) + " · " + count + " 条" +
+        (review.findings.length > 0 ? " · " + review.findings.length + " 条发现" : "") +
+        (review.rework.length > 0 ? " · 退回 " + review.rework.join("、") : "");
+    if (segment.sealedBy)
+      return "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " + stamp0(segment.closedAt) + " · " + count + " 条 · 审查设置说这一段不用审" +
+        (segment.sealedWhy ? "（" + segment.sealedWhy + "）" : "");
+    return "- " + segment.id + " · 没有结论 · " + count + " 条";
+  };
+  const findings = session.segments.flatMap((segment) => {
+    const review = verdicts.get(segment.id);
+    if (!review || review.findings.length === 0) return [];
+    return ["", "  " + segment.id + " 的发现（" + review.by + "）", ...review.findings.map((one) => "  - " + one)];
+  });
+  const carried = session.tasks
+    .filter((task) => task.status === "deferred" || task.status === "dropped")
+    .map((task) => "- " + task.id + " · " + (task.status === "deferred" ? "延后" : "放弃") + " · " + task.title + "：" +
+      (task.deferredWhy ?? task.droppedWhy ?? "没有写理由"));
+  const waiting = session.asks.filter((one) => one.resolvedAt === null && one.state === "pending");
+  const lines = edges(session).map((one) => "- " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
+  const nth = session.briefs.filter((one) => one.scope === "session").length + 1;
+  const text = [
+    "# 期审清单 · " + session.id + " · 第 " + nth + " 份",
+    "",
+    "会话 " + session.id + " · " + session.segments.length + " 段 · 生于 " + stamp0(at),
+    "",
+    "## 这一期要做成什么",
+    "",
+    session.goal ? "- " + session.goal.text + "（" + session.goal.by + " · " + stamp0(session.goal.at) + "）" : "- 还没有写下这一期要做成什么",
+    "",
+    "## 各段的结局",
+    "",
+    ...session.segments.map(segLine),
+    ...findings,
+    "",
+    "## 这一期定下的边界与弃",
+    "",
+    ...(lines.length > 0 ? lines : ["- 还没有定过"]),
+    "",
+    "## 还挂着的",
+    "",
+    ...(waiting.length > 0 ? waiting.map((one) => "- 待裁 " + one.id + " · " + one.text + "（我理解成：" + one.reading + "）") : ["- 没有待裁"]),
+    ...(carried.length > 0 ? carried : ["- 没有放弃或延后的条目"]),
+    "",
+    "## 怎么审",
+    "",
+    "1. 判的是这一期做成的样子，不是段里每条标准（那些已经判过，见上）。",
+    "2. 看各段之间说不说得通：同一件事两种做法、两套说法、后一段推翻前一段的前提。",
+    "3. 结论：deed review --all --by \"<你是谁>\" --verdict pass|fail；不合格点名段号 --rework S02.7。",
+    "4. 期审每次换一双手：判过段的人不判这一期。",
+    "",
+    "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
+    "",
+  ].join("\n");
+  const base = (n) => path.join(p.review, session.id + "-period-" + fileStamp(at) + (n === 1 ? "" : "-" + n));
+  let n = 1;
+  let file = base(n) + ".md";
+  while (fs.existsSync(file) || fs.existsSync(base(n) + "-reviewer.md")) {
+    n += 1;
+    file = base(n) + ".md";
+  }
+  const guide = periodGuideText(session, path.basename(file), scratch);
   return {
     file,
     text,
