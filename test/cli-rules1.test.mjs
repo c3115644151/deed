@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -53,7 +52,7 @@ test("a period with one segment still owes the period judgement, and that judgem
   const cwd = workspace("single-whole");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   const alone = judged(cwd, "review", "--all");
   assert.equal(alone.status, 1, "整期上没有审查这件事");
   assert.match(alone.stderr, /--all/);
@@ -123,7 +122,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   config.review.exempt = ["**"];
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   const blocked = deed(cwd, "seal", "--why", "全部免审", "--by", "user");
   assert.equal(blocked.status, 1, "改文件不改变规则");
   assert.match(blocked.stderr, /要审|审查/);
@@ -169,10 +168,10 @@ test("a digest only names a plain file inside the workspace", () => {
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   fs.writeFileSync(path.join(cwd, "..", "deed-outside.txt"), "outside");
-  const outside = deed(cwd, "task", "done", "T1", "--evidence", "写完了", "--digest", "../deed-outside.txt");
+  const outside = deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   assert.equal(outside.status, 1);
   assert.match(outside.stderr, /工作区/);
-  const dir = deed(cwd, "task", "done", "T1", "--evidence", "写完了", "--digest", ".");
+  const dir = deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   assert.equal(dir.status, 1);
   assert.match(dir.stderr, /文件/);
 });

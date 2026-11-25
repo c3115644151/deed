@@ -348,8 +348,8 @@ test("a delivery that points at nothing is told apart from one that points at a 
   assert.equal(pointsAtNothing({}), true, "老形状里什么都没有");
   assert.equal(pointsAtNothing(null), true, "还没有交付：调用点不必先记得判空");
   assert.equal(pointsAtNothing({ changed: ["docs/gone.md"] }), false, "删掉一条路径也算指着它");
-  assert.equal(pointsAtNothing({ digest: "a".repeat(64), path: "docs/a.md" }), false, "记下了内容");
-  assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md", digest: "b".repeat(64) }] }), false, "记下了一组内容");
+  assert.equal(pointsAtNothing({ path: "docs/a.md" }), false, "老账本里记下的那条路径");
+  assert.equal(pointsAtNothing({ files: [{ path: "docs/a.md" }] }), false, "记下了一组路径");
 });
 
 

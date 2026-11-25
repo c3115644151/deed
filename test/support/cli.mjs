@@ -10,7 +10,6 @@ import { readEvents } from "../../lib/store.mjs";
 import { fold } from "../../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../../cli/pins.mjs";
 import { applyGate, gatesOf } from "../../board/gates.mjs";
 
 export const CLI = path.join(import.meta.dirname, "..", "..", "cli", "deed.mjs");

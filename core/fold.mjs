@@ -161,7 +161,7 @@ const rederive = (task) => {
   const paths = [];
   const sizes = {};
   for (const proof of task.evidence) {
-    // 交付自己记下的文件也算碰过：手工 --digest 交付没有工作区差可量（changed 为空），
+    // 交付自己记下的文件也算碰过：老账本里的单文件交付没有工作区差可量（changed 为空），
     // 只认 changed 就会让审查设置看不见它到底动了哪一份字节。
     const touched = [...(proof.changed ?? []), ...(proof.files ?? []).map((one) => one.path)];
     for (const one of touched) if (!paths.includes(one)) paths.push(one);
@@ -264,19 +264,19 @@ export function fold(events) {
           noway(`任务 ${task.id} 不在未做状态：${task.status}`);
         task.status = "done";
         // A delivery pins the content of every file it says it produced. Old
-        // lines pinned one file (digest + digestPath); new lines pin a list.
+        // 老账本里的单文件交付记的是 digest + digestPath；新行记一串路径。
         // Both shapes read the same way from here on: one entry per file.
         const files =
           ev.files !== undefined
-            ? ev.files.map((one) => ({ path: one.path, digest: one.digest }))
-            : ev.digest && ev.digestPath
-              ? [{ path: ev.digestPath, digest: ev.digest }]
+            ? ev.files.map((one) => ({ path: one.path }))
+            : ev.digestPath
+              ? [{ path: ev.digestPath }]
               : [];
         task.evidence.push({
           claim: ev.evidence,
           by: ev.by,
           at: ev.at,
-          digest: files[0]?.digest ?? null,
+    
           path: files[0]?.path ?? null,
           files,
           changed: ev.changed ?? [],
@@ -347,7 +347,7 @@ export function fold(events) {
           by: ev.by ?? "agent",
           at: ev.at,
           batch: last.batch ?? null,
-          undoes: ev.undoes ?? last.files ?? (last.digest && last.path ? [{ path: last.path, digest: last.digest }] : []),
+          undoes: ev.undoes ?? last.files ?? (last.path ? [{ path: last.path }] : []),
           changed: last.changed ?? [],
         });
         // 撤回的交付不再替这些字节说话：这一段碰过的路径与大小重新由还在的交付算。
@@ -467,7 +467,7 @@ export function fold(events) {
           goal: ev.goal ?? null,
           segment: segment ? segment.id : null,
           brief: ev.brief,
-          briefDigest: ev.briefDigest,
+    
           guide: ev.guide ?? null,
           guideDigest: ev.guideDigest ?? null,
           at: ev.at,
@@ -575,7 +575,7 @@ export function fold(events) {
           id: one.id,
           verdict: one.verdict,
           note: one.note ?? null,
-          files: (one.files ?? []).map((file) => ({ path: file.path, digest: file.digest })),
+          files: (one.files ?? []).map((file) => ({ path: file.path })),
         }));
         // 按条判定说的是段：期审判的是这一期做成的样子，没有"每条标准"这回事。
         if (meaning >= MEANING.perItem && ev.verdict === "pass" && segment) {
@@ -602,7 +602,7 @@ export function fold(events) {
           by: ev.by,
           verdict: ev.verdict,
           brief: ev.brief,
-          briefDigest: ev.briefDigest ?? null,
+
           findings: ev.findings ?? [],
           results,
           rework,

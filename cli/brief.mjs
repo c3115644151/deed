@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { digest } from "../core/digest.mjs";
 import { edges, tasksIn } from "../core/rules.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
@@ -132,10 +131,10 @@ function taskBlock(task, batches = new Map()) {
     "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
     "- 状态：" + task.status + (task.deferredWhy ? (task.status === "dropped" ? " · 理由：" : " · 为什么延后：") + task.deferredWhy : ""),
     ...task.evidence.map((proof) => {
-      const files = proof.files ?? (proof.digest ? [{ path: proof.path, digest: proof.digest }] : []);
+      const files = proof.files ?? [];
       return (
         "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
-        (files.length === 0 ? "" : "\n  - 记下：" + files.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")) +
+        (files.length === 0 ? "" : "\n  - 动过：" + files.map((one) => one.path).join("、")) +
         (proof.run ? "\n  - 跑过：" + proof.run.command + " · 退出 " + proof.run.exit +
             (proof.run.tests === null ? "" : " · " + proof.run.pass + "/" + proof.run.tests + " 通过") : "") +
         (proof.batch ? batchLine(batches.get(proof.batch.at)) : "") +
@@ -158,7 +157,7 @@ function taskBlock(task, batches = new Map()) {
         stamp0(one.at) +
         "）· 那条不计入" +
         ((one.undoes ?? []).length > 0
-          ? "；它当时记下的是 " + one.undoes.map((file) => file.path + " " + file.digest.slice(0, 12)).join("、")
+          ? "；它当时动过的是 " + one.undoes.map((file) => file.path).join("、")
           : "；它当时没有记下任何内容"),
     ),
     "",
@@ -168,49 +167,19 @@ function taskBlock(task, batches = new Map()) {
 export function planBrief(root, open, segment, at) {
   const p = ensureDirs(root);
   const tasks = tasksIn(open, segment);
-  // 上一次判过的条目：判过、达成、而且它判的那几份内容今天没变——这次不再重判。
-  const standing = open.reviews.filter((one) => one.voidedAt === null && one.scope === "segment" && one.segment === segment.id).at(-1) ?? null;
-  const judged = new Map((standing?.results ?? []).map((one) => [one.id, one]));
-  const untouched = (task) => {
-    const result = judged.get(task.id);
-    if (!result || result.verdict !== "met") return false;
-    return (result.files ?? []).every((file) => {
-      try {
-        return digest(fs.readFileSync(path.resolve(root, file.path))) === file.digest;
-      } catch {
-        return false;
-      }
-    });
-  };
-  const still = tasks.filter(untouched);
-  const again = tasks.filter((task) => !untouched(task));
+  // 每次出清单都列这一段的全部条目：上一次判过什么，写在上一次的清单里，
+  // 不靠这一次去猜（拿内容指纹去认"没变过"，在天天改文件的仓库里一次也没成立过）。
   // 审查者的临时区：清单发出去时开，结论落地时删。它不属于工作区，也不进账本。
   const scratch = path.join(p.tmp, segment.id + "-" + fileStamp(at));
   fs.mkdirSync(scratch, { recursive: true });
   const text = [
     "# 审查清单 · " + segment.id,
     "",
-    "会话 " + open.id + " · 段 " + segment.id + " · " + tasks.length + " 条 · 生成于 " + stamp0(at) +
-      (still.length > 0 ? " · 这次要判 " + again.length + " 条（" + still.length + " 条判过了、不再判）" : ""),
+    "会话 " + open.id + " · 段 " + segment.id + " · " + tasks.length + " 条 · 生成于 " + stamp0(at),
     "",
-    ...(still.length > 0
-      ? [
-          "## 判过了、这次不再判",
-          "",
-          ...still.map(
-            (task) =>
-              "- " + task.id + " · " +
-              (judged.get(task.id).verdict === "met" ? "达成" : judged.get(task.id).verdict) +
-              "（" + standing.by + " · " + stamp0(standing.at) + "）· 记下的内容没变",
-          ),
-          "",
-          "这一条判过就是判过：它在上一份清单上被看过，之后它指的那几份内容没被动过。",
-          "",
-        ]
-      : []),
     "## 要审的任务",
     "",
-    ...again.flatMap((task) => taskBlock(task, batchInfo(tasks))),
+    ...tasks.flatMap((task) => taskBlock(task, batchInfo(tasks))),
     "## 怎么审",
     "",
     "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
@@ -235,10 +204,8 @@ export function planBrief(root, open, segment, at) {
   return {
     file,
     text,
-    digest: digest(text),
     guideFile: base(n) + "-reviewer.md",
     guideText: guide,
-    guideDigest: digest(guide),
   };
 }
 
@@ -354,10 +321,8 @@ export function planWhole(root, session, at) {
   return {
     file,
     text,
-    digest: digest(text),
     guideFile: base(n) + "-reviewer.md",
     guideText: guide,
-    guideDigest: digest(guide),
   };
 }
 

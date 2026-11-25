@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -178,7 +177,7 @@ test("an entry still to be done is carried to the next segment from the plan", (
   const cwd = workspace("carry-plan");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "先做这一件", "--criteria", "能跑", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "跑了 1/1", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "跑了 1/1");
   deed(cwd, "task", "add", "下一段再做", "--criteria", "也做完");
   const plan = path.join(cwd, ".deed", "plan.md");
   deed(cwd, "plan", "--force");
@@ -481,7 +480,7 @@ test("the plan can line up several segments, and only the first takes work", () 
 
   // 排好的那一段此刻不收活：交付与送审都被拒，理由指得出现在收活的是哪一段。
   fs.writeFileSync(path.join(cwd, "proof.txt"), "p\n");
-  const queued = deed(cwd, "task", "done", "T2", "--evidence", "试试看", "--digest", "proof.txt");
+  const queued = deed(cwd, "task", "done", "T2", "--evidence", "试试看");
   assert.equal(queued.status, 1, "还没轮到的那一段不能交付");
   assert.match(queued.stderr, /还没轮到/);
   const early = deed(cwd, "review", "--segment", "S01.2", "--by", "qa");
@@ -489,11 +488,11 @@ test("the plan can line up several segments, and only the first takes work", () 
   assert.match(early.stderr, /还没轮到/);
 
   // 第一段交付、审过、判过之后，第二段才接过活。
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "做完了", "--digest", "proof.txt").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "做完了").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
   assert.match(deed(cwd, "state").stdout, /S01\.2/);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "轮到它了", "--digest", "proof.txt").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "轮到它了").status, 0);
 });
 

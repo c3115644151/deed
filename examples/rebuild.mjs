@@ -27,9 +27,9 @@ deed("tick", "--who", "user", "--said", "先做账本，别急着加门", "--did
 
 // 第一期：两条都交完，审查者放行就是结局，用户签收。
 deed("task", "add", "接上这个工作区", "--criteria", "deed state 说得出这一期在做什么", "--files", ".deed/config.json");
-deed("task", "done", "T1", "--evidence", "deed state 读出 S01 讨论态与 1 轮", "--digest", ".deed/config.json");
+deed("task", "done", "T1", "--evidence", "deed state 读出 S01 讨论态与 1 轮");
 deed("task", "add", "写下这份示例在演示什么", "--criteria", "陌生人读 NOTES.md 就知道怎么照着走", "--files", "NOTES.md");
-deed("task", "done", "T2", "--evidence", "照着 NOTES.md 走了一遍：六条命令都成功", "--digest", "NOTES.md");
+deed("task", "done", "T2", "--evidence", "照着 NOTES.md 走了一遍：六条命令都成功");
 
 deed("review", "--segment", "S01.1");
 deed("review", "--segment", "S01.1", "--by", "reviewer:independent", "--verdict", "pass");
@@ -38,18 +38,18 @@ deed("sign", "--words", "可以，示例就这样", "--title", "示例账本立�
 // 第二期第一段：门与面板各一条，交完由审查者放行关闭这一段，下一批任务自然开新段。
 deed("tick", "--who", "user", "--said", "再补一段：让门、打回、未结项各出现一次");
 deed("task", "add", "让门说出失败在哪", "--criteria", "一条命令就能看到是哪条命令、退出码几", "--files", ".deed/config.json");
-deed("task", "done", "T3", "--evidence", "deed gate 在空 gates 时说「这个工作区没有门」", "--digest", ".deed/config.json");
+deed("task", "done", "T3", "--evidence", "deed gate 在空 gates 时说「这个工作区没有门」");
 deed("task", "add", "让面板跟着账本动", "--criteria", "GET / 与渲染字节一致；SSE 推 change", "--files", ".deed/config.json");
-deed("task", "done", "T4", "--evidence", "board 测试 6/6 · curl /state 200 · POST 405", "--digest", ".deed/config.json");
+deed("task", "done", "T4", "--evidence", "board 测试 6/6 · curl /state 200 · POST 405");
 deed("review", "--segment", "S02.1");
 deed("review", "--segment", "S02.1", "--by", "reviewer:independent", "--verdict", "pass");
 
 // 第二段：审查者判不合格，点名 T5 退回；补完重新交付、重新出清单，再审。
 deed("task", "add", "把说明和账本对上", "--criteria", "README 的六行能走完一整轮", "--files", "NOTES.md");
-deed("task", "done", "T5", "--evidence", "按说明跑了一遍：init 到 sign", "--digest", "NOTES.md");
+deed("task", "done", "T5", "--evidence", "按说明跑了一遍：init 到 sign");
 deed("review", "--segment", "S02.2");
 deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "fail", "--rework", "T5", "--why", "说明里没写 --digest，这条交付记录没记文件", "--finding", "说明里没写 --digest：那条交付记录没记文件，过期了查不出来");
-deed("task", "done", "T5", "--evidence", "重跑：每条交付记录都记在一份文件上", "--digest", "NOTES.md");
+deed("task", "done", "T5", "--evidence", "重跑：每条交付记录都记在一份文件上");
 deed("review", "--segment", "S02.2");
 deed("review", "--segment", "S02.2", "--by", "reviewer:independent", "--verdict", "pass");
 

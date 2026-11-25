@@ -4,7 +4,6 @@ import { fold } from "../../core/fold.mjs";
 import { UnknownKindError, validateEvent } from "../../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../../lib/version.mjs";
 import { paths } from "../../lib/store.mjs";
-import { auditBriefs, briefTrouble, staleEvidence } from "../audit.mjs";
 import { stamp0 } from "../../lib/format.mjs";
 import { wordsNotice } from "../../lib/words.mjs";
 import { hookNotice, silenceNotice } from "../../lib/heartbeat.mjs";
@@ -56,27 +55,17 @@ export default function doctor(argv) {
       if (!bad) {
         console.log("账本干净 · " + events.length + " 条事件都能重放");
         const { doc } = load();
-        const stale = staleEvidence(ROOT, doc);
-        if (stale.length > 0) console.log("  交付记录过期 " + stale.length + " 处（不算坏账）：" + stale.map((s) => s.id).join("、"));
         const late = lateWork(ROOT, doc);
         if (late && late.length > 0)
           console.log(
             "  先做后记 " + late.length + " 条（不算坏账）：" +
               late.map((one) => one.id + " 的 " + one.path + " 最后写于 " + stamp0(one.written) + "，这条任务记于 " + stamp0(one.recorded)).join("；"),
           );
-        const briefs = auditBriefs(ROOT, doc);
-        const loose = briefTrouble(briefs);
         const words = wordsNotice(ROOT);
         if (words) console.log("  接入 · " + words);
         const last = events[events.length - 1];
         const silence = silenceNotice(last?.at, stamp0);
         console.log("  心跳 · " + hookNotice(ROOT) + (silence ? " · " + silence : ""));
-        if (loose > 0)
-          console.log(
-            "  清单对不上 " + loose + " 份（不算坏账，deed verify 看细节）：" +
-              [...briefs.unpinned, ...briefs.gone, ...briefs.edited, ...briefs.outside, ...briefs.orphan].map((s) => s.segment).join("、") +
-              (briefs.stray.length ? (briefs.unpinned.length + briefs.gone.length + briefs.edited.length + briefs.outside.length + briefs.orphan.length ? "、" : "") + briefs.stray.map((s) => s.brief).join("、") : ""),
-          );
         return;
       }
       // 账本比程序新不是坏账：这一行是别人写下的真事，只是这本程序读不懂。

@@ -21,7 +21,7 @@ export default function init(argv) {
     if (ledger && !flags.force) {
       console.log("deed: 这个工作区已经接过钩子（.deed/config.json 在）");
       if (drift.length > 0)
-        console.log("  注意：磁盘上的审查设置和账本不一致（" + drift.map((one) => one.key).join("、") + "）；规则只认账本，deed verify 会报出来。");
+        console.log("  注意：磁盘上的审查设置和账本不一致（" + drift.map((one) => one.key).join("、") + "）；规则只认账本，deed state 也会提这一句报出来。");
       console.log("  要收下磁盘上的值：deed init --force --why \"为什么改\"");
       console.log("  要改审查设置：deed init --force --review \"…\" --exempt \"…\" --why \"为什么改\"（改动会记进账本）");
       for (const line of optionalBlock(ledger ?? disk ?? DEFAULT_CONFIG)) console.log(line);

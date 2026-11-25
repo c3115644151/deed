@@ -16,7 +16,6 @@ import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
-import { auditEvidence, staleEvidence } from "./audit.mjs";
 import { stamp0 } from "../lib/format.mjs";
 
 export const ROOT = process.cwd();
@@ -416,8 +415,6 @@ export function printState() {
     console.log("  签收 " + (blockers.length === 0 ? "可行" : "差：" + blockers.join("；")));
     const watch = pressure(open);
     if (watch && watch.tasks > 3) console.log("  提示 · 这一段已经 " + watch.tasks + " 条，还压着 " + watch.undecided + " 条待判");
-    const stale = staleEvidence(ROOT, doc, open.id);
-    if (stale.length > 0) console.log("  交付记录过期 · " + stale.map((one) => one.id).join("、") + "（记下的文件变了，deed verify 看细节）");
   }
   for (const one of doc.sessions)
     if (one.closedAt)
@@ -429,7 +426,7 @@ export function printState() {
   const drift = configDrift(doc.config, readConfigFile(ROOT));
   if (drift.length > 0)
     console.log(
-      "  审查设置 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；deed verify 看细节，改审查设置用 deed init --force … --why）",
+      "  审查设置 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；改审查设置用 deed init --force … --why）",
     );
   const step = nextAction(doc, config);
   console.log("");
@@ -458,15 +455,3 @@ export function optionalBlock(config) {
   ];
 }
 
-// 落结论前只问一件事：交付记录有没有指到工作区外面——deed 只认工作区里的文件。
-// 不在这里比字节：这一段在等结论时是冻结的，作者换不掉审查者手上那两份文件；
-// 真有别的进程改了盘，那是 verify 该报的账，不该把一句"过不过"的判断挂在哈希上。
-export const auditSegment = (doc, session, seg) => {
-  const inSegment = new Set(tasksIn(session, seg).map((task) => task.id));
-  const audit = auditEvidence(ROOT, doc, session.id);
-  const outside = audit.outside.filter((spot) => inSegment.has(spot.id));
-  if (outside.length > 0)
-    fail(
-      "这一段有交付记录指到工作区外面（" + outside.map((spot) => spot.id + " → " + spot.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付",
-    );
-};

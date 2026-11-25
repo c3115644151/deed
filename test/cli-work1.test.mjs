@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -31,7 +30,7 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   const cwd = workspace("verdict-order");
   deed(cwd, "init", "--said", "改重放函数");
   deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const failed = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录");
   assert.equal(failed.status, 0, failed.stderr);
@@ -41,7 +40,7 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   assert.equal(early.status, 1, "在案的不合格不能被一条 pass 顶掉");
   assert.match(early.stderr, /还有没交付的（T1）/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.log").length, 1, "被拒的那条不进账本");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "跑了 8 个并发", "--digest", proof(cwd)).status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "跑了 8 个并发").status, 0);
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const after = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met");
   assert.equal(after.status, 0, "重新交付、重新审过才放行");
@@ -55,8 +54,8 @@ test("a fail names every task it sends back", () => {
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "一", "--criteria", "c", "--files", "core/a.mjs");
   deed(cwd, "task", "add", "二", "--criteria", "c", "--files", "core/b.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了", "--digest", proof(cwd));
-  deed(cwd, "task", "done", "T2", "--evidence", "写完了", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const back = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1,T2", "--why", "两处都要补");
   assert.equal(back.status, 0, back.stdout + back.stderr);
@@ -111,7 +110,7 @@ test("a delivery that only removes a file still points at the change it made", (
   deed(cwd, "init", "--said", "开始");
   fs.writeFileSync(path.join(cwd, "gone.md"), "x");
   deed(cwd, "task", "add", "先把文件建出来", "--criteria", "它在", "--files", "gone.md");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "建了 gone.md", "--digest", "gone.md").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "建了 gone.md").status, 0);
   deed(cwd, "task", "add", "再把它删掉", "--criteria", "它不在了", "--files", "gone.md");
   fs.rmSync(path.join(cwd, "gone.md"));
   deed(cwd, "plan", "--force");
@@ -142,10 +141,10 @@ test("a delivery that pointed at nothing is reported even after a later one cove
     fs.appendFileSync(file, JSON.stringify(line) + "\n", "utf8");
   };
   bare("T1", "写了，但没指任何文件");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "这次指上了", "--digest", proof(cwd)).status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "这次指上了").status, 0);
   bare("T2", "说到底写了什么，没指东西");
   assert.equal(deed(cwd, "task", "undo", "T2", "--why", "那条什么也没记下").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交，指上了", "--digest", proof(cwd, "two.txt")).status, 0);
+  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交，指上了").status, 0);
   const run = deed(cwd, "verify");
   assert.equal(run.status, 0, "后来的交付盖住了它们，不挡放行");
   assert.match(run.stdout, /空交付 · T1 · .*那时没记下文件.*后来重交过，不挡放行/);
@@ -189,9 +188,9 @@ test("an older delivery is history, not a claim that keeps going stale", () => {
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "记下内容", "--criteria", "文件不变", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "thing.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "第一版");
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v2");
-  deed(cwd, "task", "done", "T1", "--evidence", "第二版：跟着改了", "--digest", "thing.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "第二版：跟着改了");
   const ok = deed(cwd, "verify");
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /早先的交付 1 条/, "覆盖掉的交付要说是历史，不能假装它还在核对");
@@ -209,10 +208,10 @@ test("a file pinned again by a later delivery is covered, not stale", () => {
   fs.writeFileSync(path.join(cwd, "shared.md"), "v1");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写第一部分", "--criteria", "写完", "--files", "shared.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "shared.md");
+  deed(cwd, "task", "done", "T1", "--evidence", "第一版");
   fs.writeFileSync(path.join(cwd, "shared.md"), "v2");
   deed(cwd, "task", "add", "接着写第二部分", "--criteria", "写完剩下的", "--files", "shared.md");
-  deed(cwd, "task", "done", "T2", "--evidence", "第二版：文件跟着改了", "--digest", "shared.md");
+  deed(cwd, "task", "done", "T2", "--evidence", "第二版：文件跟着改了");
 
   const ok = deed(cwd, "verify");
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
@@ -231,9 +230,9 @@ test("verify names the covered deliveries while the list is short, and only coun
   fs.writeFileSync(path.join(small, "shared.md"), "v1");
   deed(small, "init", "--said", "开始");
   deed(small, "task", "add", "写一遍", "--criteria", "写完", "--files", "shared.md");
-  deed(small, "task", "done", "T1", "--evidence", "第一版", "--digest", "shared.md");
+  deed(small, "task", "done", "T1", "--evidence", "第一版");
   fs.writeFileSync(path.join(small, "shared.md"), "v2");
-  deed(small, "task", "done", "T1", "--evidence", "第二版", "--digest", "shared.md");
+  deed(small, "task", "done", "T1", "--evidence", "第二版");
   const short = deed(small, "verify");
   assert.equal(short.status, 0, short.stdout + short.stderr);
   assert.match(short.stdout, /早先的交付 1 条（T1）/, "少的时候点得到号");
@@ -245,7 +244,7 @@ test("verify names the covered deliveries while the list is short, and only coun
   deed(wide, "task", "add", "反复改同一个文件", "--criteria", "改到第十几次", "--files", "shared.md");
   for (let n = 1; n <= 13; n += 1) {
     fs.writeFileSync(path.join(wide, "shared.md"), "v" + n);
-    deed(wide, "task", "done", "T1", "--evidence", "第 " + n + " 版", "--digest", "shared.md");
+    deed(wide, "task", "done", "T1", "--evidence", "第 " + n + " 版");
   }
   const long = deed(wide, "verify");
   assert.equal(long.status, 0, long.stdout + long.stderr);
@@ -260,7 +259,7 @@ test("one delivery pins every file it says it produced", () => {
   fs.writeFileSync(path.join(cwd, "b.md"), "b1");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写两份", "--criteria", "两份都在", "--files", "a.md,b.md");
-  const done = deed(cwd, "task", "done", "T1", "--evidence", "两份都写了", "--digest", "a.md", "--digest", "b.md");
+  const done = deed(cwd, "task", "done", "T1", "--evidence", "两份都写了");
   assert.equal(done.status, 0, done.stdout + done.stderr);
   assert.match(done.stdout, /记下 a\.md [0-9a-f]{12}、b\.md [0-9a-f]{12}/, "两枚都要报出来");
   assert.match(
@@ -287,7 +286,7 @@ test("a fail that names nobody is refused, and a pass cannot carry a rework", ()
   const cwd = workspace("fail-names");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "交一条", "--criteria", "交了", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "交了", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "交了");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const nameless = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--why", "不行");
   assert.equal(nameless.status, 1, "不点名的结论没人能接");

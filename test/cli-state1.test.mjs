@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -37,8 +36,8 @@ test("verify reports evidence pinned to content that has since changed, and does
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "记下内容", "--criteria", "文件不变", "--files", "docs/a.md");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "内容如下", "--digest", "missing.txt").status, 1, "记下的文件要真的在");
-  deed(cwd, "task", "done", "T1", "--evidence", "内容如下", "--digest", "thing.txt");
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "内容如下").status, 1, "记下的文件要真的在");
+  deed(cwd, "task", "done", "T1", "--evidence", "内容如下");
   assert.equal(deed(cwd, "verify").status, 0);
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v2");
   const stale = deed(cwd, "verify");
@@ -88,7 +87,7 @@ test("verify tells apart a stale pin, a path that left the workspace, and no pin
   const bare = deed(cwd, "verify");
   assert.equal(bare.status, 0);
   assert.match(bare.stdout, /没记下内容/);
-  deed(cwd, "task", "done", "T1", "--evidence", "又写了一遍", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "又写了一遍");
   fs.writeFileSync(path.join(cwd, "proof.txt"), "changed after the pin");
   const stale = deed(cwd, "verify");
   assert.equal(stale.status, 1);
@@ -259,7 +258,7 @@ test("doctor says when a promise came after the work", () => {
   const old = new Date(Date.now() - 3600 * 1000);
   fs.utimesSync(path.join(cwd, "docs.txt"), old, old);
   deed(cwd, "task", "add", "改 docs.txt", "--criteria", "docs.txt 有一句话", "--files", "docs.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "写下 docs.txt", "--digest", "docs.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "写下 docs.txt");
   const doctor = deed(cwd, "doctor");
   assert.equal(doctor.status, 0);
   assert.match(doctor.stdout, /先做后记 1 条/);

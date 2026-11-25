@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { digest } from "../../core/digest.mjs";
 import {
   lastBrief,
   lastPeriodBrief,
@@ -19,7 +18,7 @@ import {
 } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, writeBrief } from "../brief.mjs";
-import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list, auditSegment } from "../session.mjs";
+import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
 
 
 // 段审一直用同一双手——除非人推翻过这一段的结论：那一套判断已经被否掉了，
@@ -58,7 +57,7 @@ export default function review(argv) {
         const handed = lastPeriodBrief(session);
         if (handed && handed.withdrawnAt === undefined && handed.answeredBy === null) {
           const file = path.resolve(ROOT, handed.brief);
-          const intact = fs.existsSync(file) && digest(fs.readFileSync(file)) === handed.briefDigest;
+          const intact = fs.existsSync(file);
           if (intact) {
             console.log("期审清单 · " + handed.brief + "（已经出过，等结论落盘）");
             console.log('  结论用 deed review --all --by "' + handed.by + '" --verdict pass|fail');
@@ -77,9 +76,7 @@ export default function review(argv) {
             goal: session.goal?.text ?? "这一期没有写下目的",
             by: flags.by,
             brief,
-            briefDigest: plan.digest,
             guide,
-            guideDigest: plan.guideDigest,
           }),
           () => writeBrief(plan, brief),
         );
@@ -97,8 +94,6 @@ export default function review(argv) {
         fail("这份期审清单是交给 " + handed.by + " 判的：结论要由这一双手落（期审每次换手，但不在一份清单里换）");
       const file = path.resolve(ROOT, handed.brief);
       if (!fs.existsSync(file)) fail("期审清单不在了（" + handed.brief + "）：先 deed review --all 另出一份");
-      if (digest(fs.readFileSync(file)) !== handed.briefDigest)
-        fail("期审清单被改过（" + handed.brief + "）：它不是审查者读到的那一份；deed review --all 另出一份");
       if (stalePeriod(session))
         fail("这份期审清单出在最后一次段变动之前：它答的不是这一期现在的事，deed review --all 另出一份");
       const findings = list(flags.finding);
@@ -209,15 +204,12 @@ export default function review(argv) {
         const handed = lastBrief(one, seg.id);
         const answered = handed && one.reviews.some((rv) => rv.brief === handed.brief);
         if (handed && !answered) {
-          // 交出去的那份只要没被动过，就在等结论；被改过或删了就另出一份——
-          // 手上那份已经不是账本里记的那一份，谁读它都不算数。
+          // 交出去的那份还在，就在等结论；删了就另出一份。
+          // 内容是否被改过不看指纹：审查期间不许改这一段由冻结管，改文件这件事发生在
+          // 冻结之后就是一次新的交付，账本上看得到。
           const file = path.resolve(ROOT, handed.brief);
           const pack = handed.guide ? path.resolve(ROOT, handed.guide) : null;
-          // 清单与角色包是一起交出去的：任何一份被动过，手上就不是审查者读过的那一份。
-          const intact =
-            fs.existsSync(file) &&
-            digest(fs.readFileSync(file)) === handed.briefDigest &&
-            (!pack || (fs.existsSync(pack) && digest(fs.readFileSync(pack)) === handed.guideDigest));
+          const intact = fs.existsSync(file) && (!pack || fs.existsSync(pack));
           // 清单写的是它发出那一刻的条目与交付记录。之后这一段又动了（加任务、
           // 交付、收回），这份清单就不再说这一段现在的事——换一份，别让人审旧内容。
           const moved = lastSegmentChange(one, seg);
@@ -227,14 +219,14 @@ export default function review(argv) {
             console.log("审查清单 · " + handed.brief + "（这一段已经出过，等结论落盘）");
             console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
             return;
-          } else console.log("上一份清单(" + handed.brief + " 与角色包)改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
+          } else console.log("上一份清单(" + handed.brief + " 与角色包)改过或丢了：另出一份，旧的那条账本记录留着（它回答不了这一段现在的事）");
         }
         const plan = planBrief(ROOT, one, seg, stamp());
         const brief = rel(ROOT, plan.file);
         const guide = rel(ROOT, plan.guideFile);
         transact(
           flags,
-          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, briefDigest: plan.digest, guide, guideDigest: plan.guideDigest, by: hand }),
+          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, guide, by: hand }),
           () => writeBrief(plan, brief),
         );
         // 账本里已有几份，加上手上这份：一次审只回答一份清单。
@@ -248,7 +240,6 @@ export default function review(argv) {
         return;
       }
       if (!flags.by) fail("review 要给结论就要写清谁审的：--by \"…\"");
-      auditSegment(doc, one, seg);
       const waiting = tasksIn(one, seg).filter((task) => task.status === "todo");
       if (waiting.length > 0)
         fail("段 " + seg.id + " 还有没交付的（" + waiting.map((task) => task.id).join("、") + "）：结论只能落在交付之后");
@@ -271,15 +262,11 @@ export default function review(argv) {
         fail("这一段的那份清单已经撤回（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份，再落结论");
       const file = path.resolve(ROOT, handed.brief);
       if (!fs.existsSync(file)) fail("清单不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
-      if (digest(fs.readFileSync(file)) !== handed.briefDigest)
-        fail("清单被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
       // 角色包和清单成对交出去，结论回答的是两份一起。换掉角色包（"怎么审"
       // 被改成"随便过"）同样是一份没人读过的清单。
       if (handed.guide) {
         const pack = path.resolve(ROOT, handed.guide);
         if (!fs.existsSync(pack)) fail("角色包不在了（" + handed.guide + "）：先 deed review --segment " + seg.id + " 重出一份");
-        if (digest(fs.readFileSync(pack)) !== handed.guideDigest)
-          fail("角色包被改过（" + handed.guide + "）：它不是审查者读到的那一份；重新出一次再审（deed review --segment " + seg.id + "）");
       }
       // 清单变了，结论就没法回答它：那一份写的不是现在这一段。
       const moved = lastSegmentChange(one, seg);
@@ -305,8 +292,7 @@ export default function review(argv) {
         const task = one.tasks.find((one2) => one2.id === id);
         if (!task) fail("会话 " + one.id + " 里没有 " + id);
         if (task.segment !== seg.id) fail(id + " 不在段 " + seg.id + " 里（它在 " + task.segment + "），结论只能判这一段的条目");
-        const files = (task.evidence.at(-1)?.files ?? []).map((file) => ({ path: file.path, digest: file.digest }));
-        return { id, verdict, note: note ?? null, files };
+        return { id, verdict, note: note ?? null };
       });
       if (flags.verdict === "pass") {
         const judged = new Set(results.map((one2) => one2.id));

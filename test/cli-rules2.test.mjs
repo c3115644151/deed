@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -84,7 +83,7 @@ test("a pin in a closed segment stops blocking, but it still gets reported", () 
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "记下内容", "--criteria", "文件在", "--files", "thing.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "thing.txt");
+  deed(cwd, "task", "done", "T1", "--evidence", "第一版");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const passed = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met");
   assert.equal(passed.status, 0, passed.stderr);
@@ -128,8 +127,8 @@ test("pinning a file that did not move this time still weighs it", () => {
   const cwd = workspace("weigh-pin");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "T1", "--criteria", "做完的标准");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "第一次", "--digest", proof(cwd)).status, 0);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "重新记同一份", "--digest", "proof.txt").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "第一次").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "重新记同一份").status, 0);
   const last = readEvents(cwd).filter((one) => one.k === "task.done").at(-1);
   assert.deepEqual(last.changed, [], "这一次什么都没动");
   assert.equal(last.bytes["proof.txt"], fs.statSync(path.join(cwd, "proof.txt")).size);
