@@ -1,7 +1,8 @@
 // 人只在面板上出手：签收（议题那一层还没做，闸先占位）。命令行那条路关掉了，
 // 命令行那条路关掉了，因为「人按的」与「程序跑的」必须在账本上分得开：
 // 面板只收本机、只收同源，落下的行写着 by 与 via:"panel"。
-import { signBlockers, exemptSegments, debt } from "../core/rules.mjs";
+import { awaitingJudgement } from "../core/fold.mjs";
+import { signBlockers, exemptSegments, debt, openSegment } from "../core/rules.mjs";
 
 // 这一期叫什么：第几期。它只是一个标题，从账本里数得出来。
 const periodOf = (doc, session) => "第 " + (doc.sessions.indexOf(session) + 1) + " 期";
@@ -20,9 +21,20 @@ export function gatesOf(doc, config = doc.config) {
     if (blockers.length > 0) return { open: false, why: blockers.join("；"), blockers };
     return { open: true, why: "", words: "", title: periodOf(doc, session) };
   })();
+  // 判决：审查通过之后由人按的那一下。它一次只对一段——就是手上那一段。
+  const shut = session ? openSegment(session) : null;
+  const judgement = awaitingJudgement(session, shut)
+    ? {
+        open: true,
+        why: "",
+        segment: shut.id,
+        by: shut.reviewedBy ?? null,
+        at: shut.reviewedAt ?? null,
+      }
+    : { open: false, why: "没有等你判决的段" };
   // 议题还没进账本（那一层还没做）：闸一直在，只是没有东西可放。
   const topicRelease = { open: false, why: "还没有议题" };
-  return { sign, topicRelease };
+  return { sign, judgement, topicRelease };
 }
 
 const demand = (text) => {
@@ -71,6 +83,25 @@ export function applyGate(root, action = {}) {
       { at: action.at ?? null },
     );
     return { ...written, notes: notesAfterSign(written.doc, written.ev.s) };
+  }
+  if (kind === "judgement") {
+    const id = String(action.segment ?? "").trim();
+    if (!id) demand("判决要说是哪一段");
+    const written = record(
+      root,
+      (doc) => {
+        const session = sessionOf(doc, action.session ?? null);
+        if (!session) demand("还没有在推进的一期");
+        if (session.closeKind) demand("这一期已经结束");
+        const home = session.segments.find((one) => one.id === id);
+        if (!home) demand("账本里没有段 " + id);
+        if (home.closedAt !== null) demand(home.id + " 已经判过了");
+        if (home.verdict !== "pass") demand(home.id + " 还没有审查通过：判决在审查通过之后才按得下去");
+        return { k: "verdict.pass", s: session.id, segment: id, by: action.by ?? "user", via: "panel" };
+      },
+      { at: action.at ?? null },
+    );
+    return written;
   }
   if (kind === "topic-release") demand("还没有议题：这一层还没做");
   demand("面板不认这个闸：" + (kind || "（空）"));

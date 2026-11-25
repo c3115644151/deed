@@ -351,14 +351,14 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
       encoding: "utf8",
       env: { ...process.env, DEED_NO_PANEL: "1" },
     });
-  run("init", "--said", "开始", "--exempt", "docs/**");
-  run("task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  fs.mkdirSync(path.join(root, "docs"), { recursive: true });
-  fs.writeFileSync(path.join(root, "docs", "a.md"), "a\n");
-  run("task", "done", "T1", "--evidence", "写完了", "--digest", "docs/a.md");
-  assert.equal(run("seal", "--why", "只改了文档", "--by", "agent").status, 0);
-  assert.equal(run("review", "--all", "--by", "period-1").status, 0);
-  assert.equal(run("review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+  run("init", "--said", "开始");
+  run("task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/a.mjs");
+  fs.mkdirSync(path.join(root, "core"), { recursive: true });
+  fs.writeFileSync(path.join(root, "core", "a.mjs"), "a\n");
+  run("task", "done", "T1", "--evidence", "写完了", "--digest", "core/a.mjs");
+  // 审查通过只把这一段交回来：判决那一按才是它的结局。
+  assert.equal(run("review", "--segment", "S01.1", "--by", "qa").status, 0);
+  assert.equal(run("review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
 
   const server = start(root, 0);
   await new Promise((resolve) => server.once("listening", resolve));
@@ -376,16 +376,34 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
       req.end(JSON.stringify(body));
     });
   try {
-    const page = await get(port, "/");
-    assert.match(page.body, /data-gate="sign"/, "闸开着的这一页上有那个按钮，没有一串要人抄回命令行的字");
-    assert.doesNotMatch(page.body, /deed sign --words/, "签收不再写在页面上让人去命令行里敲");
+    // 审查通过之后这一段等你判：判决那一下在页面上，签收还挡着。
+    const waiting = await get(port, "/");
+    assert.match(waiting.body, /data-gate="judgement" data-segment="S01\.1"/, "等判决的段上有那一下");
+    assert.doesNotMatch(waiting.body, /data-gate="sign"/, "这一段还没判，签收的闸不出按钮");
+    assert.doesNotMatch(waiting.body, /deed sign --words/, "签收不再写在页面上让人去命令行里敲");
 
     const foreign = await post({ action: "sign", words: "可以" }, { origin: "http://evil.example" });
     assert.equal(foreign.status, 403, "别的站点发来的按不动");
 
-    const empty = await post({ action: "sign", words: "   " });
+    const empty = await post({ action: "judgement", segment: "  " });
     assert.equal(empty.status, 400);
-    assert.match(empty.body.why, /原话/);
+    assert.match(empty.body.why, /哪一段/);
+
+    const early = await post({ action: "sign", words: "可以" });
+    assert.equal(early.status, 400, "判决没按，签收按不下去");
+
+    const judged1 = await post({ action: "judgement", segment: "S01.1" });
+    assert.equal(judged1.status, 200, JSON.stringify(judged1.body));
+    const closed = fold(readEvents(root)).sessions[0].segments[0];
+    assert.equal(closed.closedAt !== null, true);
+    assert.equal(closed.judgedBy, "user");
+    const again2 = await post({ action: "judgement", segment: "S01.1" });
+    assert.equal(again2.status, 400, "判过的段不再判");
+    assert.equal(run("review", "--all", "--by", "period-1").status, 0);
+    assert.equal(run("review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+
+    const open = await get(port, "/");
+    assert.match(open.body, /data-gate="sign"/, "段都判过、期审也过了：签收的闸开在这里");
 
     const pressed = await post({ action: "sign", words: "可以，就这样" });
     assert.equal(pressed.status, 200, JSON.stringify(pressed.body));

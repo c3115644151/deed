@@ -400,10 +400,13 @@ function acceptScreen(doc, session, config, zone, on) {
       const review = reviewOf(session, segment);
       const state = reviewState(config, session, segment);
       const count = countIn(session, segment);
-      const word = review
-        ? review.verdict === "pass" ? "放行" : "不合格"
-        : segment.verdict === "exempt" ? "免审" : STAMP[state] ?? "要审";
-      const kind = review ? (review.verdict === "pass" ? "pass" : "fail") : segment.verdict === "exempt" ? "quiet" : "grit";
+      const waiting = segment.verdict === "pass" && segment.closedAt === null;
+      const word = waiting
+        ? "等判决"
+        : review
+          ? review.verdict === "pass" ? "审查通过" : "不合格"
+          : segment.verdict === "exempt" ? "免审" : STAMP[state] ?? "要审";
+      const kind = waiting ? "grit" : review ? (review.verdict === "pass" ? "pass" : "fail") : segment.verdict === "exempt" ? "quiet" : "grit";
       return (
         '<article class="vcard" data-kind="' + kind + '">' +
         '<div class="vhead"><span class="vid">' + esc(segment.id) + "</span>" +
@@ -419,6 +422,11 @@ function acceptScreen(doc, session, config, zone, on) {
             (review.rework && review.rework.length ? '　<span class="k">退回</span>' + esc(review.rework.join("、")) : "") + "</p>"
           : "") +
         (review && review.findings.length ? '<div class="fds">' + findingList(review.findings) + "</div>" : "") +
+        (waiting
+          ? '<form class="gate small" data-gate="judgement" data-segment="' + esc(segment.id) + '">' +
+            '<span class="gask">这一段过不过？</span>' +
+            '<button class="gpress" type="submit">判决通过 ' + esc(segment.id) + "</button></form>"
+          : "") +
         "</article>"
       );
     })
@@ -455,7 +463,7 @@ function acceptScreen(doc, session, config, zone, on) {
     '<aside class="col side">' +
     '<h3 class="colh">签收</h3>' +
     '<ul class="checks">' +
-    check(sealed.length === segments.length, "每一段都有结局", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没判" : "") +
+    check(sealed.length === segments.length, "每一段都有结局", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没有结局（等判决或免审封存）" : "") +
     check(todo === 0, "没有未做的条目", todo ? "还有 " + todo + " 条" : "") +
     check(asks.length === 0, "没有等裁定的问题", asks.length ? "还有 " + asks.length + " 条待裁（" + asks.map((one) => one.id).join("、") + "）" : "") +
     check(blocks.length === 0, "没有挡住的项", blocks.length ? blocks.length + " 条，见下" : "") +
@@ -532,7 +540,8 @@ export function renderBoard(doc, config, options = {}) {
   const turns = doc.sessions.reduce((sum, one) => sum + userTurns(one).length, 0);
   const stateKey = session ? reading(doc) : "discuss";
   const state = READING[stateKey];
-  const here = stateKey;
+  // 轮到人按的那两下（判决／签收）就在验收屏上：此刻把这一屏打开，别让他自己找。
+  const here = step.who === "user" && (step.what === "判决" || step.what === "签收") ? "accept" : stateKey;
   const open = session ? openSegment(session) : null;
   return (
     '<!doctype html>\n<html lang="zh-CN" data-theme="dark">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>deed · ' +
@@ -870,7 +879,8 @@ html[data-theme="light"] body {
   white-space: nowrap; }
 .gpress:hover { background: var(--signal); color: var(--bg); }
 .gpress:disabled { opacity: .5; cursor: default; }
-.gate.small { margin-top: 8px; }
+.gate.small { margin-top: 8px; align-items: center; }
+.gask { font-size: 12px; color: var(--dim); white-space: nowrap; }
 .gate.small .gpress { font-size: 10px; padding: 4px 8px; }
 .exempts { list-style: none; margin: 0; padding: 0; }
 .exempts li { font-size: 11.5px; color: var(--dim); padding: 2px 0; }
@@ -960,6 +970,7 @@ document.addEventListener("submit", (event) => {
   const action = form.getAttribute("data-gate");
   const body = { action };
   if (action === "sign") body.words = (form.querySelector(".gwords") || {}).value || "";
+  if (action === "judgement") body.segment = form.getAttribute("data-segment");
   const button = form.querySelector(".gpress");
   if (button) button.disabled = true;
   fetch("/gate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })

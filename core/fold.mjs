@@ -104,10 +104,20 @@ export const awaitingVerdict = (session, segment) => {
   return Boolean(last) && last.answeredBy === null && last.withdrawnAt === undefined;
 };
 
+// 含义第 23 版起，审查通过只是把这一段交回给人：判别的是用户，段在手那一刻还没关闭。
+export const awaitingJudgement = (session, segment) =>
+  Boolean(segment) && segment.closedAt === null && segment.verdict === "pass";
+
 // 清单没被回答之前，这一段是冻结的：要么审，要么先把清单撤回再改。从账本含义第 19 版
 // 起这么读；旧行按当时的样子重放——那时边审边改是允许的，拿今天的话去判它们是坏账。
-export const frozenFor = (session, segmentId, meaning) =>
-  meaning >= MEANING.freeze && awaitingVerdict(session, session.segments.find((one) => one.id === segmentId));
+// 第 23 版起多一格：审查通过了、等你判决的这段时间同样不收交付——审查者判的是那份字节，
+// 人在判之前又换掉了它，判决落在一份没人看过的内容上。
+export const frozenFor = (session, segmentId, meaning) => {
+  if (meaning < MEANING.freeze) return false;
+  const segment = session.segments.find((one) => one.id === segmentId);
+  if (awaitingVerdict(session, segment)) return true;
+  return meaning >= MEANING.judgement && awaitingJudgement(session, segment);
+};
 
 // 预备段只有一个：已经接着活的那个就是它，后来改到下一段的、新写的都往里放。
 // 「改到下一段的条目」若每次都开一个新段，一次讨论改三批就成了三段，等结论期间谁也说不清
@@ -143,7 +153,8 @@ function segmentOf(session, at, v = 1) {
   settle(session);
   const last = session.segments.filter((one) => one.closedAt === null).at(-1);
   if (!last) return nextSegment(session, at);
-  if (v < 11 || !awaitingVerdict(session, last)) return last;
+  const waiting = awaitingVerdict(session, last) || (v >= MEANING.judgement && awaitingJudgement(session, last));
+  if (v < 11 || !waiting) return last;
   // 等结论时新写的活自己开一段，并记成预备段：它是最末那个开段，所以再没有第二处预备
   // 可去——预备段一旦也送了审，它就只是又一批等结论的活，同样的判断在这里也成立。
   return nextSegment(session, at, true);
@@ -596,9 +607,16 @@ export function fold(events) {
           segment.reviewBy = ev.by;
           segment.reviewVerdict = ev.verdict;
         }
-        // 审查者放行就是结局，不再等第二个人签字：整体审封这一段，签收核对把还没封的段
-        // 一起封——那几段本身没被它的审查者看过，是签收核对替它们封的。
-        if (ev.verdict === "pass" && meaning >= 3) {
+        // 含义第 23 版起，审查通过不是结局：它把这一段交回给用户判决，段还在手上。
+        // 第 22 版及以前的行按当时的样子读——那时审查者的放行就是这一段关闭的时刻，
+        // 拿今天的规矩重放旧账本，等于把已经发生过的事判成没发生。
+        if (ev.verdict === "pass" && meaning >= MEANING.judgement) {
+          if (segment) {
+            segment.verdict = "pass";
+            segment.reviewedAt = ev.at;
+            segment.reviewedBy = ev.by;
+          }
+        } else if (ev.verdict === "pass" && meaning >= 3) {
           const shut = segment ? [segment] : session.segments.filter((one) => one.closedAt === null);
           for (const one of shut) {
             for (const task of session.tasks)
@@ -610,8 +628,6 @@ export function fold(events) {
               one.reviewAt = ev.at;
               one.reviewBy = ev.by;
               one.reviewVerdict = "pass";
-              // 记下是那次签收核对封的：人推翻它的时候，要能把这几段一起打开。
-              one.sealedByReview = id;
             }
           }
         }
@@ -670,6 +686,21 @@ export function fold(events) {
         }
         break;
       }
+      // 判决：审查通过之后由人按的那一下，它才是这一段的结局。段里已交付的条目转成
+      // 「已收下」，段头记下判决时刻与是谁判的。判之前它必须已经在审查里过过一遍。
+      case "verdict.pass": {
+        const session = sessionOf(doc, ev);
+        const home = session.segments.find((one) => one.id === ev.segment);
+        if (!home) noway(`这个会话里没有段 ${ev.segment}`);
+        if (home.closedAt !== null) noway(`${home.id} 已经判过了（${home.closedAt}）：账本不往回改`);
+        if (home.verdict !== "pass") noway(`${home.id} 还没有审查通过：判决在审查通过之后才按得下去`);
+        for (const task of session.tasks)
+          if (task.segment === home.id && task.status === "done") task.status = "accepted";
+        home.judgedAt = ev.at;
+        home.judgedBy = ev.by;
+        home.closedAt = ev.at;
+        break;
+      }
       // 人推翻结论是例外，不是步骤：它把一条在案的结论作废，并把这一段重新打开，
       // 让活回到桌面上——原先"判过"的那批任务退回已交付。
       case "review.overturn": {
@@ -700,7 +731,11 @@ export function fold(events) {
         segment.reviewVerdict = null;
         segment.reviewAt = null;
         segment.reviewBy = null;
-        if (segment.closedAt !== null) {
+        segment.reviewedAt = null;
+        segment.reviewedBy = null;
+        // 含义第 23 版起"审查通过"与"段落已关闭"分开了：旧行被推翻时两样都要撤回，
+        // 否则重放出来的段既是"判过"又是"要审"，下一步与签收差各说一套。
+        if (segment.closedAt !== null || segment.verdict === "pass") {
           for (const task of session.tasks)
             if (task.segment === segment.id && task.status === "accepted") task.status = "done";
           segment.verdict = null;

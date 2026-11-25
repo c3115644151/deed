@@ -148,6 +148,8 @@ export default function review(argv) {
             : "现在没有待审的段",
         );
       if (seg.closedAt) fail("段 " + seg.id + " 已经封存，结论不能再落");
+      // 审查通过之后这一段在等你判决：再落一份结论等于重判已经过过的那一遍。
+      if (seg.verdict === "pass") fail("段 " + seg.id + " 的审查已经通过了，在等你判决：结论已经落过，判完这一段才动");
       // 撤回一份还没被回答的清单：这一段的冻结到此为止，改完再出下一份。它不是"清单过期"
       // 那种自动判断——是一个人在账本上写下"这一份不作数"，谁写的、为什么都留着。
       if (flags.withdraw) {
@@ -345,7 +347,7 @@ export default function review(argv) {
         force: true,
       });
       if (flags.verdict === "pass") {
-        console.log("审查通过 · " + seg.id + " · " + flags.by + " · 段已封存");
+        console.log("审查通过 · " + seg.id + " · " + flags.by + " · 交回给你判（段还开着，判决之后才关闭）");
         console.log("  清单 " + handed.brief);
         for (const one2 of gaveUp)
           console.log("  被点名但已放弃 · " + one2.id + " · " + (one2.deferredWhy ?? "没写理由") + "（这条不合格没有交付可结清，结论落在它被放弃这件事上）");

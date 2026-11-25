@@ -59,7 +59,7 @@ export const SPEC = {
     booleans: ["withdraw", "all"],
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
-      'deed review --segment S01.1 --by "谁" --verdict pass --result T1=met [--result T2=met]   pass 直接关闭这一段',
+      'deed review --segment S01.1 --by "谁" --verdict pass --result T1=met [--result T2=met]   审查通过：把这一段交回给用户判决',
       'deed review --segment S01.1 --by "谁" --verdict fail --rework T1,T2 --why "…" [--finding "…"]',
       "                 --result 逐条写判定（met／unmet／unknown:说明）；--result-all met 是这一句话的省写",
       "                 pass 要求这一段每条都判过：逐条写，或用 --result-all 统一说一句",

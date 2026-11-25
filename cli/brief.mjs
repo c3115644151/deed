@@ -56,7 +56,7 @@ function guideText(subject, target, briefName, scratch, hand = null, nth = 1) {
     "",
     "    " + verdict + " --by \"你是谁\" --verdict pass",
     "",
-    "pass 直接关闭这一段，不需要第二个人签字。",
+    "pass 把这一段交回给用户：判决那一下才是这一段关闭的时刻。",
     "",
     "有没达成的：",
     "",

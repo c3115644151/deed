@@ -6,7 +6,7 @@
 // editing the plan is not a change to the workspace, it is a change to say what
 // the work was.
 
-import { awaitingVerdict } from "../core/fold.mjs";
+import { awaitingJudgement, awaitingVerdict } from "../core/fold.mjs";
 import { groupsOf } from "../core/rules.mjs";
 
 export const HEAD = "# 这一期要做成什么";
@@ -170,6 +170,11 @@ export function draft(session) {
   else if (awaitingVerdict(session, open))
     out.push(
       "## 下一段（" + open.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）",
+      "",
+    );
+  else if (awaitingJudgement(session, open))
+    out.push(
+      "## 下一段（" + open.id + " 审查通过了、等你判决，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）",
       "",
     );
   out.push("<!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->");

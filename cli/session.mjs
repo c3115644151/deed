@@ -107,10 +107,14 @@ const refuseFrozen = (doc, evs) => {
     // 撤回放弃、撤回一条改到下一段是记录层面的事：只有撤回一条交付才换掉审查者手上的文件。
     if (ev.k === "task.undo" && task.status !== "done" && task.status !== "accepted") continue;
     if (!frozenFor(session, task.segment, EVENT_VERSION)) continue;
+    const home = session.segments.find((one) => one.id === task.segment);
+    const waiting = home && home.verdict === "pass" && home.closedAt === null;
     fail(
-      ev.k === "task.done"
-        ? `${task.segment} 的清单已经发出去、还没人回答：这一段在审，不能交付（要改先把清单撤回：deed review --segment ${task.segment} --withdraw --why "…"）`
-        : `${task.segment} 在审：撤回交付会换掉审查者手上那两份文件，等结论或先撤回清单`,
+      waiting
+        ? `${task.segment} 审查通过了、等你判决：这一段先冻着，判过之后才收新的交付（判决在面板上按）`
+        : ev.k === "task.done"
+          ? `${task.segment} 的清单已经发出去、还没人回答：这一段在审，不能交付（要改先把清单撤回：deed review --segment ${task.segment} --withdraw --why "…"）`
+          : `${task.segment} 在审：撤回交付会换掉审查者手上那两份文件，等结论或先撤回清单`,
     );
   }
 };
@@ -357,7 +361,17 @@ export function printState() {
     if (aim) console.log("  目的 · " + aim);
     else if (open.segments.length > 1)
       console.log('  目的 · 还没有（deed goal "…"）：签收拿它当尺子');
-    const shown = seg ?? open.segments[open.segments.length - 1];
+    // 手上有两段时（一段等判决、一段在收活）两段都要露脸：只印"当前那一段"，
+    // 读者会以为后来的活没地方去。等判决的那一段排在前面说一句，收活的那一段照旧细印。
+    const unclosed = open.segments.filter((one) => one.closedAt === null);
+    const taking = unclosed.filter((one) => one.verdict !== "pass").at(-1) ?? null;
+    for (const other of unclosed.filter((one) => one !== taking)) {
+      const c = countIn(open, other);
+      console.log(
+        "  段 " + other.id + " · 审查通过、等你判决 · " + c.total + " 条（未做 " + c.todo + " · 已交付 " + (c.done + c.accepted) + "）",
+      );
+    }
+    const shown = taking ?? seg ?? open.segments[open.segments.length - 1];
     if (!shown) {
       console.log("  还没有段：范围说完就写第一条任务");
     } else {

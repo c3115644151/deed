@@ -1,5 +1,6 @@
 // rules: the questions a projection asks about the document. No clock, no IO.
 import { MEANING } from "./events.mjs";
+import { awaitingJudgement } from "./fold.mjs";
 // If a rule here disagrees with what fold allows, fold wins and this file is
 // wrong -- these functions explain a state, they never permit one.
 
@@ -342,11 +343,14 @@ export function signBlockers(doc, session, config = null) {
     // 要审的段等审查者的 pass；免审的段等交付的人写清凭什么不审。同一句「还没有审查通过」
     // 放在免审段上是假话——没人会来审它。
     const owed = config ? needsReview(config, session, shut) : true;
-    blockers.push(
-      owed
-        ? shut.id + " 还没有审查通过（审查者的 pass 就关闭这一段）"
-        : shut.id + " 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
-    );
+    if (awaitingJudgement(session, shut))
+      blockers.push(shut.id + " 审查通过了，等你判决（这一段过不过，不是审查者说了算）");
+    else
+      blockers.push(
+        owed
+          ? shut.id + " 还没有审查通过（审查者判的是这一段通不通过）"
+          : shut.id + " 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
+      );
   }
   // Work owed outside the open segment is what a segment-level view cannot see;
   // inside it, the segment's own blockers already say it.
@@ -515,6 +519,14 @@ export function nextAction(doc, config) {
       command: `deed review --all --by "你是谁"`,
     };
   }
+  // 审查通过只把这一段交回来：此刻轮到人判，它不是签收，也不是再审。
+  if (awaitingJudgement(session, segment))
+    return {
+      who: "user",
+      what: "判决",
+      text: `${segment.id} 的审查通过了（${segment.reviewedBy ?? "审查者"}）：这一段过不过，等你判`,
+      command: "deed panel",
+    };
   if (segment.closedAt !== null) {
     const blockers = signBlockers(doc, session, config);
     return {
