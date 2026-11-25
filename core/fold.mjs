@@ -294,8 +294,13 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
-        if (frozenFor(session, task.segment, meaningOf(ev)))
-          noway(`${task.segment} 在审：撤回也是改这一段的内容，等结论或先撤回清单`);
+        // 冻结挡的是"把审查者手上那两份文件换掉"：撤回一条交付就是了。撤回放弃、撤回一条
+        // 改到下一段不改这里的字节，那是记录层面的事，照收。
+        if (
+          (task.status === "done" || task.status === "accepted") &&
+          frozenFor(session, task.segment, meaningOf(ev))
+        )
+          noway(`${task.segment} 在审：撤回交付会换掉审查者手上那两份文件，等结论或先撤回清单`);
         task.touchedAt = ev.at;
         // 撤回也可以是撤回一条放弃/延后：账本只追加，撤的是它此刻的效力，不是那一行
         // 记录。放弃错了却只能新开一条，等于让账本里的错口径一直挂着，而新开的那条
@@ -349,8 +354,7 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
-        if (frozenFor(session, task.segment, meaningOf(ev)))
-          noway(`${task.segment} 在审：「改到下一段」也是改这一段的内容，等结论或先撤回清单`);
+
         if (task.status !== "todo")
           noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能改到下一段`);
         // 一批改到下一段会连着写好几十行：预备段接过活就接着往里放，
@@ -393,8 +397,7 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
-        if (frozenFor(session, task.segment, meaningOf(ev)))
-          noway(`${task.segment} 在审：延后与放弃也是改这一段的内容，等结论或先撤回清单`);
+        // 延后与放弃是记录层面的决定，换不掉审查者手上的字节：冻结不禁它们。
         task.status = ev.k === "task.defer" ? "deferred" : "dropped";
         task.deferredWhy = ev.why;
         task.touchedAt = ev.at;
@@ -555,7 +558,10 @@ export function fold(events) {
         }));
         if (meaning >= MEANING.perItem && ev.verdict === "pass") {
           const judged = new Set(results.map((one) => one.id));
-          const bare = inScope.filter((one) => !judged.has(one.id)).map((one) => one.id);
+          const bare = inScope
+            .filter((one) => one.status !== "dropped" && one.status !== "deferred")
+            .filter((one) => !judged.has(one.id))
+            .map((one) => one.id);
           if (bare.length > 0)
             noway(`pass 要每条都判过：${bare.join("、")} 还没有判定（--result T1=met 这样逐条写）`);
         }

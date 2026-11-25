@@ -410,7 +410,9 @@ test("two ids cannot collide, by hand or by two agents at once", async () => {
   assert.equal(new Set(ids).size, ids.length, "并发写入拿到的是不同的任务号：" + ids.join(","));
 });
 
-test("verify reports evidence pinned to content that has since changed, and holds the judgement", () => {
+// 判决不挂在哈希上：这一段在等结论时是冻结的，作者换不掉审查者手上那两份文件。
+// 盘上真被别的东西改了，那是 verify 该报的账——它报告，但不替审查者做判断。
+test("verify reports evidence pinned to content that has since changed, and does not hold the judgement", () => {
   const cwd = workspace("digest");
   fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
   deed(cwd, "init", "--said", "开始");
@@ -422,9 +424,11 @@ test("verify reports evidence pinned to content that has since changed, and hold
   const stale = deed(cwd, "verify");
   assert.equal(stale.status, 1);
   assert.match(stale.stdout, /交付记录过期/);
-  const judge = deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
-  assert.equal(judge.status, 1, "记下的内容变了,这一条不能再算数");
-  assert.match(judge.stderr, /过期/);
+  // 判决不挂在哈希上：字节变了不该替审查者做判断。verify 照旧把那一条报出来。
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const pass = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met");
+  assert.equal(pass.status, 0, pass.stdout + pass.stderr);
+  assert.match(pass.stdout, /段已封存/);
 });
 
 test("a pass seals the segment, and a fail after overturning it reopens that same one", () => {
@@ -1336,14 +1340,17 @@ test("a frozen segment refuses work until the brief is withdrawn, and the withdr
 
   for (const [what, args] of [
     ["交付", ["task", "done", "T1", "--evidence", "又跑了一遍", "--digest", proof(cwd)]],
-    ["撤回", ["task", "undo", "T1", "--why", "说错了话"]],
-    ["放弃", ["task", "drop", "T1", "--why", "不做了"]],
+    ["撤回交付", ["task", "undo", "T1", "--why", "说错了话"]],
   ]) {
     const refused = deed(cwd, ...args);
     assert.equal(refused.status, 1, what + "在冻结的段里不该被收下");
     assert.match(refused.stderr, /在审/, what + "要说出冻结这件事");
   }
+  // 冻结挡的是文件改动：记录层面的交互照旧——记轮次、写题、放弃一条。
+  assert.equal(deed(cwd, "tick", "--who", "user", "--said", "再看看").status, 0, "记轮次不受冻结影响");
+  assert.equal(deed(cwd, "ask", "要不要换做法", "--reading", "换成另一种", "--why", "拿不准").status, 0, "写题不受冻结影响");
   assert.equal(deed(cwd, "task", "add", "又想起一条", "--criteria", "也行").status, 0, "新活不进冻结的段");
+  assert.equal(deed(cwd, "task", "drop", "T2", "--why", "不做了").status, 0, "放弃是记录，不是换字节");
   assert.equal(fold(readEvents(cwd)).sessions[0].tasks.find((one) => one.id === "T2").segment, "S01.2");
 
   const left = deed(cwd, "review", "--segment", "S01.1", "--withdraw", "--why", "要按新的一版重交");

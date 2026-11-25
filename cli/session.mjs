@@ -419,8 +419,9 @@ export function optionalBlock(config) {
   ];
 }
 
-// 记下的内容变了，那一条交付回答的就不是现在的工作区：关闭这一段、落结论都不能装作
-// 没发生过。这里只问账本与磁盘的差，不看谁的判断。
+// 落结论前只问一件事：交付记录有没有指到工作区外面——deed 只认工作区里的文件。
+// 不在这里比字节：这一段在等结论时是冻结的，作者换不掉审查者手上那两份文件；
+// 真有别的进程改了盘，那是 verify 该报的账，不该把一句"过不过"的判断挂在哈希上。
 export const auditSegment = (doc, session, seg) => {
   const inSegment = new Set(tasksIn(session, seg).map((task) => task.id));
   const audit = auditEvidence(ROOT, doc, session.id);
@@ -428,10 +429,5 @@ export const auditSegment = (doc, session, seg) => {
   if (outside.length > 0)
     fail(
       "这一段有交付记录指到工作区外面（" + outside.map((spot) => spot.id + " → " + spot.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付",
-    );
-  const stale = audit.stale.filter((spot) => inSegment.has(spot.id));
-  if (stale.length > 0)
-    fail(
-      "这一段有交付记录过期（" + stale.map((spot) => spot.id + " 记下 " + spot.path).join("、") + "），记下的内容已经变了：重新交付再关闭这一段",
     );
 };

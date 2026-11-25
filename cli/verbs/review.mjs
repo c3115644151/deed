@@ -102,25 +102,6 @@ export default function review(argv) {
         return;
       }
       if (!flags.by) fail("review 要给结论就要写清谁审的：--by \"…\"");
-      // 清单发出之后这一段还在被改：先在这里点名，别让一句"记录过期"盖住是哪一条。
-      // 出路只有两条：撤回这份清单接着改，或者把改动交给下一段。
-      const drifted = tasksIn(one, seg).flatMap((task) =>
-        (task.evidence.at(-1)?.files ?? []).flatMap((file) => {
-          let now = null;
-          try {
-            now = digest(fs.readFileSync(path.resolve(ROOT, file.path)));
-          } catch {
-            now = null;
-          }
-          return now === file.digest ? [] : [{ id: task.id, path: file.path, then: file.digest, now }];
-        }),
-      );
-      if (drifted.length > 0)
-        fail(
-          "这一段有交付记录在清单发出之后变过：\n" +
-            drifted.map((one2) => "  " + one2.id + " · " + one2.path + "（记下 " + one2.then.slice(0, 12) + "，现在是 " + (one2.now ? one2.now.slice(0, 12) : "读不到") + "）").join("\n") +
-            "\n要么撤回这份清单接着改（deed review --segment " + seg.id + " --withdraw --why \"…\" --by \"…\"），要么把改动交给下一段再判",
-        );
       auditSegment(doc, one, seg);
       const waiting = tasksIn(one, seg).filter((task) => task.status === "todo");
       if (waiting.length > 0)
@@ -172,7 +153,10 @@ export default function review(argv) {
       });
       if (flags.verdict === "pass") {
         const judged = new Set(results.map((one2) => one2.id));
-        const bare = tasksIn(one, seg).filter((task) => !judged.has(task.id)).map((task) => task.id);
+        const bare = tasksIn(one, seg)
+          .filter((task) => task.status !== "dropped" && task.status !== "deferred")
+          .filter((task) => !judged.has(task.id))
+          .map((task) => task.id);
         if (bare.length > 0)
           fail("pass 要每条都判过：" + bare.join("、") + " 还没有判定（--result " + bare[0] + "=met 这样逐条写）");
       }
