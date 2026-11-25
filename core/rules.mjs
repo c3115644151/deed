@@ -211,6 +211,8 @@ export const lastBrief = (session, segmentId) =>
 const freshBrief = (session, segment) => {
   const handed = lastBrief(session, segment.id);
   if (!handed) return null;
+  // 撤回过的清单不再是"手上这一份"：它作废了，下一步是重新发一份。
+  if (handed.withdrawnAt !== undefined) return null;
   if (session.reviews.some((one) => one.scope !== "session" && one.brief === handed.brief)) return null;
   const moved = lastSegmentChange(session, segment);
   if (moved !== null && moved > handed.at) return null;
@@ -350,17 +352,33 @@ export function nextAction(doc, config) {
       command: `deed tick --who user --said "…"`,
     };
   }
-  const asks = pendingAsks(session);
-  if (asks.length > 0) {
-    const ask = asks[0];
+  // 段里正在等结论时，这一步排在待裁前面：清单不发出去这一段的活就走不动，
+  // 而待裁是一句话的事——它一直在，不会因为没人裁而消失。
+  const frozenStep = (() => {
+    const open = openSegment(session);
+    if (!open || open.closedAt !== null) return null;
+    const handed = lastBrief(session, open.id);
+    const open_ = handed && handed.answeredBy === null && handed.withdrawnAt === undefined;
+    if (!open_) return null;
     return {
-      who: "user",
-      what: "裁定",
-      text: `${ask.id} · ${ask.text}（我理解成：${ask.reading}）`,
-      command: `deed ask resolve ${ask.id} --decision "…"`,
+      who: "reviewer",
+      what: "落结论",
+      text: `${open.id} 的清单交出去了、还没人回答（${countIn(session, open).total} 条）：判完落结论，这一段才动得了；要改这一段就先撤回这份清单`,
+      command: `deed review --segment ${open.id} --by "你是谁" --verdict pass --result T1=met`,
     };
-  }
+  })();
+  const asks = pendingAsks(session);
   if (session.segments.length === 0) {
+    if (asks.length > 0) {
+      const ask = asks[0];
+      return {
+        who: "user",
+        what: "裁定",
+        text: `${ask.id} · ${ask.text}（我理解成：${ask.reading}）`,
+        command: `deed ask resolve ${ask.id} --decision "…"`,
+      };
+    }
+
     return {
       who: "agent",
       what: "开段",
@@ -495,6 +513,16 @@ export function nextAction(doc, config) {
   }
   // 走到这里只剩一种：审查设置说这一段不用审，而它还没封。免审就是不用审，所以不再
   // 叫一个人去签发假结论——由交付的人写清凭什么不审，签收时这一段会被列出来。
+  // 段里能动的都轮完了，才轮到待裁：一句话的事不该挡住今天该交的那一步。
+  if (asks.length > 0) {
+    const ask = asks[0];
+    return {
+      who: "user",
+      what: "裁定",
+      text: `${ask.id} · ${ask.text}（我理解成：${ask.reading}）`,
+      command: `deed ask resolve ${ask.id} --decision "…"`,
+    };
+  }
   return {
     who: "agent",
     what: "封存",

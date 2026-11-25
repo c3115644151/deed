@@ -22,6 +22,31 @@ export default function review(argv) {
             : "现在没有待审的段",
         );
       if (seg.closedAt) fail("段 " + seg.id + " 已经封存，结论不能再落");
+      // 撤回一份还没被回答的清单：这一段的冻结到此为止，改完再出下一份。它不是"清单过期"
+      // 那种自动判断——是一个人在账本上写下"这一份不作数"，谁写的、为什么都留着。
+      if (flags.withdraw) {
+        if (flags.verdict) fail("--withdraw 与 --verdict 是两件事：撤回这份清单，或者回答它，一次只做一件");
+        if (!flags.by) fail('撤回也要写清谁撤的：--by "…"');
+        if (!flags.why) fail('撤回要说清为什么：--why "…"（这条会留在账本上，读的人靠它知道当时怎么回事）');
+        const handed = lastBrief(one, seg.id);
+        if (!handed) fail("段 " + seg.id + " 还没有发过清单：没有可撤回的那一份");
+        if (handed.withdrawnAt !== undefined) fail("这份清单已经撤回过了：" + handed.brief);
+        if (one.reviews.some((rv) => rv.brief === handed.brief))
+          fail("这份清单已经被回答过（" + handed.brief + "）：结论落过了，撤回它就是把历史改掉");
+        transact(flags, () => ({
+          k: "review.withdraw",
+          s: one.id,
+          segment: seg.id,
+          brief: handed.brief,
+          briefDigest: handed.briefDigest,
+          why: flags.why,
+          by: flags.by,
+        }));
+        console.log("撤回清单 · " + seg.id + " · " + handed.brief + " · " + flags.by);
+        console.log("  " + flags.why);
+        console.log("  这一段回到执行态：可以继续交付；改完再 deed review --segment " + seg.id + " 出下一份清单");
+        return;
+      }
       if (!flags.verdict) {
         // 审查设置说这一段不用审（改动全落在免审路径）：不出清单。出了一份没人需要的卷子，
         // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
@@ -77,6 +102,25 @@ export default function review(argv) {
         return;
       }
       if (!flags.by) fail("review 要给结论就要写清谁审的：--by \"…\"");
+      // 清单发出之后这一段还在被改：先在这里点名，别让一句"记录过期"盖住是哪一条。
+      // 出路只有两条：撤回这份清单接着改，或者把改动交给下一段。
+      const drifted = tasksIn(one, seg).flatMap((task) =>
+        (task.evidence.at(-1)?.files ?? []).flatMap((file) => {
+          let now = null;
+          try {
+            now = digest(fs.readFileSync(path.resolve(ROOT, file.path)));
+          } catch {
+            now = null;
+          }
+          return now === file.digest ? [] : [{ id: task.id, path: file.path, then: file.digest, now }];
+        }),
+      );
+      if (drifted.length > 0)
+        fail(
+          "这一段有交付记录在清单发出之后变过：\n" +
+            drifted.map((one2) => "  " + one2.id + " · " + one2.path + "（记下 " + one2.then.slice(0, 12) + "，现在是 " + (one2.now ? one2.now.slice(0, 12) : "读不到") + "）").join("\n") +
+            "\n要么撤回这份清单接着改（deed review --segment " + seg.id + " --withdraw --why \"…\" --by \"…\"），要么把改动交给下一段再判",
+        );
       auditSegment(doc, one, seg);
       const waiting = tasksIn(one, seg).filter((task) => task.status === "todo");
       if (waiting.length > 0)
@@ -85,6 +129,8 @@ export default function review(argv) {
       // here would pin bytes produced after the reading -- a brief nobody read.
       const handed = lastBrief(one, seg.id);
       if (!handed) fail("这一段还没有清单：先 deed review --segment " + seg.id + " 出清单，再把结论落回来");
+      if (handed.withdrawnAt !== undefined)
+        fail("这一段的那份清单已经撤回（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份，再落结论");
       const file = path.resolve(ROOT, handed.brief);
       if (!fs.existsSync(file)) fail("清单不在了（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份");
       if (digest(fs.readFileSync(file)) !== handed.briefDigest)
@@ -102,6 +148,34 @@ export default function review(argv) {
       if (moved !== null && moved > handed.at)
         fail("这一段在清单出过之后又动过（" + handed.brief + "）：结论只能回答清单上那几条，deed review --segment " + seg.id + " 另出一份再审");
       const findings = list(flags.finding);
+      // 按条落下：每条标准一个判定，判定里带着它判的那几份字节。pass 要求这一段每条都有判定——
+      // "通过了"这句话不该盖着一张没人看过的条目。
+      const bulk = flags["result-all"];
+      if (bulk !== undefined && !["met", "unmet", "unknown"].includes(String(bulk)))
+        fail("--result-all 只认 met／unmet／unknown：" + bulk);
+      if (bulk !== undefined && list(flags.result).length > 0)
+        fail("--result-all 已经是「每一条都这样」：不必再逐条写同样的判定");
+      const rawResults =
+        bulk !== undefined ? tasksIn(one, seg).map((task) => task.id + "=" + String(bulk)) : list(flags.result);
+      const results = rawResults.map((raw) => {
+        const matched = /^([A-Za-z0-9]+)=([a-z]+)(?::(.+))?$/u.exec(String(raw).trim());
+        if (!matched)
+          fail('--result 的写法是 T1=met 或 T2=unmet:为什么（判定只有 met／unmet／unknown）：' + raw);
+        const [, id, verdict, note] = matched;
+        if (!["met", "unmet", "unknown"].includes(verdict))
+          fail("--result 的判定只有 met／unmet／unknown：" + raw);
+        const task = one.tasks.find((one2) => one2.id === id);
+        if (!task) fail("会话 " + one.id + " 里没有 " + id);
+        if (task.segment !== seg.id) fail(id + " 不在段 " + seg.id + " 里（它在 " + task.segment + "），结论只能判这一段的条目");
+        const files = (task.evidence.at(-1)?.files ?? []).map((file) => ({ path: file.path, digest: file.digest }));
+        return { id, verdict, note: note ?? null, files };
+      });
+      if (flags.verdict === "pass") {
+        const judged = new Set(results.map((one2) => one2.id));
+        const bare = tasksIn(one, seg).filter((task) => !judged.has(task.id)).map((task) => task.id);
+        if (bare.length > 0)
+          fail("pass 要每条都判过：" + bare.join("、") + " 还没有判定（--result " + bare[0] + "=met 这样逐条写）");
+      }
       // 一条结论要么放行，要么说清哪几条要重做。不合格而不点名，接到结论的人
       // 只能回来猜——那是把判断留给没看过活的人。
       const rework = split(flags.rework).filter(Boolean);
@@ -129,12 +203,18 @@ export default function review(argv) {
         verdict: flags.verdict,
         brief: handed.brief,
         briefDigest: handed.briefDigest,
+        results,
         findings,
         ...(flags.verdict === "fail" ? { rework, why: flags.why } : {}),
         ...(gaveUp.length > 0
           ? { gaveUp: gaveUp.map((one2) => ({ id: one2.id, why: one2.deferredWhy ?? null })) }
           : {}),
       })).doc;
+      // 审查者的临时区随结论落地销毁：里面的调试文件不是这一段的活，留着只会被人当成这一段的真相。
+      fs.rmSync(path.join(ROOT, ".deed", "tmp", String(handed.brief).split(/[\\/]/).pop().replace(/\.md$/u, "")), {
+        recursive: true,
+        force: true,
+      });
       if (flags.verdict === "pass") {
         console.log("审查通过 · " + seg.id + " · " + flags.by + " · 段已封存");
         console.log("  清单 " + handed.brief);

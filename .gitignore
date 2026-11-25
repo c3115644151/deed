@@ -15,6 +15,9 @@ node_modules/
 /undefined/
 /%SystemDrive%/
 
+# 审查者的临时区：清单发出去时建、结论落地时删；里面的东西不属于工作区。
+.deed/tmp/
+
 # Scratch workspaces used while proving a behavior by hand (drift checks etc.).
 .tmp/
 

@@ -18,6 +18,8 @@ export const EVENT_KINDS = [
   "goal.set",
   "review.brief",
   "review.log",
+  // 清单发出去之后要改这一段的活，先把它撤回：这不是"清单过期"，是一个人在账本上签了"这一份不作数"。
+  "review.withdraw",
   "review.overturn",
   "segment.seal",
   // 只读：旧账本里还有这两种结局，命令面已经不再产生它们（一段的结局由审查者的
@@ -37,7 +39,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 18;
+export const EVENT_VERSION = 19;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -60,6 +62,13 @@ export const MEANING = {
   // 审查只在段里做：签收看的是每段的结论都放行、条件都满足，整期上不再有第二份结论能落。
   // 旧账本里落过的那几行照读（历史事实），既不挡签收，也不再产生新的。
   noWholeReview: 18,
+  // 结论按条落下：一条标准一个判定，pass 只在每条都有判定时才关闭这一段；重审只判没判过与字节变过的。
+  // 之前只有段级 pass/fail，那种行按当时的写法读。
+  perItem: 19,
+  // 清单没被回答之前这一段冻结：交付、撤回、放弃、改到下一段都不收；要改先把清单撤回。
+  freeze: 19,
+  // 撤回一份还没被回答的清单：它作废、段回到执行态，账本上留着谁、为什么。
+  withdraw: 19,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -260,6 +269,27 @@ export function validateEvent(ev, at) {
         if (!Array.isArray(ev.rework) || ev.rework.length === 0)
           throw new Error("review.log 的 fail 要点名要重做的条目（--rework T1,T2）");
       }
+      // 按条落下（第 19 版起）：一条标准一个判定；pass 只在每条都有判定时才说得通，
+      // 缺了哪条由重放拒，免得"通过了"这句话盖着一张没人看过的条目。
+      if (ev.results !== undefined) {
+        if (!Array.isArray(ev.results)) throw new Error("review.log 的 results 要是 [{ id, verdict, note }] 数组");
+        const seen = new Set();
+        for (const one of ev.results) {
+          if (!one || typeof one.id !== "string" || !one.id.trim()) throw new Error("review.log 的 results 每一条都要写清是哪一条（id）");
+          if (!["met", "unmet", "unknown"].includes(one.verdict))
+            throw new Error(`review.log 的 results 判定只能是 met／unmet／unknown：${one.verdict}`);
+          if (seen.has(one.id)) throw new Error(`review.log 的 results 里 ${one.id} 出现了两次：一条标准只有一个判定`);
+          seen.add(one.id);
+          if (one.files !== undefined) {
+            if (!Array.isArray(one.files)) throw new Error("review.log 的 results 里 files 要是 [{ path, digest }] 数组");
+            for (const file of one.files) {
+              if (!file || typeof file.path !== "string" || !file.path.trim()) throw new Error("review.log 的 results 里 files 每条都要有 path");
+              if (!/^[0-9a-f]{64}$/.test(String(file.digest ?? "")))
+                throw new Error(`review.log 的 results 里 ${file.path} 的 digest 要是 64 位小写 hex`);
+            }
+          }
+        }
+      }
       // 被点名之后改主意不做的条目，放行时要把这件事与理由一起记下来：它是这条
       // 结论为什么会过的一部分，只印在当场终端里，读账本的人就看不到。
       if (ev.gaveUp !== undefined) {
@@ -268,6 +298,14 @@ export function validateEvent(ev, at) {
           if (!one || typeof one.id !== "string" || !one.id.trim())
             throw new Error("review.log 的 gaveUp 每一条都要写清是哪一条（id）");
       }
+      break;
+    case "review.withdraw":
+      need(ev, "segment");
+      need(ev, "brief");
+      need(ev, "why");
+      need(ev, "by");
+      if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
+        throw new Error("review.withdraw 的 briefDigest 要是那份清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
       break;
     case "review.overturn":
       need(ev, "review");

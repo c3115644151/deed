@@ -65,7 +65,8 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 要审的段：`deed review --segment S0x.N` 出清单与角色包——清单（审什么）与角色包（怎么审），记一条 `review.brief`，不写结论；结论要求这一段已经全部交付（还有未做的会被拒）。
 - 只有发出去过的清单才能被回答：没发过清单就落结论会被拒；发出去之后那两份字节被改过、或文件不在了，结论也落不下来（`deed review --segment S0x.N` 另出一份，旧的那条记录留着让 `verify` 报）。
 - 结论记的是发出去那一刻两份的 sha256（`briefDigest`+`guideDigest`），不是落结论时现写的一份；`deed verify` 会重算核对。
-- 审查者放行就是这一段的结局：`deed review --segment S0x.N --by 「谁」 --verdict pass` 直接关闭这一段，不需要第二个人签字。判不合格要 `--verdict fail --rework T1,T2 --why 「为什么」`：被点名的条目回到未做，其余保持交付，这一段不关闭。
+- 审查者放行就是这一段的结局：`deed review --segment S0x.N --by 「谁」 --verdict pass --result T1=met`（每条标准一个判定；`--result-all met` 是省写）直接关闭这一段，不需要第二个人签字。判不合格要 `--verdict fail --rework T1,T2 --why 「为什么」`：被点名的条目回到未做，其余保持交付，这一段不关闭。判过的条目下一份清单不再要人重判。
+- 清单发出去、还没人回答的这段时间，这一段冻结：交付、撤回、放弃、改到下一段都不收（新活落进下一段）。要改这一段的活就先撤回这份清单：`deed review --segment S0x.N --withdraw --why 「为什么」 --by 「谁」`。
 - 审查只在段里做：每一段由它自己的结局关闭（结论放行，或 deed seal）。段都关闭、条件都满足，就轮到你签收——整期上不再另有一道审查，`deed review --all` 不是命令。
 - 人只在一份结论错了时出手：`deed judge --overturn R1 --why 「为什么」` 把这条结论作废、这一段重新打开。签收 `deed sign --words 「用户原话」 --by 「谁」`：人在终端里敲可以省 `--by`（账本记 user），从管道里跑必须写清谁按的。
 - 审查设置说这一段不用审（改动只落在免审路径）：`deed seal --why 「凭什么不审」` 关闭这一段。它不是结论，签收时这一段会被列成「没经过审查」。一段的结局只由审查者的结论落：`judge` 只剩 `--overturn`，`--pass`／`--rework` 这两个开关不认了。

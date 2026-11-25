@@ -77,10 +77,12 @@ test("a conclusion older than the last delivery says so on the page", () => {
   assert.doesNotMatch(html, /undefined/);
 });
 
+// 待裁不劫持「下一步」：段里还有该做的事时，页面说的是那一步；待裁照旧列出来。
 test("the page names the next actor instead of listing everything", () => {
   const html = render();
-  assert.match(html, /下一步 · user/);
-  assert.match(html, /裁定/);
+  assert.match(html, /下一步 · agent/);
+  assert.match(html, /记下文件/, "T2 的交付没记下文件：那是该先做的一步，不是待裁");
+  assert.match(html, /A1/, "待裁不因为轮不上就消失");
 });
 
 test("serving is read-only and says so", async () => {
@@ -104,7 +106,7 @@ test("serving is read-only and says so", async () => {
     const state = JSON.parse((await get(port, "/state")).body);
     assert.equal(state.reading, "execute");
     assert.equal(state.events, ledger + configEvents.length, "报的是账本条数，不是轮次");
-    assert.deepEqual(state.next.who, "user");
+    assert.deepEqual(state.next.who, "agent", "段里还有该做的事：下一步是段内那一步，不是待裁");
     assert.equal(state.turns, 1);
     assert.equal(state.session.segment.id, "S01.2");
     assert.deepEqual(state.session.asks, ["A1"]);

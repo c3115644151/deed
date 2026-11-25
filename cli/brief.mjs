@@ -11,7 +11,7 @@ import { fileStamp, stamp0 } from "../lib/format.mjs";
 
 // 角色包：清单说"审什么"，这一份说"怎么审"。它和清单一起交出去，也一起
 // 记下 sha256——换掉其中任何一份，结论就落不下来。
-function guideText(subject, target, briefName) {
+function guideText(subject, target, briefName, scratch) {
   const verdict = "deed review --segment " + target;
   return [
     "# 审查者 · " + subject,
@@ -58,11 +58,21 @@ function guideText(subject, target, briefName) {
     "",
     "被点名的条目回到未做（交付记录退回），其余保持交付；这一段不关闭，补完再交再审。",
     "",
-    "## 你不能",
+    "## 你怎么动手",
     "",
-    "- 不能改代码：动过这一段的活，你的结论就不再是独立的。",
-    "- 不能判自己交付过的活：deed 会拒这条结论。",
-    "- 不能把没达成写成达成来结束这件事。",
+    "可以跑任何命令：跑测试、发请求、读文件、把整个工作区复制到临时区做破坏性实验。",
+    "临时区（清单发出去时开的，落结论时连同里面的一切一起删掉）：",
+    "",
+    "    " + scratch + "",
+    "",
+    "- 在那里造夹具、改一处判断看用例是否真红、跑损坏的数据——随便。",
+    "- 仓库里的东西一个字节都别动：这一段已经冻结在审，你改了这一段的东西，这份清单就不再是现在这一段，",
+    "  结论也落不下来（重放会按当时的字节逐条点名）。要改，是作者的事：他得先撤回这份清单。",
+    "- 别改账本（`.deed/`）：谁说了什么、谁判的，是别人读你的依据。",
+    "- 别替作者修：发现写清楚就够了，改是他下一次交付的事。",
+    "",
+    "每条结论与发现都要配复现路径：命令加实际输出，或 文件:行。没有复现路径的发现，",
+    "读的人只能重做一遍才知道你说得对不对。",
     "",
     "这份角色包和清单一起记进了账本（review.brief + 两份 sha256）：改其中任何一份，结论都落不下来。",
     "",
@@ -151,19 +161,55 @@ function taskBlock(task, batches = new Map()) {
 export function planBrief(root, open, segment, at) {
   const p = ensureDirs(root);
   const tasks = tasksIn(open, segment);
+  // 上一次判过的条目：判过、达成、而且它判的那几份内容今天没变——这次不再重判。
+  const standing = open.reviews.filter((one) => one.voidedAt === null && one.scope === "segment" && one.segment === segment.id).at(-1) ?? null;
+  const judged = new Map((standing?.results ?? []).map((one) => [one.id, one]));
+  const untouched = (task) => {
+    const result = judged.get(task.id);
+    if (!result || result.verdict !== "met") return false;
+    return (result.files ?? []).every((file) => {
+      try {
+        return digest(fs.readFileSync(path.resolve(root, file.path))) === file.digest;
+      } catch {
+        return false;
+      }
+    });
+  };
+  const still = tasks.filter(untouched);
+  const again = tasks.filter((task) => !untouched(task));
+  // 审查者的临时区：清单发出去时开，结论落地时删。它不属于工作区，也不进账本。
+  const scratch = path.join(p.tmp, segment.id + "-" + fileStamp(at));
+  fs.mkdirSync(scratch, { recursive: true });
   const text = [
     "# 审查清单 · " + segment.id,
     "",
-    "会话 " + open.id + " · 段 " + segment.id + " · " + tasks.length + " 条 · 生成于 " + stamp0(at),
+    "会话 " + open.id + " · 段 " + segment.id + " · " + tasks.length + " 条 · 生成于 " + stamp0(at) +
+      (still.length > 0 ? " · 这次要判 " + again.length + " 条（" + still.length + " 条判过了、不再判）" : ""),
     "",
+    ...(still.length > 0
+      ? [
+          "## 判过了、这次不再判",
+          "",
+          ...still.map(
+            (task) =>
+              "- " + task.id + " · " +
+              (judged.get(task.id).verdict === "met" ? "达成" : judged.get(task.id).verdict) +
+              "（" + standing.by + " · " + stamp0(standing.at) + "）· 记下的内容没变",
+          ),
+          "",
+          "这一条判过就是判过：它在上一份清单上被看过，之后它指的那几份内容没被动过。",
+          "",
+        ]
+      : []),
     "## 要审的任务",
     "",
-    ...tasks.flatMap((task) => taskBlock(task, batchInfo(tasks))),
+    ...again.flatMap((task) => taskBlock(task, batchInfo(tasks))),
     "## 怎么审",
     "",
     "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
     "2. 只看这一段的任务，不替它补未来的事。",
-    "3. 结论落盘：deed review --segment " + segment.id + " --by \"<你是谁>\" --verdict pass|fail --finding \"<不合格的那几条>\"",
+    "3. 每条标准给一个判定，落结论时逐条写：--result T1=met --result T2=unmet；pass 要求这一段每条都有判定。",
+    "4. 结论落盘：deed review --segment " + segment.id + " --by \"<你是谁>\" --verdict pass|fail --finding \"<不合格的那几条>\"",
     "",
     "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
     "",
@@ -176,7 +222,7 @@ export function planBrief(root, open, segment, at) {
     n += 1;
     file = base(n) + ".md";
   }
-  const guide = guideText("段 " + segment.id, segment.id, path.basename(file));
+  const guide = guideText("段 " + segment.id, segment.id, path.basename(file), scratch);
   return {
     file,
     text,

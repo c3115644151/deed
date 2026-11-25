@@ -96,7 +96,14 @@ function nextSegment(session, at, carried = false) {
 // 这一段手上那份清单还没人回答：它就是等结论的样子。清单里写新条目时也要问同一句
 // ——新条目落不落进这一段，只由这里说得算。
 export const awaitingVerdict = (session, segment) =>
-  (session.briefs ?? []).some((one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null);
+  (session.briefs ?? []).some(
+    (one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null && one.withdrawnAt === undefined,
+  );
+
+// 清单没被回答之前，这一段是冻结的：要么审，要么先把清单撤回再改。从账本含义第 19 版
+// 起这么读；旧行按当时的样子重放——那时边审边改是允许的，拿今天的话去判它们是坏账。
+const frozenFor = (session, segmentId, meaning) =>
+  meaning >= MEANING.freeze && awaitingVerdict(session, session.segments.find((one) => one.id === segmentId));
 
 // 预备段只有一个：已经接着活的那个就是它，后来改到下一段的、新写的都往里放。
 // 「改到下一段的条目」若每次都开一个新段，一次讨论改三批就成了三段，等结论期间谁也说不清
@@ -236,6 +243,10 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        if (frozenFor(session, task.segment, meaningOf(ev)))
+          noway(
+            `${task.segment} 的清单已经发出去、还没人回答：这一段在审，不能交付（要改先把清单撤回：deed review --segment ${task.segment} --withdraw --why "…"）`,
+          );
         task.touchedAt = ev.at;
         if (task.status !== "todo" && task.status !== "done")
           noway(`任务 ${task.id} 不在未做状态：${task.status}`);
@@ -283,6 +294,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        if (frozenFor(session, task.segment, meaningOf(ev)))
+          noway(`${task.segment} 在审：撤回也是改这一段的内容，等结论或先撤回清单`);
         task.touchedAt = ev.at;
         // 撤回也可以是撤回一条放弃/延后：账本只追加，撤的是它此刻的效力，不是那一行
         // 记录。放弃错了却只能新开一条，等于让账本里的错口径一直挂着，而新开的那条
@@ -336,6 +349,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        if (frozenFor(session, task.segment, meaningOf(ev)))
+          noway(`${task.segment} 在审：「改到下一段」也是改这一段的内容，等结论或先撤回清单`);
         if (task.status !== "todo")
           noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能改到下一段`);
         // 一批改到下一段会连着写好几十行：预备段接过活就接着往里放，
@@ -367,6 +382,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        if (frozenFor(session, task.segment, meaningOf(ev)))
+          noway(`${task.segment} 在审：延后与放弃也是改这一段的内容，等结论或先撤回清单`);
         task.order = ev.order;
         task.touchedAt = ev.at;
         break;
@@ -376,6 +393,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
+        if (frozenFor(session, task.segment, meaningOf(ev)))
+          noway(`${task.segment} 在审：延后与放弃也是改这一段的内容，等结论或先撤回清单`);
         task.status = ev.k === "task.defer" ? "deferred" : "dropped";
         task.deferredWhy = ev.why;
         task.touchedAt = ev.at;
@@ -431,6 +450,23 @@ export function fold(events) {
           by: ev.by ?? null,
           answeredBy: null,
         });
+        break;
+      }
+      // 撤回一份还没被回答的清单：它不是"过期"，是一个人在账本上签了"这一份不作数"。
+      // 撤回之后这一段回到执行态，可以继续改；清单本身留着（谁、为什么撤回都在这一行）。
+      case "review.withdraw": {
+        const session = sessionOf(doc, ev);
+        const segment = segmentById(session, ev.segment);
+        if (segment.closedAt !== null) noway(`段 ${segment.id} 已经关闭：没有正在等结论的清单可撤回`);
+        const handed = session.briefs.find(
+          (one) => one.scope === "segment" && one.segment === segment.id && one.brief === ev.brief,
+        );
+        if (!handed) noway(`这一段的清单里没有 ${ev.brief}：撤回的是发出去过的那一份`);
+        if (handed.answeredBy !== null) noway(`${ev.brief} 已经被回答过了：撤回答不了的旧话，账本只往后加`);
+        if (handed.withdrawnAt !== undefined) noway(`${ev.brief} 已经撤回过了`);
+        handed.withdrawnAt = ev.at;
+        handed.withdrawnBy = ev.by;
+        handed.withdrawnWhy = ev.why;
         break;
       }
       case "review.log": {
@@ -510,6 +546,19 @@ export function fold(events) {
             noway(`签收核对点名的是段（${id} 不是段）：段里的条目由那一段的审查者点名`);
           }
         }
+        // 按条落下：判了几条、每条的判定与它判的那几份字节。缺了哪条 pass 就不成立。
+        const results = (ev.results ?? []).map((one) => ({
+          id: one.id,
+          verdict: one.verdict,
+          note: one.note ?? null,
+          files: (one.files ?? []).map((file) => ({ path: file.path, digest: file.digest })),
+        }));
+        if (meaning >= MEANING.perItem && ev.verdict === "pass") {
+          const judged = new Set(results.map((one) => one.id));
+          const bare = inScope.filter((one) => !judged.has(one.id)).map((one) => one.id);
+          if (bare.length > 0)
+            noway(`pass 要每条都判过：${bare.join("、")} 还没有判定（--result T1=met 这样逐条写）`);
+        }
         const id = `R${session.reviews.length + 1}`;
         // Every live verdict is replaced explicitly, so two conclusions never
         // both claim to be the current one.
@@ -527,6 +576,7 @@ export function fold(events) {
           brief: ev.brief,
           briefDigest: ev.briefDigest ?? null,
           findings: ev.findings ?? [],
+          results,
           rework,
           gaveUp: ev.gaveUp ?? [],
           v: meaningOf(ev),
