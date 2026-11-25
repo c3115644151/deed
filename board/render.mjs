@@ -16,6 +16,7 @@ import {
   nextAction,
   openSegment,
   pendingAsks,
+  periodReviewOf,
   reading,
   reviewOf,
   reviewState,
@@ -391,7 +392,7 @@ function acceptScreen(doc, session, config, zone, on) {
   const asks = session ? pendingAsks(session) : [];
   const blocks = signBlockers(doc, session, config);
   const unreviewed = segments.filter((segment) => segment.verdict === "exempt");
-  const sealed = segments.filter((segment) => segment.closedAt && segment.verdict !== "exempt");
+  const sealed = segments.filter((segment) => segment.closedAt !== null);
   const todo = tasks.filter((task) => task.status === "todo").length;
   const cards = [...segments]
     .reverse()
@@ -407,7 +408,10 @@ function acceptScreen(doc, session, config, zone, on) {
         '<article class="vcard" data-kind="' + kind + '">' +
         '<div class="vhead"><span class="vid">' + esc(segment.id) + "</span>" +
         '<span class="vword">' + esc(word) + "</span>" +
-        '<span class="vmeta">' + (review ? esc(review.by) + " · " + when(review.at, zone) : "还没有结论") + "</span>" +
+        '<span class="vmeta">' +
+          (review ? esc(review.by) + " · " + when(review.at, zone)
+            : segment.verdict === "exempt" ? "免审 · " + (segment.sealedWhy ? esc(segment.sealedWhy) : "当时没写理由")
+            : "还没有结论") + "</span>" +
         '<span class="vcount">' + count.total + " 条 · " + (review ? "点了 " + review.findings.length + " 条" : "没有发现") + "</span>" +
         "</div>" +
         (review
@@ -415,10 +419,32 @@ function acceptScreen(doc, session, config, zone, on) {
             (review.rework && review.rework.length ? '　<span class="k">退回</span>' + esc(review.rework.join("、")) : "") + "</p>"
           : "") +
         (review && review.findings.length ? '<div class="fds">' + findingList(review.findings) + "</div>" : "") +
+        (review && !review.voidedAt && !(session && session.closeKind)
+          ? '<form class="gate small" data-gate="overturn" data-review="' + esc(review.id) + '">' +
+            '<input class="gwhy" type="text" placeholder="推翻它 · 为什么" aria-label="推翻这条结论的理由">' +
+            '<button class="gpress" type="submit">推翻 ' + esc(review.id) + "</button></form>"
+          : "") +
         "</article>"
       );
     })
     .join("");
+  // 期审的结论回答的是这一期，它没有自己那一段卡片：单独摆一张，推翻那一下也在这里。
+  const period = session ? periodReviewOf(session) : null;
+  const periodCard = period
+    ? '<article class="vcard" data-kind="' + (period.verdict === "pass" ? "pass" : "fail") + '">' +
+      '<div class="vhead"><span class="vid">' + esc(session.id) + " 期审</span>" +
+      '<span class="vword">' + (period.verdict === "pass" ? "放行" : "不合格") + "</span>" +
+      '<span class="vmeta">' + esc(period.by) + " · " + when(period.at, zone) + "</span>" +
+      '<span class="vcount">' + esc(String(period.brief).split(/[\\/]/).pop()) + "</span></div>" +
+      (period.rework && period.rework.length ? '<p class="vbrief"><span class="k">退回</span>' + esc(period.rework.join("、")) + "</p>" : "") +
+      (period.findings.length ? '<div class="fds">' + findingList(period.findings) + "</div>" : "") +
+      (!period.voidedAt && !session.closeKind
+        ? '<form class="gate small" data-gate="overturn" data-review="' + esc(period.id) + '">' +
+          '<input class="gwhy" type="text" placeholder="推翻它 · 为什么" aria-label="推翻这条结论的理由">' +
+          '<button class="gpress" type="submit">推翻 ' + esc(period.id) + "</button></form>"
+        : "") +
+      "</article>"
+    : "";
   const signed = session && session.sign;
   const goal = session ? goalOf(session) : null;
   const settled = session ? edges(session) : [];
@@ -428,7 +454,7 @@ function acceptScreen(doc, session, config, zone, on) {
     (goal ? '<p class="goal"><span class="k">这一期要做成什么</span>' + esc(goal) + "</p>" : "") +
     '<div class="cols">' +
     '<div class="col">' +
-    '<h3 class="colh">结论</h3>' + (cards || '<p class="quiet">还没有审查结论</p>') +
+    '<h3 class="colh">结论</h3>' + (periodCard || "") + (cards || '<p class="quiet">还没有审查结论</p>') +
     (settled.length
       ? '<h3 class="colh">定过的边界与不做</h3><ul class="edges">' +
         settled.map((one) => '<li class="edge"><span class="ekind">' + (one.kind === "border" ? "边界" : "弃") + "</span>" + esc(one.text) +
@@ -439,17 +465,21 @@ function acceptScreen(doc, session, config, zone, on) {
     '<aside class="col side">' +
     '<h3 class="colh">签收</h3>' +
     '<ul class="checks">' +
-    check(sealed.length === segments.length, "每一段都判过", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没判" : "") +
+    check(sealed.length === segments.length, "每一段都有结局", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没判" : "") +
     check(todo === 0, "没有未做的条目", todo ? "还有 " + todo + " 条" : "") +
     check(asks.length === 0, "没有等裁定的问题", asks.length ? "还有 " + asks.length + " 条待裁（" + asks.map((one) => one.id).join("、") + "）" : "") +
-    check(blocks.length === 0 && (!session || !!signed || sealed.length === segments.length), "没有挡住的项", blocks.length ? blocks.length + " 条，见下" : "") +
+    check(blocks.length === 0, "没有挡住的项", blocks.length ? blocks.length + " 条，见下" : "") +
     "</ul>" +
     (signed
       ? '<p class="signwords">「' + esc(signed.words) + '」</p><p class="quiet">' + esc(signed.by) + " · " + when(signed.at, zone) + "</p>"
       : blocks.length
         ? '<ul class="blockers">' + blocks.map((one) => "<li>" + esc(one) + "</li>").join("") + "</ul>" +
-          '<p class="quiet">先把上面挡路的清掉，再签这一句原话</p>' + cmd('deed sign --words "你的原话"')
-        : '<p class="ok">签收可行 · 该结的都结了</p>' + cmd('deed sign --words "你的原话"')) +
+          '<p class="quiet">先把上面挡路的清掉，再签这一句原话</p>'
+        : '<p class="ok">签收可行 · 该结的都结了</p>' +
+          '<form class="gate" data-gate="sign">' +
+          '<input class="gwords" type="text" placeholder="这一句就是你的原话" aria-label="签收要说的一句话">' +
+          '<button class="gpress" type="submit">签收这一期</button></form>' +
+          '<p class="quiet">按下去只写一行账：谁、什么时候、说了什么。命令行那条路已经关了。</p>') +
     (unreviewed.length
       ? '<p class="k">没经过审查</p><ul class="exempts">' +
         unreviewed.map((segment) => "<li>" + esc(segment.id) + (segment.sealedWhy ? " · " + esc(segment.sealedWhy) : "") + "</li>").join("") +
@@ -493,7 +523,7 @@ function footer(doc, session, config, sign, state, live) {
     : null;
   return (
     '<footer class="foot">' +
-    '<span class="fk">账本</span><span>.deed/log · 只读</span>' +
+    '<span class="fk">账本</span><span>.deed/log · 只追加</span>' +
     (tally
       ? '<span class="ft">已判 ' + tally.accepted + "　待判 " + tally.done + "　未做 " + tally.todo + "　延后 " + tally.deferred + "　放弃 " + tally.dropped + "</span>"
       : "") +
@@ -840,6 +870,18 @@ html[data-theme="light"] body {
 .blockers li::before { content: ""; position: absolute; left: 0; top: 11px; width: 4px; height: 4px; background: currentColor; }
 .ok { margin: 4px 0; font-family: var(--mono); font-size: 11px; color: var(--signal); }
 .signwords { margin: 6px 0 2px; font-size: 14px; color: var(--ink); border-left: 2px solid var(--signal); padding-left: 10px; }
+.gate { display: flex; gap: 6px; margin: 8px 0 4px; }
+.gate input { flex: 1; min-width: 0; background: transparent; border: 1px solid var(--line2); color: var(--ink);
+  font: inherit; font-size: 12px; padding: 5px 8px; border-radius: 2px; }
+.gate input::placeholder { color: var(--dim); }
+.gate input:focus { outline: none; border-color: var(--signal); }
+.gpress { border: 1px solid var(--signal); background: transparent; color: var(--signal); font: inherit;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding: 5px 10px; cursor: pointer; border-radius: 2px;
+  white-space: nowrap; }
+.gpress:hover { background: var(--signal); color: var(--bg); }
+.gpress:disabled { opacity: .5; cursor: default; }
+.gate.small { margin-top: 8px; }
+.gate.small .gpress { font-size: 10px; padding: 4px 8px; }
 .exempts { list-style: none; margin: 0; padding: 0; }
 .exempts li { font-size: 11.5px; color: var(--dim); padding: 2px 0; }
 
@@ -920,6 +962,29 @@ document.addEventListener("click", (event) => {
     tool.textContent = dark ? "暗" : "明";
     tool.setAttribute("aria-pressed", dark ? "true" : "false");
   }
+});
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-gate]");
+  if (!form) return;
+  event.preventDefault();
+  const action = form.getAttribute("data-gate");
+  const body = { action };
+  if (action === "sign") body.words = (form.querySelector(".gwords") || {}).value || "";
+  if (action === "overturn") {
+    body.review = form.getAttribute("data-review");
+    body.why = (form.querySelector(".gwhy") || {}).value || "";
+  }
+  const button = form.querySelector(".gpress");
+  if (button) button.disabled = true;
+  fetch("/gate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+    .then((response) => response.json().then((answer) => ({ ok: response.ok && answer.ok, why: answer.why })))
+    .then((answer) => {
+      if (button) button.disabled = false;
+      if (answer.ok) { say("已经记下 · 跟着账本刷新"); return; }
+      if (form.querySelector(".gwords")) form.querySelector(".gwords").value = "";
+      say(answer.why || "按不下去");
+    })
+    .catch(() => { if (button) button.disabled = false; say("面板没连上"); });
 });
 document.addEventListener("keydown", (event) => {
   const map = { 1: "discuss", 2: "execute", 3: "accept" };

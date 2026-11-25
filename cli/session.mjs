@@ -434,7 +434,7 @@ export function optionalBlock(config) {
   return [
     " 接下来这几件都能现在做完（都可选，不做也不会坏）：",
     "   规则     deed init --print-agents  → 原样粘进 AGENTS.md 或 CLAUDE.md（deed 不写那个文件）",
-    "   面板     deed serve                → 本机只读 http://127.0.0.1:" + port,
+    "   面板     deed serve                → 本机 http://127.0.0.1:" + port + "（只读 + 签收与推翻两个闸）",
     "   体检     deed doctor               → 账本坏在哪、接入还缺什么",
     "   审查设置     deed gate                 → 看这个工作区的门（没有门时它会说没有，并给一行写法）",
     "   改审查设置   deed init --force --review \"…\" --exempt \"…\" --port " + port + " --why \"为什么改\"",

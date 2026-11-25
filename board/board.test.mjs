@@ -8,6 +8,8 @@ import { append } from "../lib/store.mjs";
 import { renderBoard, when } from "../board/render.mjs";
 import { start } from "../board/serve.mjs";
 import { workspace } from "../support/lib.mjs";
+import { spawnSync } from "node:child_process";
+import { readEvents } from "../lib/store.mjs";
 
 const config = { review: { required: ["core/**"], exempt: ["docs/**"] }, board: { port: 0 } };
 const T = (n) => new Date(Date.UTC(2026, 10, 22, 10, n)).toISOString();
@@ -142,6 +144,13 @@ test("serving is read-only and says so", async () => {
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+// 挡着的时候不画按钮：条件不满足的闸只在边上说明为什么，不给人一个按不下去的位置。
+test("a gate that cannot be pressed is not drawn", () => {
+  const html = render();
+  assert.doesNotMatch(html, /data-gate="sign"/, "这一期还欠着交付：没有签收的按钮");
+  assert.match(html, /先把上面挡路的清掉/);
 });
 
 test("a notice is an input to the page, not something the page looks up", () => {
@@ -330,4 +339,72 @@ test("the accept screen lists the borders a decision drew", () => {
   assert.match(html, /导出不做了/);
   assert.match(html, /<span class="ekind">边界</);
   assert.match(html, /<span class="ekind">弃</);
+});
+
+// 面板只多收一个写入口：/gate。签收就是从这里落的——命令行那条路已经关了，
+// 账本上要读得出是谁在页面上按的那一下。
+test("the one write the panel accepts is a gate, and signing happens there", async () => {
+  const root = workspace("gate-panel");
+  const run = (...args) =>
+    spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "cli", "deed.mjs"), ...args], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, DEED_NO_PANEL: "1" },
+    });
+  run("init", "--said", "开始", "--exempt", "docs/**");
+  run("task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+  fs.writeFileSync(path.join(root, "docs", "a.md"), "a\n");
+  run("task", "done", "T1", "--evidence", "写完了", "--digest", "docs/a.md");
+  assert.equal(run("seal", "--why", "只改了文档", "--by", "agent").status, 0);
+  assert.equal(run("review", "--all", "--by", "period-1").status, 0);
+  assert.equal(run("review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+
+  const server = start(root, 0);
+  await new Promise((resolve) => server.once("listening", resolve));
+  const port = server.address().port;
+  const post = (body, headers = {}) =>
+    new Promise((resolve) => {
+      const req = http.request(
+        { host: "127.0.0.1", port, method: "POST", path: "/gate", headers: { "content-type": "application/json", ...headers } },
+        (res) => {
+          let text = "";
+          res.on("data", (chunk) => (text += chunk));
+          res.on("end", () => resolve({ status: res.statusCode, body: text ? JSON.parse(text) : null }));
+        },
+      );
+      req.end(JSON.stringify(body));
+    });
+  try {
+    const page = await get(port, "/");
+    assert.match(page.body, /data-gate="sign"/, "闸开着的这一页上有那个按钮，没有一串要人抄回命令行的字");
+    assert.match(page.body, /data-gate="overturn"[^>]*data-review="R[0-9]+"/, "期审结论在案：推翻那一下也在页面上");
+    assert.doesNotMatch(page.body, /deed sign --words/, "签收不再写在页面上让人去命令行里敲");
+
+    const foreign = await post({ action: "sign", words: "可以" }, { origin: "http://evil.example" });
+    assert.equal(foreign.status, 403, "别的站点发来的按不动");
+
+    const empty = await post({ action: "sign", words: "   " });
+    assert.equal(empty.status, 400);
+    assert.match(empty.body.why, /原话/);
+
+    const pressed = await post({ action: "sign", words: "可以，就这样" });
+    assert.equal(pressed.status, 200, JSON.stringify(pressed.body));
+    const signed = fold(readEvents(root)).sessions[0];
+    assert.equal(signed.closeKind, "signed");
+    assert.equal(signed.sign.words, "可以，就这样");
+    assert.equal(signed.sign.by, "user", "按下的人是用户");
+    assert.equal(signed.sign.via, "panel", "账本要读得出这一下是从哪按的");
+
+    const again = await post({ action: "sign", words: "再签一次" });
+    assert.equal(again.status, 400, "签过的一期不再有闸");
+    assert.match(again.body.why, /签收|搁下/);
+
+    // 条件不满足就不画那个按钮：签过的一期上没有签收闸，也没有可推翻的结论。
+    const after = await get(port, "/");
+    assert.doesNotMatch(after.body, /data-gate="sign"/);
+    assert.doesNotMatch(after.body, /data-gate="overturn"/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

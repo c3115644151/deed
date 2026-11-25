@@ -76,11 +76,11 @@ export const SPEC = {
   },
   judge: {
     flags: ["overturn", "why", "by"],
-    usage: ['deed judge --overturn R1 --why "…"    推翻一条在案的结论（例外，不是步骤）'],
+    usage: ["deed judge    只说一句：这两条闸改到面板上了（命令行不再提供）"],
   },
   sign: {
     flags: ["words", "title", "by", "session"],
-    usage: ['deed sign --words "<用户原话>" [--title "<这一期的名字>"]'],
+    usage: ["deed sign    只说一句：签收在面板上按（命令行不再提供）"],
   },
   shelve: {
     flags: ["why", "by", "session"],

@@ -521,7 +521,7 @@ export function nextAction(doc, config) {
       who: "user",
       what: "签收",
       text: blockers.length === 0 ? `${session.id} 的任务都判过了，等你一句话结束` : blockers.join("；"),
-      command: `deed sign --words "<你的原话>" --title "第 ${doc.sessions.length} 期"`,
+      command: "deed panel",
     };
   }
   if (count.todo > 0) {
@@ -602,8 +602,7 @@ export function nextAction(doc, config) {
         who: "agent",
         what: "清结论",
         text,
-        command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
-      };
+        };
     }
     // 手上那份清单是审查者的活：清单发出去、还没人回答，下一步是落结论，不是再发一份。
     const handed = freshBrief(session, segment);
@@ -620,7 +619,7 @@ export function nextAction(doc, config) {
         who: "agent",
         what: "清结论",
         text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，只能由人推翻那条结论，或者开新一期`,
-        command: `deed judge --overturn ${review.id} --why "…" --by "…"`,
+        command: "deed panel",
       };
     // 点名的条目改主意不做了：没有活可以重交，放行落下来会把它记为放弃并留下理由。
     const gave = named.filter((one) => one.status === "dropped");
@@ -669,7 +668,7 @@ export function sealBlockers(config, session, segment = openSegment(session)) {
     blockers.push(`还有 ${count.todo} 条没交付（${session.tasks.filter((one) => one.segment === segment.id && one.status === "todo").map((one) => one.id).join("、")}）`);
   const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
   if (live.length > 0)
-    blockers.push("这一段已经有审查结论：结局由那份结论定（deed judge --overturn 只用来推翻它）");
+    blockers.push("这一段已经有审查结论：结局由那份结论定（推翻它只能在面板上按）");
   if (needsReview(config, session, segment))
     blockers.push(`这一段按审查设置要审：结局得由审查者的结论落（deed review --segment ${segment.id}）`);
   return blockers;

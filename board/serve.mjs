@@ -12,6 +12,7 @@ import { readEvents } from "../lib/store.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { wordsNotice } from "../lib/words.mjs";
 import { renderBoard, when } from "./render.mjs";
+import { applyGate } from "./gates.mjs";
 import { buildNow, clearPanel, recordPanel } from "../lib/panel.mjs";
 
 function snapshot(root) {
@@ -59,9 +60,52 @@ export function handler(root, onRequest = () => {}) {
   return (req, res) => {
     onRequest();
     const url = new URL(req.url, "http://localhost");
+    // 面板只多收一个写入口：/gate（那三个闸）。别的路径照旧只读。
+    if (req.method === "POST") {
+      if (url.pathname !== "/gate") {
+        res.writeHead(405, { allow: "GET, HEAD, POST /gate", "content-type": "text/plain; charset=utf-8" });
+        res.end("只读：这个面板只收 /gate 这一处写入\n");
+        return;
+      }
+      // 只在跑它的这台机器上按：来源要是指向它自己的页面，也不许跨站。
+      const peer = req.socket.remoteAddress ?? "";
+      const local = peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
+      const origin = req.headers.origin ?? "";
+      const host = req.headers.host ?? "";
+      const same = !origin || origin.replace(/^https?:\/\//u, "") === host;
+      if (!local || !same) {
+        res.writeHead(403, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, why: "这个闸只在这台机器上的这一页里按" }) + "\n");
+        return;
+      }
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+        if (body.length > 8192) req.destroy();
+      });
+      req.on("end", () => {
+        let asked;
+        try {
+          asked = body ? JSON.parse(body) : {};
+        } catch {
+          res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, why: "看不懂这一行" }) + "\n");
+          return;
+        }
+        try {
+          const { ev } = applyGate(root, asked);
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+          res.end(JSON.stringify({ ok: true, kind: ev.k, by: ev.by, via: ev.via }) + "\n");
+        } catch (error) {
+          res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, why: String(error.message ?? error) }) + "\n");
+        }
+      });
+      return;
+    }
     if (req.method !== "GET" && req.method !== "HEAD") {
-      res.writeHead(405, { allow: "GET, HEAD", "content-type": "text/plain; charset=utf-8" });
-      res.end("只读：这个面板不接受写入\n");
+      res.writeHead(405, { allow: "GET, HEAD, POST /gate", "content-type": "text/plain; charset=utf-8" });
+      res.end("只读：这个面板只收 /gate 这一处写入\n");
       return;
     }
     if (url.pathname === "/") {
@@ -213,7 +257,7 @@ export function start(root, port) {
     recordPanel(root, { pid: process.pid, port: actual, build: buildNow() });
     lastRequest = Date.now();
     console.log(`契约页 http://127.0.0.1:${actual}`);
-    console.log("  只读：命令由人执行，页面只呈现当前事实");
+    console.log("  只读 + 三个闸：命令由人执行；页面上只有签收与推翻能写账本，按下去记下谁、什么时候");
   };
   server.listen(port, "127.0.0.1", ready);
   return server;

@@ -181,7 +181,7 @@ export default function review(argv) {
         if (!hand)
           fail('这一段要交给谁判：--by "这一段的审查者"（之后这一段的清单都写他——同一段的判断不该每次换个人从头摸一遍）');
         if (before?.by && before.by !== hand && !maySwitch(one, seg.id))
-          fail("这一段已经交给 " + before.by + " 判了：段审一直用同一双手（要换手先由人推翻那条结论：deed judge --overturn <R> --why \"…\"）");
+          fail("这一段已经交给 " + before.by + " 判了：段审一直用同一双手（要换手先由人在面板上推翻那条结论）");
         // 审查设置说这一段不用审（改动全落在免审路径）：不出清单。出了一份没人需要的卷子，
         // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
         if (!needsReview(doc.config, one, seg)) {

@@ -1,27 +1,12 @@
-import { debt, exemptSegments, signBlockers } from "../../core/rules.mjs";
-import { parse, load, transact, targetSession, fail, guard, period, show, signer } from "../session.mjs";
+import { guard, fail } from "../session.mjs";
 
-export default function sign(argv) {
-    const { flags } = parse(argv, "sign");
+// 签收是三个闸之一：它只在面板上按。命令行这条路关掉，是因为账本上必须读得出
+// 「人按的」——程序跑的命令与人在页面上按的那一下，落款要分得开。
+export default function sign() {
     guard(() => {
-      const { doc } = load();
-      const one = targetSession(doc, flags);
-      const blockers = signBlockers(doc, one, doc.config);
-      if (blockers.length > 0) fail("还不能签收：" + blockers.join("；"));
-      if (!flags.words) fail("签收要留用户原话：--words \"…\"");
-      const title = flags.title ?? period(doc);
-      transact(flags, () => ({ k: "sign", s: one.id, words: flags.words, title, by: signer(flags, "签收") }));
-      console.log("签收 · " + one.id + " · " + title + " · 「" + flags.words + "」");
-      // 没人审过的段不能被静默放过：签收这一刻把它们摆出来。
-      const unread = exemptSegments(one);
-      if (unread.length > 0)
-        console.log(
-          "  没经过审查 · " +
-            unread.map((s) => (s.sealedWhy ? s.id + "（" + s.sealedWhy + "）" : s.id)).join("、"),
-        );
-      const owed = debt(one);
-      if (owed.deferred.length + owed.dropped.length > 0)
-        console.log("  带着走的未结项 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
-      console.log("  会话封存，下一轮对话会自己开新期");
+      fail(
+        "签收不在命令行做：打开面板（deed panel）在验收屏写下那句原话、按下「签收这一期」。\n" +
+          "  账本上会记下谁、什么时候、说了什么；这一行只有一个来源。",
+      );
     });
 };

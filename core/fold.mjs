@@ -435,7 +435,7 @@ export function fold(events) {
         // 签收核对的清单覆盖整期：它没有段这一格，也不该被某一段的封存挡在外面。
         const segment = scope === "session" ? null : segmentById(session, ev.segment);
         if (segment && sealed(segment))
-          noway(`段 ${segment.id} 已经封存：要再审先由人推翻那份结论（deed judge --overturn <R> --why "…"）`);
+          noway(`段 ${segment.id} 已经封存：要再审先由人推翻那份结论（在面板上推翻那条结论）`);
         session.briefs.push({
           scope,
           goal: ev.goal ?? null,
@@ -516,11 +516,11 @@ export function fold(events) {
                 .map((task) => task.id);
           if (named.length === 0)
             noway(
-              `${subject} 在案的结论是不合格（${latest.by}）：它没点名要重做的条目，没有可结清的东西——要改判先由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"），再重新审`,
+              `${subject} 在案的结论是不合格（${latest.by}）：它没点名要重做的条目，没有可结清的东西——要改判先由人推翻那条结论（在面板上推翻那条结论），再重新审`,
             );
           if (stuck.length > 0)
             noway(
-              `${subject} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（deed judge --overturn ${latest.id} --why "…"）`,
+              `${subject} 在案的不合格（${latest.by}）还没结清：${stuck.join("、")} 得先重新交付，或者由人推翻那条结论（在面板上推翻那条结论）`,
             );
         }
         // 这条新记录自己带的是哪一版的含义：第 3 版起 pass 自己关闭这一段、fail 必须点名。
@@ -800,6 +800,8 @@ export function fold(events) {
           session.title = ev.title;
           session.words = ev.words;
           session.closeKind = "signed";
+          // 谁按的这一下、从哪按的：命令行不给这条路，账本要读得出是人按的。
+          session.sign = { words: ev.words, by: ev.by ?? null, via: ev.via ?? null, at: ev.at };
         } else {
           session.closeKind = "shelved";
           session.words = ev.why;
