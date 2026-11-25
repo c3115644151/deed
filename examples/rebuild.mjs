@@ -65,4 +65,4 @@ deed("ask", "这一段要不要现在审？", "--reading", "等 T7 交付再审"
 
 console.log(deed("state"));
 console.log("");
-console.log(deed("verify"));
+console.log(deed("doctor"));

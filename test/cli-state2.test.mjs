@@ -129,7 +129,7 @@ test("--version answers with the version this program ships as", () => {
 // 2) --help for a verb with no arguments
 test("asking a verb that takes no arguments answers with its line, not the whole page", () => {
   const cwd = workspace("usage-noargs");
-  for (const verb of ["state", "verify", "doctor"]) {
+  for (const verb of ["state", "doctor"]) {
     const run = deed(cwd, verb, "--help");
     assert.equal(run.status, 0);
     assert.equal(run.stdout.trim(), "deed " + verb, verb + " --help 只该打这一行");
@@ -265,7 +265,7 @@ test("a verb that takes no flags still says so instead of ignoring them", () => 
   // 只读动词以前不过开关表：拼错的开关被当成没写，命令照常 exit 0。
   const cwd = workspace("readonly-flags");
   deed(cwd, "init", "--said", "起点");
-  for (const verb of ["state", "verify", "doctor"]) {
+  for (const verb of ["state", "doctor"]) {
     const one = deed(cwd, verb, "--digset", "a.md");
     assert.equal(one.status, 1, verb + " 带了不认的开关却说没事：" + one.stdout);
     assert.match(one.stderr, /不认 --digset/);

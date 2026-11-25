@@ -185,50 +185,6 @@ export function transactMany(flags, buildAll, commit) {
   });
 }
 
-// 「先做后记」：一条交付记下的文件，如果它最后一次写入的时刻早于这条任务
-// 被写进账本的时刻，那这条任务是追认已经做完的事，不是先答应再做。账本里的时刻
-// 改不了；这里拿文件的写入时刻对一次，只报事实——不是坏账，是账本和事实对不上。
-export function lateWork(root, doc) {
-  const git = (args) => {
-    const one = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-    return one.status === 0 ? one.stdout.trim() : null;
-  };
-  // 只在 git 工作区里比。mtime 只在能被 git 解释的工作树里代表「写下来的时刻」：
-  // 从别处拷来的、解压出来的、检出出来的目录，mtime 是文件被挪进来的时刻，比任务被记下
-  // 的时刻早晚都没有意义。没有 git 就整段不报，也不报错。
-  if (git(["rev-parse", "--is-inside-work-tree"]) !== "true") return [];
-  const seen = new Map();
-  // 比的是文件的最后写入时刻：提交时刻总在任务被记下之后（先写、再记、再提交），
-  // 拿它来比永远看不出这件事。代价是 clone 出来的工作副本 mtime 全是检出时刻，
-  // 这条检查在那种副本上不报——报不出来的方向是安静，不是诬告。
-  const when = (file) => {
-    if (!seen.has(file)) {
-      try {
-        seen.set(file, fs.statSync(path.resolve(root, file)).mtimeMs);
-      } catch {
-        seen.set(file, null);
-      }
-    }
-    return seen.get(file);
-  };
-  const late = [];
-  for (const session of doc.sessions) {
-    for (const task of session.tasks) {
-      const last = task.evidence[task.evidence.length - 1];
-      if (!last) continue;
-      const recorded = Date.parse(task.createdAt);
-      if (!Number.isFinite(recorded)) continue;
-      for (const pin of last.files ?? []) {
-        const written = when(pin.path);
-        if (written === null || written >= recorded) continue;
-        late.push({ id: task.id, path: pin.path, written, recorded });
-        break;
-      }
-    }
-  }
-  return late;
-}
-
 export const session = (doc) => {
   const found = currentSession(doc);
   if (!found) fail("现在没有在推进的会话：先记一轮，会话自己开出来");

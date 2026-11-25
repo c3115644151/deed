@@ -29,26 +29,7 @@ test("doctor keeps saying it until the workspace tells its agents where to ask",
 });
 
 
-// 判决不挂在哈希上：这一段在等结论时是冻结的，作者换不掉审查者手上那两份文件。
-// 盘上真被别的东西改了，那是 verify 该报的账——它报告，但不替审查者做判断。
-test("verify reports evidence pinned to content that has since changed, and does not hold the judgement", () => {
-  const cwd = workspace("digest");
-  fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "记下内容", "--criteria", "文件不变", "--files", "docs/a.md");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "内容如下").status, 1, "记下的文件要真的在");
-  deed(cwd, "task", "done", "T1", "--evidence", "内容如下");
-  assert.equal(deed(cwd, "verify").status, 0);
-  fs.writeFileSync(path.join(cwd, "thing.txt"), "v2");
-  const stale = deed(cwd, "verify");
-  assert.equal(stale.status, 1);
-  assert.match(stale.stdout, /交付记录过期/);
-  // 判决不挂在哈希上：字节变了不该替审查者做判断。verify 照旧把那一条报出来。
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
-  const pass = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met");
-  assert.equal(pass.status, 0, pass.stdout + pass.stderr);
-  assert.match(pass.stdout, /交回给你判/);
-});
+
 
 
 
@@ -75,53 +56,14 @@ test("a config.json saved with a BOM reads the same as one without", () => {
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
   assert.doesNotMatch(state.stdout, /审查设置 文件与账本不一致/);
-  assert.equal(deed(cwd, "verify").status, 0);
+  assert.equal(deed(cwd, "doctor").status, 0, "带 BOM 的那份照样读得动");
 });
 
 
-test("verify tells apart a stale pin, a path that left the workspace, and no pin at all", () => {
-  const cwd = workspace("verify-three");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  const bare = deed(cwd, "verify");
-  assert.equal(bare.status, 0);
-  assert.match(bare.stdout, /没记下内容/);
-  deed(cwd, "task", "done", "T1", "--evidence", "又写了一遍");
-  fs.writeFileSync(path.join(cwd, "proof.txt"), "changed after the pin");
-  const stale = deed(cwd, "verify");
-  assert.equal(stale.status, 1);
-  assert.match(stale.stdout, /交付记录过期/);
-
-  const other = workspace("verify-outside");
-  deed(other, "init", "--said", "开始");
-  deed(other, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  const log = readEvents(other).length;
-  fs.appendFileSync(
-    path.join(other, ".deed", "log", new Date().toISOString().slice(0, 7) + ".jsonl"),
-    JSON.stringify({ v: 1, at: new Date(Date.now() + 1000).toISOString(), k: "task.done", s: null, id: "T1", evidence: "写完了", by: "agent", digest: "b".repeat(64), digestPath: "../elsewhere.txt", changed: [] }) + "\n",
-  );
-  assert.equal(readEvents(other).length, log + 1);
-  const escaped = deed(other, "verify");
-  assert.equal(escaped.status, 1);
-  assert.match(escaped.stdout, /路径越界/);
-});
 
 
-// 心跳只说两件能查的事：认得的宿主配置里有没有跑 deed tick，账本多久没动。
-test("doctor says whether anything is keeping the record warm", () => {
-  const cwd = workspace("heartbeat");
-  deed(cwd, "init", "--said", "开始");
-  const before = deed(cwd, "doctor");
-  assert.equal(before.status, 0);
-  assert.match(before.stdout, /心跳 · 未接：/);
-  assert.match(before.stdout, /账本最后一条 .+（/);
-  fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "deed tick" }] } }));
-  const after = deed(cwd, "doctor");
-  assert.match(after.stdout, /心跳 · 已接/);
-  assert.doesNotMatch(deed(cwd, "state").stdout, /分钟前/, "状态页不读时钟，只有体检读");
-});
+
+
 
 
 // 面板跟着命令走：你不必记得先跑 serve，也不必在 dsh 重启之后手动把它拉回来。
@@ -249,28 +191,7 @@ test("the panel stays out of the way when it is told to", () => {
 // 先做后记：文件在任务被记下之前就写好了，那条任务记的是既成事实。
 // doctor 只报事实，不算坏账。
 
-test("doctor says when a promise came after the work", () => {
-  const cwd = workspace("promise-late");
-  deed(cwd, "init", "--said", "开始");
-  // 这条检查只在 git 工作区里比：没有 git 的目录里 mtime 是文件被挪进来的时刻，不作数。
-  spawnSync("git", ["init"], { cwd, encoding: "utf8" });
-  fs.writeFileSync(path.join(cwd, "docs.txt"), "x", "utf8");
-  const old = new Date(Date.now() - 3600 * 1000);
-  fs.utimesSync(path.join(cwd, "docs.txt"), old, old);
-  deed(cwd, "task", "add", "改 docs.txt", "--criteria", "docs.txt 有一句话", "--files", "docs.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "写下 docs.txt");
-  const doctor = deed(cwd, "doctor");
-  assert.equal(doctor.status, 0);
-  assert.match(doctor.stdout, /先做后记 1 条/);
-  assert.match(doctor.stdout, /T1 的 docs.txt/);
 
-  // 同一个目录，把 git 摘掉：不比了，也不报错。
-  fs.rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
-  const bare = deed(cwd, "doctor");
-  assert.equal(bare.status, 0, bare.stderr);
-  assert.doesNotMatch(bare.stdout, /先做后记/);
-  assert.doesNotMatch(bare.stdout, /没有 git|不在 git/);
-});
 
 
 test("a panel is replaced when any module it loaded changes, not only its own files", () => {
@@ -363,6 +284,5 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.match(sealed.stderr, /已封存/);
   assert.equal(readEvents(cwd).length, before + 1, "只多了那一条封存");
   assert.equal(deed(cwd, "state").status, 0, "工作区没被写坏");
-  assert.equal(deed(cwd, "verify").status, 0);
   assert.equal(deed(cwd, "doctor").status, 0);
 });

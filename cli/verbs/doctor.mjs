@@ -7,7 +7,7 @@ import { paths } from "../../lib/store.mjs";
 import { stamp0 } from "../../lib/format.mjs";
 import { wordsNotice } from "../../lib/words.mjs";
 import { hookNotice, silenceNotice } from "../../lib/heartbeat.mjs";
-import { ROOT, parse, load, lateWork, fail, guard, split } from "../session.mjs";
+import { ROOT, parse, load, fail, guard, split } from "../session.mjs";
 
 export default function doctor(argv) {
     parse(argv, "doctor");
@@ -55,12 +55,6 @@ export default function doctor(argv) {
       if (!bad) {
         console.log("账本干净 · " + events.length + " 条事件都能重放");
         const { doc } = load();
-        const late = lateWork(ROOT, doc);
-        if (late && late.length > 0)
-          console.log(
-            "  先做后记 " + late.length + " 条（不算坏账）：" +
-              late.map((one) => one.id + " 的 " + one.path + " 最后写于 " + stamp0(one.written) + "，这条任务记于 " + stamp0(one.recorded)).join("；"),
-          );
         const words = wordsNotice(ROOT);
         if (words) console.log("  接入 · " + words);
         const last = events[events.length - 1];

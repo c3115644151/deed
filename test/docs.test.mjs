@@ -20,7 +20,8 @@ test("the README carries exactly the block init --print-agents prints", () => {
 });
 
 test("the block names the commands an agent needs, and no verb it does not have", () => {
-  for (const verb of ["deed state", "deed tick", "deed plan", "deed submit", "deed review", "deed sign", "deed verify", "deed doctor"])
+  // verify 动词已经删了：账本不再对字节，规则里不许再提它。
+  for (const verb of ["deed state", "deed tick", "deed plan", "deed submit", "deed review", "deed sign", "deed doctor"])
     assert.ok(BLOCK.includes(verb), "那段里少了 " + verb);
   assert.doesNotMatch(BLOCK, /deed (start|close|switch)\b/u, "没有的动作不要写进规则里");
 });

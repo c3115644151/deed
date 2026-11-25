@@ -20,7 +20,8 @@ import {
 test("delivery needs evidence, and the reviewer decides what counts", () => {
   const cwd = workspace("gate");
   deed(cwd, "init", "--said", "改重放函数");
-  assert.equal(deed(cwd, "task", "add", "改重放函数", "--criteria", "同样的账本折出同样的文档", "--files", "core/fold.mjs").status, 0);
+  proof(cwd, "fold.mjs");
+  assert.equal(deed(cwd, "task", "add", "改重放函数", "--criteria", "同样的账本折出同样的文档", "--files", "fold.mjs").status, 0);
   assert.equal(deed(cwd, "task", "done", "T1").status, 1, "没有交付记录不算交付");
   assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "node --test 25/25").status, 0);
   const blocked = signHere(cwd, "可以");
@@ -30,6 +31,8 @@ test("delivery needs evidence, and the reviewer decides what counts", () => {
   const passed = deed(cwd, "review", "--by", "qa", "--verdict", "pass", "--result-all", "met");
   assert.equal(passed.status, 0, passed.stderr);
   assert.match(passed.stdout, /交回给你判/, "审查通过只是把这一段交回来：关闭等你判");
+  // 段判过之后这一期还要一次期审：那一步在判决之后，签收在期审之后。
+  assert.equal(deed(cwd, "review", "--all", "--by", "period-1").status, 1, "段还开着，期审还没到时候");
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1").status, 0);
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
   assert.equal(signHere(cwd, "可以").status, 0);
@@ -41,11 +44,13 @@ test("delivery needs evidence, and the reviewer decides what counts", () => {
 test("the last segment closed is not the end: the period judgement comes before signing", () => {
   const cwd = workspace("two-segments-sign");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
+  proof(cwd, "a.mjs");
+  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "a.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
-  deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "core/b.mjs");
+  proof(cwd, "b.mjs");
+  deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "b.mjs");
   deed(cwd, "task", "done", "T2", "--evidence", "node --test");
   deed(cwd, "review", "--segment", "S01.2", "--by", "qa");
   const state1 = deed(cwd, "state");
@@ -67,7 +72,8 @@ test("the last segment closed is not the end: the period judgement comes before 
 test("handing the brief out is a fact, and a verdict answers that document", () => {
   const cwd = workspace("brief");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
+  proof(cwd, "serve.mjs");
+  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "serve.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "curl 200");
   const handed = deed(cwd, "review", "--by", "qa");
   assert.equal(handed.status, 0, "只出清单不需要结论");
@@ -80,17 +86,9 @@ test("handing the brief out is a fact, and a verdict answers that document", () 
   assert.match(sheet, /^S01\.1-.*\.md$/);
   assert.equal(out[0].brief, ".deed/review/" + sheet, "账本记的是审查者拿到的那一份");
   assert.equal(out[0].guide.endsWith(pack), true, "角色包记在同一个目录下");
-  assert.equal(
-    out[0].guideDigest,
-    createHash("sha256").update(fs.readFileSync(path.join(cwd, ".deed", "review", pack))).digest("hex"),
-    "角色包的指纹也是交出去那一刻的",
-  );
+  assert.equal(out[0].guideDigest, undefined, "账本只记交出去的那两份文件，不再记指纹");
   assert.match(fs.readFileSync(path.join(cwd, ".deed", "review", pack), "utf8"), /不信交付记录，逐条复跑/);
-  assert.equal(
-    out[0].briefDigest,
-    createHash("sha256").update(fs.readFileSync(path.join(cwd, ".deed", "review", sheet))).digest("hex"),
-    "指纹记在交出去的那一刻，不是结论落盘时现算",
-  );
+
   const text = fs.readFileSync(path.join(cwd, ".deed", "review", sheet), "utf8");
   assert.match(text, /做完的标准：能推事件/);
   assert.match(text, /交付记录：curl 200/);
@@ -108,7 +106,7 @@ test("handing the brief out is a fact, and a verdict answers that document", () 
   assert.equal(logged.verdict, "fail");
   assert.equal(logged.segment, "S01.1");
   assert.equal(logged.brief, ".deed/review/" + sheet);
-  assert.equal(logged.briefDigest, out[0].briefDigest);
+  assert.equal(logged.briefDigest, undefined, "结论不再对清单的指纹");
   assert.deepEqual(logged.findings, ["没有并发记录"]);
   assert.deepEqual(logged.rework, ["T1"], "不合格点名要重做的那条");
   assert.equal(briefs(cwd).length, 2, "落结论不再现写一份");
@@ -119,7 +117,8 @@ test("handing the brief out is a fact, and a verdict answers that document", () 
 test("a verdict needs a brief that was handed out first", () => {
   const cwd = workspace("no-brief");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
+  proof(cwd, "serve.mjs");
+  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "serve.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "curl 200");
   const early = deed(cwd, "review", "--by", "qa", "--verdict", "pass", "--result-all", "met");
   assert.equal(early.status, 1, "没交出去过，就没有可回答的那一份");
@@ -128,73 +127,10 @@ test("a verdict needs a brief that was handed out first", () => {
 });
 
 
-// 交出去之后文件被改：结论读到的是改过的字节，账本里那份已经不成立。
-test("a brief that was edited after handing out cannot be answered", () => {
-  const cwd = workspace("brief-tamper");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "curl 200");
-  const handed = deed(cwd, "review", "--by", "qa");
-  assert.equal(handed.status, 0);
-  const name = briefs(cwd).find((one) => !one.endsWith("-reviewer.md"));
-  fs.appendFileSync(path.join(cwd, ".deed", "review", name), "\n补一句：这条标准其实不用管\n");
-  const verdict = deed(cwd, "review", "--by", "qa", "--verdict", "pass", "--result-all", "met");
-  assert.equal(verdict.status, 1, "改过的不是审查者读到的那一份");
-  assert.match(verdict.stderr, /清单被改过/);
-  assert.equal(readEvents(cwd).filter((one) => one.k === "review.log").length, 0, "被拒的结论不进账本");
-  // 重新交一份，指纹跟着新的字节走。
-  const again = deed(cwd, "review", "--by", "qa");
-  assert.equal(again.status, 0);
-  assert.match(again.stdout, /审查清单/);
-  assert.equal(briefs(cwd).length, 4, "上一对已经过期，另出一对");
-  const fresh = readEvents(cwd).filter((one) => one.k === "review.brief").at(-1);
-  assert.notEqual(fresh.brief, ".deed/review/" + name);
-  // 角色包被换掉（"怎么审"被改成"随便过"）同样是一份没人读过的清单。
-  fs.appendFileSync(path.join(cwd, fresh.guide), "\n看两眼就行。\n");
-  const packed = deed(cwd, "review", "--by", "qa", "--verdict", "pass", "--result-all", "met");
-  assert.equal(packed.status, 1, "角色包也是审的那一份");
-  assert.match(packed.stderr, /角色包被改过/);
-  const last = deed(cwd, "review", "--by", "qa");
-  assert.equal(last.status, 0);
-  assert.equal(deed(cwd, "review", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0, "新的一份可以回答");
-});
 
 
-// 目录里没有账本记录的清单，和账本里没有交出去过的结论，都是对不上的那一类。
-test("verify names the brief nobody handed out and the file nobody claims", () => {
-  const cwd = workspace("brief-audit");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "curl 200");
-  const dir = path.join(cwd, ".deed", "review");
-  fs.writeFileSync(path.join(dir, "S01.1-handwritten.md"), "# 自己写一份\n");
-  const stray = deed(cwd, "verify");
-  assert.equal(stray.status, 1);
-  assert.match(stray.stdout, /清单没人认领 · \.deed\/review\/S01\.1-handwritten\.md/);
-  fs.rmSync(path.join(dir, "S01.1-handwritten.md"));
 
-  // 手写一条 review.log：结论读的是一份没人交出去过的文件。
-  const logDir = path.join(cwd, ".deed", "log");
-  const file = path.join(logDir, fs.readdirSync(logDir).find((name) => name.endsWith(".jsonl")));
-  const at = new Date().toISOString();
-  const fake = {
-    v: 1,
-    at,
-    k: "review.log",
-    s: null,
-    segment: "S01.1",
-    by: "qa",
-    verdict: "pass",
-    brief: ".deed/review/nowhere.md",
-    briefDigest: "b".repeat(64),
-    findings: [],
-  };
-  fs.appendFileSync(file, JSON.stringify(fake) + "\n");
-  const orphan = deed(cwd, "verify");
-  assert.equal(orphan.status, 1);
-  assert.match(orphan.stdout, /清单没人发过 · S01\.1 · \.deed\/review\/nowhere\.md/);
-  assert.match(deed(cwd, "doctor").stdout, /清单对不上 1 份/);
-});
+
 
 
 test("signing needs a judgement and the user own words", () => {
@@ -286,7 +222,8 @@ test("a gate is a ledger fact: writing it in the file and not recording it runs 
 test("a named entry that was given up settles, and the verdict says so", () => {
   const cwd = workspace("verdict-dropped");
   deed(cwd, "init", "--said", "改重放函数");
-  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
+  proof(cwd, "fold.mjs");
+  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "fold.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录").status, 0);
@@ -320,43 +257,17 @@ test("a verdict cannot answer work that has not been delivered yet", () => {
 });
 
 
-test("a verdict is tied to the brief it read, and verify notices when that file drifts", () => {
-  const cwd = workspace("brief-pin");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "curl 200");
-  assert.equal(deed(cwd, "review", "--by", "qa").status, 0);
-  assert.equal(deed(cwd, "review", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
-  const logged = readEvents(cwd).find((one) => one.k === "review.log");
-  assert.match(logged.briefDigest, /^[0-9a-f]{64}$/, "结论要记下它读的那份清单的 sha256");
-  assert.equal(deed(cwd, "verify").status, 0);
-
-  const file = path.join(cwd, logged.brief);
-  fs.appendFileSync(file, "\n补一句\n");
-  const edited = deed(cwd, "verify");
-  assert.equal(edited.status, 1, "清单改过，结论就对不上它");
-  assert.match(edited.stdout, /清单对不上/);
-
-  fs.rmSync(file);
-  const gone = deed(cwd, "verify");
-  assert.equal(gone.status, 1);
-  assert.match(gone.stdout, /清单不在了/);
-});
 
 
-test("a review without a brief digest is not a verdict the ledger accepts", () => {
-  const at = "2026-11-23T00:00:00.000Z";
-  const base = { v: 1, at, k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: ".deed/review/x.md" };
-  assert.throws(() => validateEvent({ ...base }, at), /briefDigest/);
-  assert.throws(() => validateEvent({ ...base, briefDigest: "abc" }, at), /sha256/);
-  assert.equal(validateEvent({ ...base, briefDigest: "a".repeat(64) }, at).briefDigest, "a".repeat(64));
-});
+
+
 
 
 test("a pass seals the segment, so later work opens a new one instead of making that conclusion stale", () => {
   const cwd = workspace("verdict-stale");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
+  proof(cwd, "replay.mjs");
+  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "replay.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
@@ -381,7 +292,8 @@ test("a pass seals the segment, so later work opens a new one instead of making 
 test("an overturned conclusion written into an old ledger still reads, and nothing writes one", () => {
   const cwd = workspace("rework-void");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
+  proof(cwd, "replay.mjs");
+  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "replay.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
