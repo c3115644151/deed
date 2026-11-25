@@ -102,7 +102,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 
 没有落进账本的动作不算发生过；状态是推出来的，不用手写。
 ```bash
-deed project --shape software --layers "core:,lib:core" --background "…"   # 声明这个工作区是一个项目
+deed project --shape software --layers "core=core:,app=cli:core+lib" --extras "docs,examples" --background "…"   # 声明这个工作区是一个项目（格=目录：它可以依赖的格）
 deed check       # 体检：项目状态 + 逐条诊断（只读，不挡任何动作）
 deed doctor      # 账本能不能重放：事件形状、编号撞车、时刻对不上；读不动就 exit 1
 deed doctor      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法。顺带两行：接入（规则文件里有没有 deed state）、心跳（认得的宿主配置里跑不跑 deed tick，账本最后一条是几点的）

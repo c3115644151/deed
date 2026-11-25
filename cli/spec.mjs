@@ -86,11 +86,12 @@ export const SPEC = {
   // 不产生行动，也不挡三种状态。
   check: { flags: [], usage: ["deed check               体检：项目状态与逐条诊断（只读）"] },
   project: {
-    flags: ["shape", "background", "layers", "by", "why"],
+    flags: ["shape", "background", "layers", "extras", "by", "why"],
     usage: [
       'deed project --shape software --by "谁"      声明这个工作区是一个项目（形态决定启用哪些约束）',
       'deed project --background "是什么、为谁、不做什么" --by "谁"',
-      'deed project --layers "core:,lib:core,cli:core+lib" --by "谁"   每层写目录与它可以依赖的目录',
+      'deed project --layers "core=core:,app=cli:core+lib" --by "谁"   每条写 格=目录：它可以依赖的格',
+      'deed project --extras "scripts,examples" --by "谁"           不在结构里的顶层目录，说清它们不参与',
     ],
   },
   doctor: { flags: [], usage: ["deed doctor"] },

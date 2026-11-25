@@ -212,10 +212,17 @@ export function fold(events) {
           by: ev.by ?? null,
           shape: ev.shape,
           background: ev.background ?? "",
-          layers: (ev.layers ?? []).map((one) => ({
-            dir: String(one.dir).replace(/^\/+|\/+$/gu, ""),
-            mayImport: Array.isArray(one.mayImport) ? [...one.mayImport] : [],
-          })),
+          layers: (ev.layers ?? []).map((one) => {
+            const dir = String(one.dir).replace(/^\/+|\/+$/gu, "");
+            // 角色是"这个目录在范式里算哪一格"：目录名可以跟范式不一样（cli 是 app），
+            // 但要说清它是哪一格，否则"结构对不对"就没有可判的东西。
+            return {
+              role: String(one.role ?? dir).replace(/^\/+|\/+$/gu, ""),
+              dir,
+              mayImport: Array.isArray(one.mayImport) ? [...one.mayImport] : [],
+            };
+          }),
+          extras: (ev.extras ?? []).map((one) => String(one).replace(/^\/+|\/+$/gu, "")),
         };
         break;
       }

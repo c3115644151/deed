@@ -348,9 +348,13 @@ export function validateEvent(ev, at) {
       for (const layer of ev.layers ?? []) {
         if (!layer || typeof layer.dir !== "string" || layer.dir.trim() === "")
           throw new Error("project.declare 的每一层都要写 dir：收到 " + JSON.stringify(layer));
+        if (layer.role !== undefined && typeof layer.role !== "string")
+          throw new Error("project.declare 的 role 要是一个名字：" + JSON.stringify(layer.role));
         if (layer.mayImport !== undefined && !Array.isArray(layer.mayImport))
           throw new Error("project.declare 的 mayImport 要是数组：" + JSON.stringify(layer.mayImport));
       }
+      if (ev.extras !== undefined && !Array.isArray(ev.extras))
+        throw new Error("project.declare 的 extras 要是数组：" + JSON.stringify(ev.extras));
       if (ev.background !== undefined && typeof ev.background !== "string")
         throw new Error("project.declare 的 background 要是一段文字");
       break;

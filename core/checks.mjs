@@ -11,10 +11,21 @@
 //   na   —— 不适用（这个工作区没声明成项目时，项目级的检查都不适用）
 // 不适用不算未结项：状态只在"已声明的项目"上计算通过率。
 
+
+// 范式的"格"：一类项目至少要有的角色。目录名可以不同——用 role 说清它是哪一格，
+// 但格本身不能缺：缺一格，结构里就一定少了一类东西。
+export const PARADIGM = {
+  software: ["core", "app", "tests"],
+  document: ["texts", "tests"],
+  data: ["data", "schema", "tests"],
+  work: ["tests"],
+  free: [],
+};
+
 export const CHECKS = [
   {
     id: "workspace",
-    title: "工作区能记账、能重放",
+    title: "账本可读、审查设置已声明",
     capability: "三种状态与账本",
     fix: 'deed init --said "这一轮说了什么"',
     judge: ({ doc }) => {
@@ -27,30 +38,50 @@ export const CHECKS = [
   },
   {
     id: "shape",
-    title: "文件树符合声明的分层",
+    title: "文件树符合声明的结构",
     capability: "结构约束",
-    fix: 'deed project --layers "core:,lib:core" --by 谁（按实际的目录与依赖方向写）',
+    fix: 'deed project --layers "core=core:,app=cli:core+lib" --extras "scripts,examples" --by 谁',
     judge: ({ project, tree }) => {
       if (!project) return { verdict: "na", detail: "没有声明成项目" };
       if (project.shape === "free" || project.shape === "none")
         return { verdict: "pass", detail: "这个项目声明不用结构约束" };
-      if ((project.layers ?? []).length === 0)
+      const layers = project.layers ?? [];
+      if (layers.length === 0)
         return { verdict: "fail", detail: "声明成项目了，但没写分层：没有分层就没有可核的结构" };
+      // ① 范式要求的那几格必须在：缺一格，结构里一定少了一类东西。
+      const roles = new Map(layers.map((one) => [one.role, one]));
+      const absent = (PARADIGM[project.shape] ?? []).filter((role) => !roles.has(role));
+      if (absent.length > 0)
+        return {
+          verdict: "fail",
+          detail: "这一类项目缺这" + absent.length + "格：" + absent.join("、") + "（声明里没有哪个目录认领它）",
+        };
       if (!tree) return { verdict: "na", detail: "这次没带目录快照" };
-      const missing = project.layers.filter((one) => !tree.files.some((file) => file === one.dir || file.startsWith(one.dir + "/")));
+      // ② 声明的每个目录都得在盘上。
+      const missing = layers.filter((one) => !tree.files.some((file) => file === one.dir || file.startsWith(one.dir + "/")));
       if (missing.length > 0)
-        return { verdict: "fail", detail: "这些层在盘上找不到：" + missing.map((one) => one.dir).join("、") };
-      const where = (file) => project.layers.find((one) => file === one.dir || file.startsWith(one.dir + "/")) ?? null;
+        return { verdict: "fail", detail: "这些目录在盘上找不到：" + missing.map((one) => one.dir).join("、") };
+      // ③ 盘上的每个顶层目录都要有归属：认领成某一格，或者显式写进 extras。
+      const tops = [...new Set(tree.files.map((file) => file.split("/")[0]).filter((one) => tree.files.some((file) => file.startsWith(one + "/"))))];
+      const extras = new Set(project.extras ?? []);
+      const homeless = tops.filter(
+        (one) => !extras.has(one) && !layers.some((layer) => one === layer.dir || one.startsWith(layer.dir + "/")),
+      );
+      if (homeless.length > 0)
+        return { verdict: "fail", detail: "这些顶层目录没有归属：" + homeless.slice(0, 5).join("、") + "（认领成某一格，或写进 extras 说清它不属于结构）" };
+      // ④ 跨格的依赖方向：两端都在声明里、又不是同一格，就必须在 mayImport 里。
+      const where = (file) => layers.find((one) => file === one.dir || file.startsWith(one.dir + "/")) ?? null;
       const broken = [];
       for (const edge of tree.imports) {
         const from = where(edge.from);
         const to = where(edge.to);
         if (!from || !to || from === to) continue;
-        if (!from.mayImport.includes(to.dir)) broken.push(from.dir + " → " + to.dir + "（" + edge.from + "）");
+        if (!from.mayImport.includes(to.role) && !from.mayImport.includes(to.dir))
+          broken.push(from.dir + " → " + to.dir + "（" + edge.from + "）");
       }
       if (broken.length > 0)
         return { verdict: "fail", detail: "依赖方向反了：" + [...new Set(broken)].slice(0, 3).join("；") };
-      return { verdict: "pass", detail: project.layers.length + " 层，方向都对" };
+      return { verdict: "pass", detail: layers.length + " 个目录认领 " + roles.size + " 格，方向都对" };
     },
   },
   {
