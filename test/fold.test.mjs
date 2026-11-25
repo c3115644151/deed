@@ -285,7 +285,7 @@ test("a standing fail written before verdicts named anything still blocks a late
   const pass4 = { v: 4, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b2.md" };
   const ledger = [turn(1), add(2, "T1"), done(3, "T1"), old];
   assert.throws(() => fold([...ledger, pass4]), /没有可结清的东西/u);
-  // 出路只有一条：人推翻那条结论，然后重新审。
+  // 旧账本里那一行照读成历史：结论作废，段回到没人判过的样子。
   const overturned = { v: 4, at: T(6), k: "review.overturn", s: null, review: "R1", why: "看错了", by: "user" };
   assert.equal(fold([...ledger, overturned, { ...pass4, at: T(7) }]).sessions[0].segments[0].verdict, "pass");
 });

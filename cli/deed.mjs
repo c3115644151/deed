@@ -15,7 +15,6 @@ import goal from "./verbs/goal.mjs";
 import plan from "./verbs/plan.mjs";
 import submit from "./verbs/submit.mjs";
 import review from "./verbs/review.mjs";
-import judge from "./verbs/judge.mjs";
 import seal from "./verbs/seal.mjs";
 import sign from "./verbs/sign.mjs";
 import shelve from "./verbs/shelve.mjs";
@@ -28,7 +27,7 @@ import panel from "./verbs/panel.mjs";
 
 const HELP = [...HEAD, ...ORDER.flatMap((one) => SPEC[one].usage), "", "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。"].join("\n");
 
-const commands = { init, tick, task, ask, goal, plan, submit, review, judge, seal, sign, shelve, state, verify, doctor, gate, serve, panel };
+const commands = { init, tick, task, ask, goal, plan, submit, review, seal, sign, shelve, state, verify, doctor, gate, serve, panel };
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、verify、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。

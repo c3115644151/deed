@@ -419,11 +419,6 @@ function acceptScreen(doc, session, config, zone, on) {
             (review.rework && review.rework.length ? '　<span class="k">退回</span>' + esc(review.rework.join("、")) : "") + "</p>"
           : "") +
         (review && review.findings.length ? '<div class="fds">' + findingList(review.findings) + "</div>" : "") +
-        (review && !review.voidedAt && !(session && session.closeKind)
-          ? '<form class="gate small" data-gate="overturn" data-review="' + esc(review.id) + '">' +
-            '<input class="gwhy" type="text" placeholder="推翻它 · 为什么" aria-label="推翻这条结论的理由">' +
-            '<button class="gpress" type="submit">推翻 ' + esc(review.id) + "</button></form>"
-          : "") +
         "</article>"
       );
     })
@@ -438,11 +433,6 @@ function acceptScreen(doc, session, config, zone, on) {
       '<span class="vcount">' + esc(String(period.brief).split(/[\\/]/).pop()) + "</span></div>" +
       (period.rework && period.rework.length ? '<p class="vbrief"><span class="k">退回</span>' + esc(period.rework.join("、")) + "</p>" : "") +
       (period.findings.length ? '<div class="fds">' + findingList(period.findings) + "</div>" : "") +
-      (!period.voidedAt && !session.closeKind
-        ? '<form class="gate small" data-gate="overturn" data-review="' + esc(period.id) + '">' +
-          '<input class="gwhy" type="text" placeholder="推翻它 · 为什么" aria-label="推翻这条结论的理由">' +
-          '<button class="gpress" type="submit">推翻 ' + esc(period.id) + "</button></form>"
-        : "") +
       "</article>"
     : "";
   const signed = session && session.sign;
@@ -970,10 +960,6 @@ document.addEventListener("submit", (event) => {
   const action = form.getAttribute("data-gate");
   const body = { action };
   if (action === "sign") body.words = (form.querySelector(".gwords") || {}).value || "";
-  if (action === "overturn") {
-    body.review = form.getAttribute("data-review");
-    body.why = (form.querySelector(".gwhy") || {}).value || "";
-  }
   const button = form.querySelector(".gpress");
   if (button) button.disabled = true;
   fetch("/gate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })

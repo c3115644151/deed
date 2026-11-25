@@ -378,7 +378,6 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
   try {
     const page = await get(port, "/");
     assert.match(page.body, /data-gate="sign"/, "闸开着的这一页上有那个按钮，没有一串要人抄回命令行的字");
-    assert.match(page.body, /data-gate="overturn"[^>]*data-review="R[0-9]+"/, "期审结论在案：推翻那一下也在页面上");
     assert.doesNotMatch(page.body, /deed sign --words/, "签收不再写在页面上让人去命令行里敲");
 
     const foreign = await post({ action: "sign", words: "可以" }, { origin: "http://evil.example" });
@@ -403,7 +402,6 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
     // 条件不满足就不画那个按钮：签过的一期上没有签收闸，也没有可推翻的结论。
     const after = await get(port, "/");
     assert.doesNotMatch(after.body, /data-gate="sign"/);
-    assert.doesNotMatch(after.body, /data-gate="overturn"/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

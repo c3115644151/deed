@@ -74,10 +74,6 @@ export const SPEC = {
     flags: ["segment", "why", "by", "session"],
     usage: ['deed seal [--segment S01.1] --why "…"  封一个免审段（审查设置说不用审，没人审过）'],
   },
-  judge: {
-    flags: ["overturn", "why", "by"],
-    usage: ["deed judge    只说一句：这两条闸改到面板上了（命令行不再提供）"],
-  },
   sign: {
     flags: ["words", "title", "by", "session"],
     usage: ["deed sign    只说一句：签收在面板上按（命令行不再提供）"],
@@ -95,7 +91,7 @@ export const SPEC = {
 };
 
 // 帮助里的顺序就是这里的顺序：帮助从 SPEC 出，不再有一份手抄的清单。
-export const ORDER = ["init", "tick", "task", "ask", "goal", "plan", "submit", "review", "seal", "judge", "sign", "shelve", "state", "verify", "doctor", "gate", "serve", "panel"];
+export const ORDER = ["init", "tick", "task", "ask", "goal", "plan", "submit", "review", "seal", "sign", "shelve", "state", "verify", "doctor", "gate", "serve", "panel"];
 
 export const HEAD = ["deed · 一个工作区的放行协议", "", "deed --version                   打印这个程序自己的版本"];
 

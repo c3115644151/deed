@@ -36,7 +36,6 @@ const gate = (cwd, action) => {
   }
 };
 const signHere = (cwd, words, extra = {}) => gate(cwd, { action: "sign", words, ...extra });
-const overturnHere = (cwd, review, why) => gate(cwd, { action: "overturn", review, why });
 const kinds = (cwd) => readEvents(cwd).map((one) => one.k);
 const briefs = (cwd) => fs.readdirSync(path.join(cwd, ".deed", "review"));
 // A delivery that pins nothing cannot be checked afterwards, so the tests pin a
@@ -464,23 +463,6 @@ test("verify reports evidence pinned to content that has since changed, and does
   assert.match(pass.stdout, /段已封存/);
 });
 
-test("a pass seals the segment, and a fail after overturning it reopens that same one", () => {
-  const cwd = workspace("rework");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
-  deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "封过之后又改").status, 1, "封过的段不能再往任务上写");
-  assert.equal(overturnHere(cwd, "R1", "这份结论看错了一处").status, 0);
-  const back = deed(cwd, "review", "--segment", "S01.1", "--by", "qa2", "--verdict", "fail", "--rework", "T1", "--why", "少了一节");
-  assert.equal(back.status, 0, back.stdout + back.stderr);
-  const doc = readEvents(cwd);
-  assert.equal(doc.filter((one) => one.k === "review.overturn").length, 1);
-  assert.equal(doc.filter((one) => one.s === "S01" && one.k === "task.add").length, 1, "退回不开新段");
-  assert.match(deed(cwd, "state").stdout, /● T1|○ T1/);
-  assert.match(deed(cwd, "state").stdout, /段 S01\.1/);
-});
 
 test("doctor names the line that broke the ledger and the only repair it allows", () => {
   const cwd = workspace("doctor");
@@ -736,7 +718,8 @@ test("a pass seals the segment, so later work opens a new one instead of making 
   assert.match(sign.stderr, /S01\.2/);
 });
 
-test("an overturned conclusion stays in the ledger but stops counting", () => {
+// 推翻这个动作已经不收了（含义第 22 版）：旧账本里那一行照读成历史，命令面再也写不出来。
+test("an overturned conclusion written into an old ledger still reads, and nothing writes one", () => {
   const cwd = workspace("rework-void");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
@@ -744,16 +727,26 @@ test("an overturned conclusion stays in the ledger but stops counting", () => {
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
   assert.match(deed(cwd, "state").stdout, /签收/, "pass 关闭这一段之后只剩签收");
-  const overturned = overturnHere(cwd, "R1", "结论没看交付记录");
-  assert.equal(overturned.status, 0, overturned.stdout + overturned.stderr);
+  // 手工把一行旧事件写进账本：那时这条动作还在。
+  const logDir = path.join(cwd, ".deed", "log");
+  const name = fs.readdirSync(logDir).find((one) => one.endsWith(".jsonl"));
+  const file = path.join(logDir, name);
+  const old = fs.readFileSync(file, "utf8").split("\n").filter(Boolean);
+  const last = JSON.parse(old.at(-1));
+  old.push(JSON.stringify({ v: 4, at: new Date(Date.now() + 1000).toISOString(), k: "review.overturn", s: "S01", review: "R1", why: "旧账本里那一行", by: "user" }));
+  fs.writeFileSync(file, old.join("\n") + "\n");
   const review = fold(readEvents(cwd)).sessions[0].reviews[0];
-  assert.equal(review.voidedBy, "user");
-  assert.notEqual(review.voidedAt, null, "作废的那条留着，只是不再算");
-  assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1$|deed review --segment S01\.1/, "这一段回到要审");
+  assert.equal(review.voidedAt !== null, true, "作废的那条留着，只是不再算");
+  assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1/, "这一段回到要审");
   const blocked = signHere(cwd, "可以");
   assert.equal(blocked.status, 1, "没有在案的结论不能签收");
   assert.match(blocked.stderr, /S01\.1/);
+  // 命令面没有这条路：写一条新的会被账本拒。
+  assert.equal(deed(cwd, "judge", "--overturn", "R1", "--why", "再来一次").status, 1);
+  assert.equal(readEvents(cwd).filter((one) => one.k === "review.overturn").length, 1, "没有第二条");
+  assert.ok(last);
 });
+
 
 test("a fail names every task it sends back", () => {
   const cwd = workspace("rework-many");
@@ -1610,39 +1603,7 @@ test("a fail that names nobody is refused, and a pass cannot carry a rework", ()
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.log").length, 0, "被拒的结论一条都不写");
 });
 
-test("a person can overturn a conclusion, and that reopens the segment", () => {
-  const cwd = workspace("overturn");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "交一条", "--criteria", "交了", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "交了", "--digest", proof(cwd));
-  deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
-  const before = fold(readEvents(cwd)).sessions[0].reviews[0];
-  assert.equal(before.id, "R1", "结论有自己的编号，人能点名它");
-  const noReason = overturnHere(cwd, before.id, "");
-  assert.equal(noReason.status, 1, "推翻是一句要负责任的话");
-  assert.match(noReason.stderr, /为什么/);
-  const done = overturnHere(cwd, before.id, "审查者没看并发");
-  assert.equal(done.status, 0, done.stderr);
-  const events = readEvents(cwd);
-  const flip = events.filter((one) => one.k === "review.overturn").pop();
-  assert.equal(flip.review, before.id, "作废的是哪一条，账本自己说");
-  assert.equal(flip.why, "审查者没看并发");
-  assert.equal(done.ev.why, "审查者没看并发");
-  const state = deed(cwd, "state");
-  assert.match(state.stdout, /deed review --segment S01\.1/, "这里回到没判过的样子");
-  assert.equal(deed(cwd, "review", "--by", "qa2", "--verdict", "pass", "--result-all", "met").status, 0, "推翻过的段可以再判一次（人推翻过，换一双手也允许）");
-  assert.equal(deed(cwd, "review", "--all", "--by", "period-1").status, 0, "段判过了，这一期还要有人判");
-  assert.equal(deed(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
-  assert.equal(signHere(cwd, "可以").status, 0, "再判过才签得动");
-  // 一句话已经签收成历史，账本不往回改：推翻只能发生在签收之前。
-  const second = fold(readEvents(cwd)).sessions[0].reviews.filter((one) => one.scope === "segment")[1];
-  assert.equal(second.verdict, "pass");
-  const settled = overturnHere(cwd, second.id, "太晚了");
-  assert.equal(settled.status, 1);
-  assert.match(settled.stderr, /已经签收/);
-  assert.equal(events.filter((one) => one.k === "review.overturn").length, 1, "被拒的那条不写");
-});
+
 
 test("a pass names the segment it sealed, and the next step is the signature", () => {
   const cwd = workspace("seal");
@@ -2600,8 +2561,8 @@ test("the three human gates are not on the command line", () => {
   assert.equal(sign.status, 1);
   assert.match(sign.stderr, /面板/);
   const judge = deed(cwd, "judge", "--overturn", "R1", "--why", "不服");
-  assert.equal(judge.status, 1);
-  assert.match(judge.stderr, /面板/);
+  assert.equal(judge.status, 1, "推翻那个动作连动词都不在了");
+  assert.match(judge.stderr, /没有这个动作/);
   const topic = deed(cwd, "topic", "release", "I1");
   assert.equal(topic.status, 1, "议题那一条连动词都还没有");
   assert.equal(readEvents(cwd).length, before, "三条路都不记账");

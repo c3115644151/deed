@@ -181,7 +181,7 @@ export default function review(argv) {
         if (!hand)
           fail('这一段要交给谁判：--by "这一段的审查者"（之后这一段的清单都写他——同一段的判断不该每次换个人从头摸一遍）');
         if (before?.by && before.by !== hand && !maySwitch(one, seg.id))
-          fail("这一段已经交给 " + before.by + " 判了：段审一直用同一双手（要换手先由人在面板上推翻那条结论）");
+          fail("这一段已经交给 " + before.by + " 判了：段审一直用同一双手（封过的段不换手：要改就开新一期）");
         // 审查设置说这一段不用审（改动全落在免审路径）：不出清单。出了一份没人需要的卷子，
         // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
         if (!needsReview(doc.config, one, seg)) {
@@ -252,7 +252,7 @@ export default function review(argv) {
         fail(
           delivered
             ? "段 " + seg.id + " 的活是 " + flags.by + " 交付的：同一个人不能判自己交付的段（换一个 --by）"
-            : "这一段是交给 " + handed.by + " 判的（同一段一直用同一双手）：结论要由他落；要换手先由人推翻那条结论",
+            : "这一段是交给 " + handed.by + " 判的（同一段一直用同一双手）：结论要由他落；封过的段不换手，要改就开新一期",
         );
       }
       if (handed.withdrawnAt !== undefined)

@@ -370,7 +370,7 @@ export function signBlockers(doc, session, config = null) {
     if (state === "fail")
       blockers.push(
         session.id + " 的期审不合格还在案（" + (live?.by ?? "谁") + "）：" +
-          ((live?.rework ?? []).length > 0 ? (live.rework).join("、") + " 得先重新判过" : "要改判先由人推翻那条结论"),
+          ((live?.rework ?? []).length > 0 ? (live.rework).join("、") + " 得先重新判过" : "要改就开新一期把要补的记进去"),
       );
   }
   if (config) {
@@ -504,7 +504,7 @@ export function nextAction(doc, config) {
       return {
         who: "agent",
         what: "结清期审点名的那几段",
-        text: session.id + " 的期审不合格还在案：点名的段判过才能签收；判不了就由人推翻那条结论",
+        text: session.id + " 的期审不合格还在案：点名的段判过才能签收；判不了就开新一期把要补的记进去",
         command: `deed state`,
       };
     }
@@ -583,7 +583,7 @@ export function nextAction(doc, config) {
   }
   if (state === "fail") {
     // 走到这里说明这一段没有被点名的未做条目：要么点名的被放弃了，要么已经重新交付。
-    // 前者只能由人推翻那条结论（命令面不再产生 judge --rework），后者另出一份清单再审。
+    // 前者没有出路（账本不往回改），后者另出一份清单再审。
     const review = reviewOf(session, segment);
     const findings = review?.findings?.length ?? 0;
     const named = (review?.rework ?? [])
@@ -596,13 +596,14 @@ export function nextAction(doc, config) {
       const gone = stuck.filter((one) => one.status === "deferred");
       const text =
         gone.length > 0
-          ? `${segment.id} 的不合格（${review.by}）压着已经延后的 ${gone.map((one) => one.id).join("、")}：要么重新交付，要么由人推翻那条结论`
-          : `${segment.id} 的不合格（${review.by}）还压着：${stuck.map((one) => one.id).join("、")} 没有重新交付${findings > 0 ? `（${findings} 条发现）` : ""}——重新交付，或者由人推翻那条结论`;
+          ? `${segment.id} 的不合格（${review.by}）压着已经延后的 ${gone.map((one) => one.id).join("、")}：先重新交付，交付不了就放弃并写理由`
+          : `${segment.id} 的不合格（${review.by}）还压着：${stuck.map((one) => one.id).join("、")} 没有重新交付${findings > 0 ? `（${findings} 条发现）` : ""}——重新交付，交付不了就放弃并写理由`;
       return {
         who: "agent",
         what: "清结论",
         text,
-        };
+        command: "deed plan",
+      };
     }
     // 手上那份清单是审查者的活：清单发出去、还没人回答，下一步是落结论，不是再发一份。
     const handed = freshBrief(session, segment);
@@ -613,13 +614,13 @@ export function nextAction(doc, config) {
         text: `${segment.id} 的不合格（${review.by}）还在案；新的一份清单已经交出去了：${handed.brief}`,
         command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
       };
-    // 旧账本里有点名之前写下的不合格：没有可结清的条目，只能由人推翻。
+    // 旧账本里有点名之前写下的不合格：没有可结清的条目，这一段停在这里，账本不往回改。
     if (named.length === 0)
       return {
-        who: "agent",
-        what: "清结论",
-        text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，只能由人推翻那条结论，或者开新一期`,
-        command: "deed panel",
+        who: "user",
+        what: "开新一期",
+        text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，这一期到此为止——开新一期把要补的记进去`,
+        command: 'deed tick --said "开新一期，把要补的记进去" --who user',
       };
     // 点名的条目改主意不做了：没有活可以重交，放行落下来会把它记为放弃并留下理由。
     const gave = named.filter((one) => one.status === "dropped");
@@ -668,7 +669,7 @@ export function sealBlockers(config, session, segment = openSegment(session)) {
     blockers.push(`还有 ${count.todo} 条没交付（${session.tasks.filter((one) => one.segment === segment.id && one.status === "todo").map((one) => one.id).join("、")}）`);
   const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
   if (live.length > 0)
-    blockers.push("这一段已经有审查结论：结局由那份结论定（推翻它只能在面板上按）");
+    blockers.push("这一段已经有审查结论：结局由那份结论定（要改就开新一期）");
   if (needsReview(config, session, segment))
     blockers.push(`这一段按审查设置要审：结局得由审查者的结论落（deed review --segment ${segment.id}）`);
   return blockers;

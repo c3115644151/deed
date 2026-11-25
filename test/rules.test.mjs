@@ -84,7 +84,7 @@ test("a failing review keeps the segment shut until something changes", () => {
   const doc = fold([turn(1), add(2, "T1", ["core/fold.mjs"]), done(3, "T1"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
-  assert.equal(sealBlockers(config, session, session.segments[0]).includes("这一段已经有审查结论：结局由那份结论定（推翻它只能在面板上按）"), true);
+  assert.equal(sealBlockers(config, session, session.segments[0]).includes("这一段已经有审查结论：结局由那份结论定（要改就开新一期）"), true);
 });
 
 // A reviewer who looks and says no is not overruled by a glob.
@@ -92,7 +92,7 @@ test("a failing verdict counts even where review was not required", () => {
   const doc = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), verdict(4, "fail")]);
   const session = doc.sessions[0];
   assert.equal(reviewState(config, session, session.segments[0]), "fail");
-  assert.equal(sealBlockers(config, session, session.segments[0]).some((one) => one.includes("只能在面板上按")), true);
+  assert.equal(sealBlockers(config, session, session.segments[0]).some((one) => one.includes("要改就开新一期")), true);
 });
 
 test("a reworked delivery has no standing verdict left", () => {

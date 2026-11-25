@@ -1,4 +1,4 @@
-// 三个闸：议题通过、判决通过（推翻一条结论）、签收通过。它们只在面板上按——
+// 人只在面板上出手：签收（议题那一层还没做，闸先占位）。命令行那条路关掉了，
 // 命令行那条路关掉了，因为「人按的」与「程序跑的」必须在账本上分得开：
 // 面板只收本机、只收同源，落下的行写着 by 与 via:"panel"。
 import { signBlockers, exemptSegments, debt } from "../core/rules.mjs";
@@ -10,9 +10,6 @@ import { record } from "../lib/record.mjs";
 const sessionOf = (doc, id) =>
   id ? doc.sessions.find((one) => one.id === id) ?? null : (doc.sessions.at(-1) ?? null);
 
-const live = (doc) =>
-  doc.sessions.flatMap((one) => one.reviews.filter((rv) => rv.voidedAt === null).map((rv) => ({ session: one, review: rv })));
-
 // 现在这一页上有哪几个闸是开着的，以及为什么关着——面板只画开着的那些。
 export function gatesOf(doc, config = doc.config) {
   const session = sessionOf(doc, null);
@@ -23,22 +20,9 @@ export function gatesOf(doc, config = doc.config) {
     if (blockers.length > 0) return { open: false, why: blockers.join("；"), blockers };
     return { open: true, why: "", words: "", title: periodOf(doc, session) };
   })();
-  const running = live(doc).filter((pair) => !pair.session.closeKind);
-  const overturn = running.length
-    ? {
-        open: true,
-        why: "",
-        choices: running.map((pair) => ({
-          id: pair.review.id,
-          where: pair.review.scope === "session" ? pair.review.period ?? pair.session.id : pair.review.segment,
-          by: pair.review.by,
-          verdict: pair.review.verdict,
-        })),
-      }
-    : { open: false, why: "没有在案的结论可以推翻" };
   // 议题还没进账本（那一层还没做）：闸一直在，只是没有东西可放。
   const topicRelease = { open: false, why: "还没有议题" };
-  return { sign, overturn, topicRelease };
+  return { sign, topicRelease };
 }
 
 const demand = (text) => {
@@ -87,28 +71,6 @@ export function applyGate(root, action = {}) {
       { at: action.at ?? null },
     );
     return { ...written, notes: notesAfterSign(written.doc, written.ev.s) };
-  }
-  if (kind === "overturn") {
-    const id = String(action.review ?? "");
-    if (!id) demand("推翻要说清是哪一条结论：review");
-    if (!String(action.why ?? "").trim()) demand("推翻一条结论要说清为什么");
-    return record(
-      root,
-      (doc) => {
-        const pair = live(doc).find((one) => one.review.id === id);
-        if (!pair) demand("账本里没有在案的结论 " + id);
-        if (pair.session.closeKind) demand("这一期已经签收：账本不往回改，要推翻得在签收之前");
-        return {
-          k: "review.overturn",
-          s: pair.session.id,
-          review: id,
-          why: String(action.why).trim(),
-          by: action.by ?? "user",
-          via: "panel",
-        };
-      },
-      { at: action.at ?? null },
-    );
   }
   if (kind === "topic-release") demand("还没有议题：这一层还没做");
   demand("面板不认这个闸：" + (kind || "（空）"));

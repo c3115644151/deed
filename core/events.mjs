@@ -39,7 +39,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 21;
+export const EVENT_VERSION = 22;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -76,6 +76,9 @@ export const MEANING = {
   // 三个闸放到面板上：签收与推翻结论不再从命令行发生，落下的行要写明是谁在哪按的
   // （by + via:"panel"）。命令行那两条路当场拒。旧行照读（那时 by 是自述）。
   gates: 21,
+  // 推翻这个动作不存在了：结论判错由审查机制自己回答，人不需要 Amendments 账本。
+  // 新行一律拒；旧账本里那一两行照读，占位仍留着，读得动、不再产生。
+  noOverturn: 22,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -322,9 +325,9 @@ export function validateEvent(ev, at) {
       need(ev, "review");
       need(ev, "why");
       need(ev, "by");
-      // 第 21 版起它只在面板上按：命令行那条路当场拒，账本上要读得出是谁在哪按的。
-      if (meaningOf(ev) >= MEANING.gates && ev.via !== "panel")
-        throw new Error('review.overturn 只在面板上按：via 要写 "panel"');
+      // 第 22 版起这个动作不收了：推翻一条结论不是人要做的事。旧行照读（见 fold）。
+      if (meaningOf(ev) >= MEANING.noOverturn)
+        throw new Error("推翻一条结论已经不收（含义第 22 版）：账本不往回改，要改结论就开新一期把要补的记进去");
       break;
     // 免审段的结局：审查设置说这一段不用审，但段仍然要有人封，不然它永远开在
     // state 里、谁也签不了收。它不是审查结论，所以不写 review.log。
