@@ -310,7 +310,8 @@ test("a workspace is not a project until it says so, and the standing is compute
   fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "export const a = 1;\n");
   fs.writeFileSync(path.join(cwd, "app", "x.mjs"), "export const x = 1;\n");
   fs.mkdirSync(path.join(cwd, "tests"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "tests", "t.mjs"), "export const t = 1;\n");
+  fs.writeFileSync(path.join(cwd, "tests", "t.test.mjs"), "export const t = 1;\n");
+  deed(cwd, "plan");
   const said = deed(cwd, "project", "--shape", "software", "--layers", "core=core:,app=app:core,tests=tests:core+app", "--extras", "scripts", "--background", "一个本地工具；不碰网络。", "--by", "user");
   assert.equal(said.status, 0, said.stdout + said.stderr);
   assert.equal(kinds(cwd).filter((one) => one === "project.declare").length, 1, "声明是账本上的一行");
@@ -324,6 +325,6 @@ test("a workspace is not a project until it says so, and the standing is compute
   const fell = deed(cwd, "check");
   assert.equal(fell.status, 0, "未通过也不是命令失败：它不挡三种状态");
   assert.match(fell.stdout, /2\/3 条通过/u);
-  assert.match(fell.stdout, /✗ 文件树符合声明的结构/u);
+  assert.match(fell.stdout, /✗ 文件树符合范式/u);
   assert.match(fell.stdout, /未通过 1 条；它们不挡三种状态/u);
 });

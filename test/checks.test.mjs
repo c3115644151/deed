@@ -12,7 +12,7 @@ const doc = (project = null) => ({
   project,
 });
 
-const tree = (files, imports = []) => ({ files, imports });
+const tree = (files, imports = [], plan = true) => ({ files, imports, plan });
 const declared = (extra = {}) => ({
   shape: "software",
   background: "一个本地工具，给一个人用；不碰网络。",
@@ -51,7 +51,7 @@ test("a declared project passes when the tree keeps the declared directions", ()
       { role: "app", dir: "app", mayImport: ["core"] },
       { role: "tests", dir: "tests", mayImport: ["core", "app"] },
     ] })),
-    tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs"], [{ from: "app/b.mjs", to: "core/a.mjs" }]),
+    tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "app/b.mjs", to: "core/a.mjs" }]),
   );
   assert.equal(state.declared, true);
   assert.equal(state.passed, 3);
@@ -65,12 +65,12 @@ test("a reversed import is a structural failure, and it says which edge", () => 
       { role: "app", dir: "app", mayImport: ["core"] },
       { role: "tests", dir: "tests", mayImport: ["core", "app"] },
     ] })),
-    tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs"], [{ from: "core/a.mjs", to: "app/b.mjs" }]),
+    tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "core/a.mjs", to: "app/b.mjs" }]),
   );
   const shape = list.find((one) => one.id === "shape");
   assert.equal(shape.verdict, "fail");
   assert.match(shape.detail, /core → app/u);
-  assert.match(shape.fix, /--layers/u, "未通过要给一条能跑的修法");
+  assert.match(shape.fix, /deed project/u, "未通过要给一条能跑的修法");
 });
 
 test("a declared layer that is not on disk fails, and says which one", () => {
@@ -80,7 +80,7 @@ test("a declared layer that is not on disk fails, and says which one", () => {
       { role: "app", dir: "app", mayImport: ["core"] },
       { role: "tests", dir: "tests", mayImport: ["core", "app"] },
     ] })),
-    tree(["core/a.mjs", "tests/c.mjs"]),
+    tree(["core/a.mjs", "tests/c.test.mjs"]),
   );
   const shape = list.find((one) => one.id === "shape");
   assert.equal(shape.verdict, "fail");
@@ -93,10 +93,7 @@ test("an empty background is a failure: signing would have no ruler", () => {
   assert.equal(background.verdict, "fail");
 });
 
-test("a project that opted out of structure passes that check without a tree", () => {
-  const list = checkAll(doc(declared({ shape: "free", layers: [] })), null);
-  assert.deepEqual(list.map((one) => one.verdict), ["pass", "pass", "pass"]);
-});
+
 
 const software = (extra = {}) => declared({
   layers: [
@@ -108,14 +105,14 @@ const software = (extra = {}) => declared({
 });
 
 test("the standing falls back when the tree moves: it is a value, not a badge", () => {
-  const before = projectState(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs"]));
+  const before = projectState(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"]));
   assert.equal(before.passed, 3);
   const after = projectState(
     doc(software()),
-    tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs"], [{ from: "core/a.mjs", to: "app/b.mjs" }]),
+    tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "core/a.mjs", to: "app/b.mjs" }]),
   );
   assert.equal(after.passed, 2);
-  assert.deepEqual(after.missing, ["文件树符合声明的结构"]);
+  assert.deepEqual(after.missing, ["文件树符合范式"]);
 });
 
 // 结构检查对着范式的"格"来判：一类项目至少要有的角色，目录名可以不同。
@@ -132,16 +129,17 @@ test("a software project that is missing a required role says which one", () => 
 });
 
 test("a directory nobody claims is reported, and extras is how you say it does not belong", () => {
-  const before = checkAll(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs", "scripts/d.mjs"]))
+  const before = checkAll(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs", "scripts/d.mjs"]))
     .find((one) => one.id === "shape");
   assert.equal(before.verdict, "fail");
   assert.match(before.detail, /没有归属：scripts/u, "盘上多出来的目录要有人认领，或者被显式排除");
-  const after = checkAll(doc(software({ extras: ["scripts"] })), tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs", "scripts/d.mjs"]))
+  const after = checkAll(doc(software({ extras: ["scripts"] })), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs", "scripts/d.mjs"]))
     .find((one) => one.id === "shape");
   assert.equal(after.verdict, "pass");
 });
 
-test("a directory may claim a role whose name differs from its own", () => {
+// 格名就是位置：允许"改个名字再声明"就等于让这条检查形式化。
+test("a paradigm role cannot be renamed by declaring another directory", () => {
   const renamed = declared({
     layers: [
       { role: "core", dir: "core", mayImport: [] },
@@ -149,8 +147,30 @@ test("a directory may claim a role whose name differs from its own", () => {
       { role: "tests", dir: "test", mayImport: ["core", "app"] },
     ],
   });
-  const shape = checkAll(doc(renamed), tree(["core/a.mjs", "cli/b.mjs", "test/c.mjs"], [{ from: "cli/b.mjs", to: "core/a.mjs" }]))
+  const shape = checkAll(doc(renamed), tree(["core/a.mjs", "cli/b.mjs", "test/c.test.mjs"], [{ from: "cli/b.mjs", to: "core/a.mjs" }]))
     .find((one) => one.id === "shape");
-  assert.equal(shape.verdict, "pass", shape.detail);
-  assert.match(shape.detail, /3 个目录认领 3 格/u);
+  assert.equal(shape.verdict, "fail");
+  assert.match(shape.detail, /app 用了 cli/u);
+  assert.match(shape.detail, /tests 用了 test/u);
+});
+
+test("a paradigm role cannot be swept into extras either", () => {
+  const hid = software({ extras: ["tests"] });
+  const shape = checkAll(doc(hid), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"])).find((one) => one.id === "shape");
+  assert.equal(shape.verdict, "fail");
+  assert.match(shape.detail, /不能当成 extras 藏起来：tests/u);
+});
+
+test("the structure is not a set of empty folders: the plan and the tests must really exist", () => {
+  const noPlan = checkAll(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [], false)).find((one) => one.id === "shape");
+  assert.equal(noPlan.verdict, "fail");
+  assert.match(noPlan.detail, /清单不成立/u);
+  const noTest = checkAll(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.mjs"])).find((one) => one.id === "shape");
+  assert.equal(noTest.verdict, "fail");
+  assert.match(noTest.detail, /tests 格里没有一个测试文件/u);
+});
+
+test("a project that opted out of structure says so instead of passing it", () => {
+  const list = checkAll(doc(declared({ shape: "free", layers: [] })), null);
+  assert.deepEqual(list.map((one) => one.verdict), ["pass", "na", "pass"], "不适用就是 na：它没通过，只是这条对它不成立");
 });

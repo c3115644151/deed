@@ -38,38 +38,52 @@ export const CHECKS = [
   },
   {
     id: "shape",
-    title: "文件树符合声明的结构",
+    title: "文件树符合范式",
     capability: "结构约束",
-    fix: 'deed project --layers "core=core:,app=cli:core+lib" --extras "scripts,examples" --by 谁',
+    fix: '把目录改成范式里的名字（core/ app/ tests/），或用 deed project 如实声明偏离，再看 deed check 指到哪',
     judge: ({ project, tree }) => {
       if (!project) return { verdict: "na", detail: "没有声明成项目" };
       if (project.shape === "free" || project.shape === "none")
-        return { verdict: "pass", detail: "这个项目声明不用结构约束" };
+        return { verdict: "na", detail: "这个项目声明不用结构：范式在这里不适用" };
       const layers = project.layers ?? [];
       if (layers.length === 0)
         return { verdict: "fail", detail: "声明成项目了，但没写分层：没有分层就没有可核的结构" };
-      // ① 范式要求的那几格必须在：缺一格，结构里一定少了一类东西。
+      if (!tree) return { verdict: "na", detail: "这次没带目录快照" };
+
+      // ① 范式要求的格必须在：缺一格，结构里就少了一类系统要读的东西。
       const roles = new Map(layers.map((one) => [one.role, one]));
       const absent = (PARADIGM[project.shape] ?? []).filter((role) => !roles.has(role));
       if (absent.length > 0)
+        return { verdict: "fail", detail: "这一类项目缺这" + absent.length + "格：" + absent.join("、") };
+
+      // ② 格的名字就是位置：范式规定的那几个格，目录必须同名。
+      // 允许"改个名字再声明"就等于让检查形式化——偏离要看得见，不能自己消掉。
+      const renamed = layers.filter((one) => one.role !== one.dir && (PARADIGM[project.shape] ?? []).includes(one.role));
+      if (renamed.length > 0)
         return {
           verdict: "fail",
-          detail: "这一类项目缺这" + absent.length + "格：" + absent.join("、") + "（声明里没有哪个目录认领它）",
+          detail: "范式里的格不能换目录名：" + renamed.map((one) => one.role + " 用了 " + one.dir).join("；"),
         };
-      if (!tree) return { verdict: "na", detail: "这次没带目录快照" };
-      // ② 声明的每个目录都得在盘上。
+
+      // ③ 声明的目录得在盘上（空目录不算：结构的意义是里面真放了东西）。
       const missing = layers.filter((one) => !tree.files.some((file) => file === one.dir || file.startsWith(one.dir + "/")));
       if (missing.length > 0)
         return { verdict: "fail", detail: "这些目录在盘上找不到：" + missing.map((one) => one.dir).join("、") };
-      // ③ 盘上的每个顶层目录都要有归属：认领成某一格，或者显式写进 extras。
-      const tops = [...new Set(tree.files.map((file) => file.split("/")[0]).filter((one) => tree.files.some((file) => file.startsWith(one + "/"))))];
+
+      // ④ 盘上每个顶层目录都要有归属：认领成一格，或写进 extras 说清它不参与结构。
       const extras = new Set(project.extras ?? []);
-      const homeless = tops.filter(
-        (one) => !extras.has(one) && !layers.some((layer) => one === layer.dir || one.startsWith(layer.dir + "/")),
+      const tops = [...new Set(tree.files.map((file) => file.split("/")[0]))].filter((one) =>
+        tree.files.some((file) => file.startsWith(one + "/")),
       );
+      const roleNames = new Set(PARADIGM[project.shape] ?? []);
+      const hiding = [...extras].filter((one) => roleNames.has(one));
+      if (hiding.length > 0)
+        return { verdict: "fail", detail: "这些目录本来就是范式里的格，不能当成 extras 藏起来：" + hiding.join("、") };
+      const homeless = tops.filter((one) => !extras.has(one) && !layers.some((layer) => one === layer.dir || one.startsWith(layer.dir + "/")));
       if (homeless.length > 0)
-        return { verdict: "fail", detail: "这些顶层目录没有归属：" + homeless.slice(0, 5).join("、") + "（认领成某一格，或写进 extras 说清它不属于结构）" };
-      // ④ 跨格的依赖方向：两端都在声明里、又不是同一格，就必须在 mayImport 里。
+        return { verdict: "fail", detail: "这些顶层目录没有归属：" + homeless.slice(0, 5).join("、") + "（认领成一格，或写进 extras）" };
+
+      // ⑤ 跨格的依赖方向。
       const where = (file) => layers.find((one) => file === one.dir || file.startsWith(one.dir + "/")) ?? null;
       const broken = [];
       for (const edge of tree.imports) {
@@ -81,7 +95,15 @@ export const CHECKS = [
       }
       if (broken.length > 0)
         return { verdict: "fail", detail: "依赖方向反了：" + [...new Set(broken)].slice(0, 3).join("；") };
-      return { verdict: "pass", detail: layers.length + " 个目录认领 " + roles.size + " 格，方向都对" };
+
+      // ⑥ 格里的东西要真成立：目前只有两份能被机械判——
+      // 清单（系统每次 submit 都读它）与测试（tests 格里得有测试文件，不能只是个空壳）。
+      if (!tree.plan) return { verdict: "fail", detail: "清单不成立：.deed/plan.md 没有或有空（deed plan 出草稿）" };
+      const testsLayer = layers.find((one) => one.role === "tests");
+      const hasTest = testsLayer && tree.files.some((file) => file.startsWith(testsLayer.dir + "/") && /\.(?:test|spec)\./u.test(file));
+      if (!hasTest) return { verdict: "fail", detail: "tests 格里没有一个测试文件：这一格是空的" };
+
+      return { verdict: "pass", detail: layers.length + " 个目录，名字与格都对上，方向都对" };
     },
   },
   {
