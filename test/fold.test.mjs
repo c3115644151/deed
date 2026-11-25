@@ -74,6 +74,20 @@ test("a segment waiting for a verdict takes no new work: the next entry opens a 
   assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
 });
 
+test("a second brief supersedes the first one nobody answered: the segment stops waiting", () => {
+  // 一段发过好几份清单是常态（前一份写得不对、或者作者改了字节另出一份）。
+  // 「有哪一份没被回答」当在等结论，往后再出一份、被回答，这一段也永远解不开。
+  const doc = fold([
+    turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
+    { ...brief(5, "S01.1"), brief: "b2.md" },
+    { v: 3, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b2.md", findings: [], rework: ["T1"], why: "不够" },
+    add11(7, "T2"),
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(session.segments.length, 1, "最后那份被回答了，这一段就不再等结论：新活还落它这里");
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.1");
+});
+
 test("there is one prep segment, and work written after it lands in it", () => {
   // 送审的那一批不再收活，接下来的活全进同一个预备段：后来的新活不该每批开一个新段。
   const doc = fold([

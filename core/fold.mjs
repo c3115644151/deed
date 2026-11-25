@@ -95,10 +95,14 @@ function nextSegment(session, at, carried = false) {
 // 决定收不收活的地方必须在这一层——只在 submit 里挡，重放出来的段仍会多出一条任务。
 // 这一段手上那份清单还没人回答：它就是等结论的样子。清单里写新条目时也要问同一句
 // ——新条目落不落进这一段，只由这里说得算。
-export const awaitingVerdict = (session, segment) =>
-  (session.briefs ?? []).some(
-    (one) => one.scope === "segment" && one.segment === segment.id && one.answeredBy === null && one.withdrawnAt === undefined,
-  );
+export const awaitingVerdict = (session, segment) => {
+  // 只有手上最后那一份算数：再出一份清单，前一份没人回答也不再是这一段的"等结论"。
+  // 按"有哪一份没被回答"去判，一段只要发过两回就永远解不开——第二份被回答，第一份还挂着 null。
+  const last = (session.briefs ?? [])
+    .filter((one) => one.scope === "segment" && one.segment === segment.id)
+    .at(-1);
+  return Boolean(last) && last.answeredBy === null && last.withdrawnAt === undefined;
+};
 
 // 清单没被回答之前，这一段是冻结的：要么审，要么先把清单撤回再改。从账本含义第 19 版
 // 起这么读；旧行按当时的样子重放——那时边审边改是允许的，拿今天的话去判它们是坏账。

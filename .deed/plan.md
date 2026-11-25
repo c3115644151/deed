@@ -229,8 +229,9 @@
 ~~ T96 出清单前先算要不要审：免审就不出清单，直接把下一步指到封存或签收
   标准：deed review --segment 与 deed review --all 出清单之前先算门槛（needsReview／needsWhole）；算下来不用审时不写账本、不生成清单与角色包，打印「门槛说这一段不用审」并把下一步指到 deed seal（段）或签收（整期），exit 0；要审时行为与现在一样；有用例断言免审段调用后账本没有新的 review.brief、目录里没有新文件
   理由：和 T103 是同一条：都要求出清单前先算要不要审。重复登记，按 T103 做，这条不单独立项。
-- [ ] T100 审查者说那条没人看着的分支，其实是一条死路：删掉它，而不是给它补用例
+- [x] T100 审查者说那条没人看着的分支，其实是一条死路：删掉它，而不是给它补用例
   标准：core/fold.mjs 的 segmentOf 在等结论时不查 livePrep（预备段就是最末那个开段，查也查不到第二处）；这条删除有用例看着——把搬运改回每次开新段，test/fold.test.mjs 的预备段用例仍红；全量测试全绿；HANDOFF 的「下一步」不再写已经做完的事
+  交付：core/fold.mjs:138-146 的 segmentOf 只问最末那个开段是否在等结论，不再问 livePrep——那是同一个判断的第二处，预备段就是最末那个开段，问也问不出第二个答案；test/fold.test.mjs 的预备段用例照旧看着这条判断；HANDOFF 的「现在到哪一步」只剩一句指向 deed state 与 deed plan --print，五波表已经不在那份文件里
 - [x] T103 材料只在真要判时才出：不用审的段与整期不生成清单
   标准：deed review --segment 与 deed review --all 出清单之前先算 needsReview／needsWhole；算下来不用审就不写账本、不生成清单与角色包，打印门槛的原话并把下一步指到 deed seal 或签收，exit 0；要审时行为与现在一致；有用例（免审段调用之后账本没有新的 review.brief，.deed/review 下没有新文件）
   交付：跑：node --test 207/207 全过（其中 test/cli.test.mjs 117 条，含 a segment the settings exempt gets no brief 那条）；这一轮的字节上 deed review 仍先算门槛再出清单，免审段不写账本、不生成文件，下一步指到 seal／签收
@@ -243,10 +244,12 @@
 - [x] T106 说法要能跑出来：交付记录里的现象必须配一条命令与它的期望
   标准：交付记录里写「某操作之后会怎样」时必须带一行「命令 + 期望」，落账时真跑一遍，输出不符就整批拒；不带期望的说法在清单上只算「说法」，不算可核事实；有用例（写一条不成立的期望 → exit 1 并指出是哪一条；成立的期望 → 落账且记录里留下命令与输出）
   交付：跑：node --test 207/207 全过（其中 cli 117 条，含把要看到的话写成一行、记账前真跑那条）；没配命令的交付在清单上仍标只是说法
-- [ ] T107 落账那一刻自查：刚落的钉当场就旧、或数当场对不上，就地报出来
+- [x] T107 落账那一刻自查：刚落的钉当场就旧、或数当场对不上，就地报出来
   标准：交付时对每个路径取两次 sha（量差前与落账后），不一致就拒；落账后立刻跑一遍 verify 的核对，若刚落的钉当场过期或空交付，当场打印并 exit 1，不等审查者；有用例（落账前手改文件 → 被拒；正常交付 → exit 0 且不报）
-- [ ] T108 下一步写成五波排期与交接清单，安排到这里要做的活
+  交付：cli/verbs/task.mjs:49-95 两处：量差之后、记账之前 requireUnchanged 真拒并印「记账之前再核一遍 · N 条没有变」；记账之后 auditDelivered 核刚落的那一条，空交付印「空交付 · T1 · 谁也没指着」、字节变了印「字节变了 · T1 · 路径 · 记下 …，记账这一刻是 …」，两者都 exit 1；核过印「记账之后核对 · 1 条都对得上当时那份内容」
+~~ T108 下一步写成五波排期与交接清单，安排到这里要做的活
   标准：HANDOFF.md 的「下一步」写清五波顺序、每波的依赖理由、每波收尾怎么送审，以及换人接手按什么顺序读哪些文件；条目号与文件路径在这份字节上核得出来；docs 测试全绿
+  理由：标准要一张写在 HANDOFF.md 里的五波表，而你已经定了那份文件最终要删、仓库不留工程材料：排期从 deed state 与 deed plan --print 读，表本身不再要有。这一条的标准因此作废——作废不等于没做，账本上的顺序由 T121（行序即顺序）与 T119（下一步不被待裁劫持）承接
 - [x] T109 面板的指纹盖住它加载过的全部模块：改了 core/ 也要换进程
   标准：buildNow 走 board/、core/、lib/ 三个目录里的每一份 .mjs（不列名单，新加的模块自动进去）；改 core/fold.mjs 之后下一条命令会把旧面板换掉；有用例断言 core/fold.mjs 在名单里，且指纹不等于只盖面板自己那三份的值
   交付：node --test 194/194（跑在交付的这份字节上，DEED_NO_PANEL=1）；buildNow 现在盖住 board/、core/、lib/ 三个目录共 13 份 .mjs，实录：改了 core/fold.mjs 之后账本重放是 19 段，而旧面板进程（build 指向前一份）仍在按老 fold 渲染出第二十段，7317 与 7318 两个端口的页面都还印着 S02.20；换成新进程之后页面只剩 S02.1…S02.19 十九个段头，S02.20 只还在两条文字里（一轮的 said 与 T95 的交付记录）；变异核对：把 TREES 缩回 ["board"]，test/cli.test.mjs 那条用例红（107 条过 1 条败）
@@ -277,6 +280,9 @@
   交付：跑：node --test 215/215（test/cli.test.mjs 的 a frozen segment refuses…、verify reports evidence pinned…and does not hold the judgement 两条）；core/fold.mjs 的 frozenFor 只挡交付与撤回一条交付，defer／drop／carry 放行，undo 只在条目已交付时拦；cli/session.mjs 的 auditSegment 只查交付有没有指到工作区外面，不再比字节；cli/verbs/review.mjs 删掉 drifted 那段；docs/DESIGN.md 规则 12 与 §1.1 的段审／期审行、lib/words.mjs 与 README／AGENTS 的冻结行改成同一句「交付与撤回交付不收；记轮次、写题、放弃、改到下一段照旧」
 - [ ] T127 一段结束后段审，全段结束后期审，签收在期审之后
   标准：`deed review --segment S0x.N` 判这一段（照旧）；`deed review --all` 作为期审判整期，回答的是这一期的目的与跨段一致性，不是另一道签收；期审的清单与结论成对（review.brief 与 review.log 记 scope:"session"），旧账本里早先的 session 结论仍只作历史、不挡签收；每一段都有结局、无未做、无已交付未判之后才出期审清单，期审 pass 才轮到签收，fail 点名哪一段就重开那一段；`deed state` 在段全关之后先给「出期审清单／落期审结论」，面板同步；EVENT_VERSION 升 1、旧行照读；有用例（段没关全不出发期审清单；期审 pass 之后签收可行；期审 fail 点名一段则那一段重新打开）
+- [x] T128 一段发过多份清单时，只有最后那份算还在等结论
+  标准：`awaitingVerdict` 只看这一段手上的最后一份清单（scope:segment 的最后一条 review.brief）；前一份没人回答不再让这一段继续冻结、也不再让新活自己开段；再出一份、被回答之后这一段回到执行态，冻结算的是同一句；旧账本照读；有用例（同一段发过两份、第一份没人回答、第二份被判 → 段不再等结论、新活落回这一段；把判断改回「有任何一份没被回答」即红）
+  交付：跑：node --test 216/216（全量；这个数就是 --run 当场采到的）；core/fold.mjs 的 awaitingVerdict 只看这一段最后那一份清单——前一份没人回答不再让这一段继续冻结、也不再让新活自己开段，再出一份被回答之后这段回到执行态（cli/session.mjs 的冻结与 cli/plan.mjs 的落点读的是同一句）；新增 test/fold.test.mjs 的 a second brief supersedes the first one nobody answered；变异：把判断改回 some → 那条红（fold 37 过 1 败），还原后 fold 38/38
 - [x] T122 撤回一条「改到下一段」，走空的段跟着消失
   标准：`deed task undo T<号> --why "…"` 能撤回一条 carry——条目回到它原来那一段，那一段重新成为预备段；被走空的那一段从段列表里消失（段由条目生出来，不是计划）；撤销一条从未挪过的条目仍被拒并说清；有用例（挪出去再撤回来，段列表只剩一条；把删段那一行改掉，那一条红）
   交付：跑：node --test test/fold.test.mjs 37/37（两条新用例：撤回之后段列表只剩一条、没撤过可撤的仍被拒）；core/fold.mjs 的 task.undo 在条目还没交过、站在最末一段时把它送回上一段，把那一段的 carried 置回 true，并把走空的那一段从重放结果里删掉；变异：把删段那一行改成 void left → 那一条红
