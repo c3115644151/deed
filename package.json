@@ -1,6 +1,6 @@
 {
   "name": "deed",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "private": true,
   "description": "A workspace as an append-only ledger: facts in, judgment and the next step out.",
   "license": "MIT",
@@ -17,7 +17,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "test:fast": "node --test test/fold.test.mjs test/rules.test.mjs test/plan.test.mjs test/docs.test.mjs board/board.test.mjs",
+    "test:fast": "node --test test/fold.test.mjs test/rules.test.mjs test/plan.test.mjs test/docs.test.mjs test/checks.test.mjs board/board.test.mjs",
     "state": "node cli/deed.mjs state",
     "board": "node cli/deed.mjs serve"
   }

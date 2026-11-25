@@ -293,3 +293,35 @@ test("a red run cannot be handed in, and the refusal says what failed", () => {
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /--run 的命令没有跑通（退出 1）/);
 });
+
+// 体检层是只读的：它回答"这个工作区还是不是一个项目、差哪几条"，不产生行动。
+// 声明进账本，状态是算出来的，所以它可以退回去。
+test("a workspace is not a project until it says so, and the standing is computed", () => {
+  const cwd = workspace("standing");
+  deed(cwd, "init", "--said", "开始");
+  const plain = deed(cwd, "check");
+  assert.equal(plain.status, 0, "体检不因为没有项目而失败");
+  assert.match(plain.stdout, /没有声明（工作区模式/u);
+  assert.match(plain.stdout, /— 项目背景已写 · 没有声明成项目/u, "不适用要写成不适用，不能算通过");
+  assert.match(deed(cwd, "state").stdout, /项目 · 没有声明/u, "state 顶上那行说清现在是哪种模式");
+
+  fs.mkdirSync(path.join(cwd, "core"), { recursive: true });
+  fs.mkdirSync(path.join(cwd, "app"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "export const a = 1;\n");
+  fs.writeFileSync(path.join(cwd, "app", "x.mjs"), "export const x = 1;\n");
+  const said = deed(cwd, "project", "--shape", "software", "--layers", "core:,app:core", "--background", "一个本地工具；不碰网络。", "--by", "user");
+  assert.equal(said.status, 0, said.stdout + said.stderr);
+  assert.equal(kinds(cwd).filter((one) => one === "project.declare").length, 1, "声明是账本上的一行");
+
+  const declared = deed(cwd, "check");
+  assert.match(declared.stdout, /项目 · software · 3\/3 条通过/u);
+  assert.match(deed(cwd, "state").stdout, /项目 · software · 3\/3/u);
+
+  // 树一走样，状态自己掉回去：它是当前值，不是一次性的徽章。
+  fs.writeFileSync(path.join(cwd, "core", "a.mjs"), 'import "../app/x.mjs";\nexport const a = 1;\n');
+  const fell = deed(cwd, "check");
+  assert.equal(fell.status, 0, "未通过也不是命令失败：它不挡三种状态");
+  assert.match(fell.stdout, /2\/3 条通过/u);
+  assert.match(fell.stdout, /✗ 文件树符合声明的分层/u);
+  assert.match(fell.stdout, /未通过 1 条；它们不挡三种状态/u);
+});

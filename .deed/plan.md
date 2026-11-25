@@ -322,7 +322,10 @@
   标准：submit --run 在「自上次记录以来工作区内容没变」时复用那次结果并把它记进交付记录（记着那份结果的来源与工作区指纹），变了就照旧真跑；用例覆盖复用与失效两条路；不得出现「复制来的数字」——复用的是同一份字节上的真跑
 - [ ] T142 一条命令换掉「撤回再重交」：task renew
   标准：交付过的条目在字节变了之后可以一条命令重记（记新内容与为什么），账本上留一条事件而不是 undo+done 两条；verify 不再把重记过的那条当过期；用例覆盖 renew 之后 verify 干净、事件种类只有 one 条
-<!-- 已完成（25 条）：交过的，往下沉 -->
+<!-- 已完成（26 条）：交过的，往下沉 -->
+- [x] T144 体检层：这个工作区还是不是一个项目，用一张有序的检查表算出来
+  标准：core/checks.mjs 是纯函数（账本 + 目录快照 → 逐条结论），CHECKS 有序、每行登记"事实/判定/修法/能力"；三种结论 pass/fail/na，未声明项目时项目级检查一律 na 且不算未结项；projectState 给 declared/shape/passed/total/missing 且会随树走样退回去；project.declare 事件（含义 25）进账本，认可不落盘；deed check 只读、exit 0、逐条印结论与修法；deed state 顶上印"项目 · 形态 · k/n"或"没有声明（工作区模式）"；未通过不挡三种状态；既有用例全绿
+  交付：node --test 212/212（全量，含新 test/checks.test.mjs 8 条与 cli-state2 的 standing 用例）；core/checks.mjs 的 CHECKS 三行（工作区/树/背景）各有 事实·判定·修法·能力 四样，checkAll/projectState 不读盘不读钟；lib/tree.mjs 只提供目录与相对 import；deed check 只读、未通过也 exit 0，逐条印 ✓/✗/— 与修法；deed state 顶上那行随说了算的账本变（本仓已声明 software，4 层方向都对，3/3）；project.declare 是含义第 25 版的事件，package 0.22.0；DESIGN §13、README 命令表与事件表、规则块三份同步
 - [x] T143 把不对的机制删掉：账本不对字节、清单每份列全部、去掉「先做后记」与每段花了多少
   标准：cli/audit.mjs 与 deed verify 动词删除（cli/spec.mjs、cli/deed.mjs 里不再有），$digest 开关不再收；交付记录只记路径与字节数（evidence.files=[{path}]、changed、bytes），清单只记两份路径（review.brief 的 brief/guide），都不带 sha256 或内容指纹；送审冻结仍然挡住「这一段的活在被审期间被改动」；清单每份列全部条目（没有「判过了、这次不再重判」一节）；「先做后记」（lateWork）与 costOf 及 state/面板上的「花了 · N 份清单」都删除；doc/README/DESIGN/HANDOFF/规则块与代码同一口径；删掉的机制对应的用例一并删除，留下的用例全绿
   交付：node --test 203/203（全量，含 board/docs/fold/plan/rules 与八个 cli 文件）；cli/audit.mjs 与 cli/verbs/verify.mjs 删除，SPEC 与 commands 里不再有 verify，--digest 拒收（`deed task --help` 的开关表里只剩 --evidence/--files/--by/--why）；交付记录只留 files:[{path}] + changed + bytes，review.brief 只留两份路径；送审冻结照旧（在审的那一段交付被拒）；清单每份列全部条目；lateWork 与 costOf 删除，state 与面板不再印「花了」；README/DESIGN/HANDOFF/AGENTS 与 lib/words.mjs 的规则块同一口径（test/docs.test.mjs 6/6 逐字比对通过）

@@ -13,6 +13,8 @@ import { digest } from "../core/digest.mjs";
 import { fold, frozenFor } from "../core/fold.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
+import { projectState } from "../core/checks.mjs";
+import { treeOf } from "../lib/tree.mjs";
 import { edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
@@ -308,6 +310,15 @@ export function printState() {
     return;
   }
   console.log("");
+  // 体检层的一行：这个工作区是不是项目、通过了几条。状态是算出来的，所以每看一次算一次；
+  // 目录快照只在这一条里用得上，算不出来也不影响下面的输出。
+  const standing = projectState(doc, treeOf(ROOT));
+  console.log(
+    standing.declared
+      ? "项目 · " + standing.shape + " · " + standing.passed + "/" + standing.total +
+          (standing.missing.length ? "（未通过：" + standing.missing.join("、") + "）" : "（已认可）")
+      : "项目 · 没有声明（工作区模式：三种状态照常）",
+  );
   console.log("状态 · " + ({ idle: "没有在推进的会话", discuss: "讨论", execute: "执行", accept: "验收" }[reading(doc)]));
   if (!open) {
     console.log(

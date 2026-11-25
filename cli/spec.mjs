@@ -82,6 +82,17 @@ export const SPEC = {
     usage: ['deed shelve --why "…"'],
   },
   state: { flags: [], usage: ["deed state"] },
+  // 体检层：只读。它回答"这个工作区还是不是一个项目、差哪几条"，
+  // 不产生行动，也不挡三种状态。
+  check: { flags: [], usage: ["deed check               体检：项目状态与逐条诊断（只读）"] },
+  project: {
+    flags: ["shape", "background", "layers", "by", "why"],
+    usage: [
+      'deed project --shape software --by "谁"      声明这个工作区是一个项目（形态决定启用哪些约束）',
+      'deed project --background "是什么、为谁、不做什么" --by "谁"',
+      'deed project --layers "core:,lib:core,cli:core+lib" --by "谁"   每层写目录与它可以依赖的目录',
+    ],
+  },
   doctor: { flags: [], usage: ["deed doctor"] },
   gate: { flags: [], usage: ["deed gate [名字…]              按账本里的 gates 顺序跑门，失败即退出"] },
   serve: { flags: ["port"], usage: ["deed serve [--port 7317]"] },
@@ -89,7 +100,7 @@ export const SPEC = {
 };
 
 // 帮助里的顺序就是这里的顺序：帮助从 SPEC 出，不再有一份手抄的清单。
-export const ORDER = ["init", "tick", "task", "ask", "goal", "plan", "submit", "review", "seal", "sign", "shelve", "state", "doctor", "gate", "serve", "panel"];
+export const ORDER = ["init", "tick", "task", "ask", "goal", "project", "plan", "submit", "review", "seal", "sign", "check", "shelve", "state", "doctor", "gate", "serve", "panel"];
 
 export const HEAD = ["deed · 一个工作区的放行协议", "", "deed --version                   打印这个程序自己的版本"];
 

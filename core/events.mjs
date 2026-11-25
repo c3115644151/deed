@@ -23,6 +23,8 @@ export const EVENT_KINDS = [
   "review.overturn",
   "verdict.pass",
   "segment.plan",
+  // 这个工作区是项目，还是只是借它干活的地方：形态、背景、分层都写在这一行里。
+  "project.declare",
   "segment.seal",
   // 只读：旧账本里还有这两种结局，命令面已经不再产生它们（一段的结局由审查者的
   // 结论定，人只能推翻结论）。
@@ -41,7 +43,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 24;
+export const EVENT_VERSION = 25;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -85,6 +87,9 @@ export const MEANING = {
   judgement: 23,
   // 段可以由清单预先排进来：一节就是一个段，先声明、按顺序接过活。
   segmentsPlanned: 24,
+  // 项目声明：工作区可以是项目，也可以只是干活的地方。声明之后才有项目级的东西
+  // （结构约束、条目、期审拿背景当尺子），没有声明时三种状态照常跑。
+  projectDeclared: 25,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -333,6 +338,23 @@ export function validateEvent(ev, at) {
       if (meaningOf(ev) < MEANING.segmentsPlanned)
         throw new Error("segment.plan 是含义第 24 版才有的事件：v 要写 " + MEANING.segmentsPlanned);
       break;
+    // 项目声明：形态说这个工作区是哪一类项目；背景说它是什么、为谁、不做什么；
+    // 分层说它自己的目录与依赖方向（每个项目不一样，所以要它自己说）。
+    case "project.declare": {
+      if (meaningOf(ev) < MEANING.projectDeclared)
+        throw new Error("project.declare 是含义第 25 版才有的事件：v 要写 " + MEANING.projectDeclared);
+      need(ev, "shape");
+      if (typeof ev.shape !== "string" || ev.shape.trim() === "") throw new Error("project.declare 缺少 shape");
+      for (const layer of ev.layers ?? []) {
+        if (!layer || typeof layer.dir !== "string" || layer.dir.trim() === "")
+          throw new Error("project.declare 的每一层都要写 dir：收到 " + JSON.stringify(layer));
+        if (layer.mayImport !== undefined && !Array.isArray(layer.mayImport))
+          throw new Error("project.declare 的 mayImport 要是数组：" + JSON.stringify(layer.mayImport));
+      }
+      if (ev.background !== undefined && typeof ev.background !== "string")
+        throw new Error("project.declare 的 background 要是一段文字");
+      break;
+    }
     case "segment.seal":
       need(ev, "segment");
       need(ev, "why");

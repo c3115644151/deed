@@ -12,7 +12,7 @@ const noway = (message) => {
   throw new Error(message);
 };
 
-const blank = () => ({ v: 1, sessions: [], changes: [], config: null });
+const blank = () => ({ v: 1, sessions: [], changes: [], config: null, project: null });
 
 const lastSession = (doc) => doc.sessions[doc.sessions.length - 1] ?? null;
 
@@ -202,6 +202,21 @@ export function fold(events) {
       case "turn": {
         const session = sessionOf(doc, ev);
         session.turns.push({ at: ev.at, who: ev.who, said: ev.said, did: ev.did ?? null });
+        break;
+      }
+      // 项目声明：这个工作区是不是一个项目、是哪一类、它自己怎么分层。声明是账本
+      // 事实（可改，旧的那份留在历史里），而"认没认出这是本项目"是算出来的，不是记下来的。
+      case "project.declare": {
+        doc.project = {
+          at: ev.at,
+          by: ev.by ?? null,
+          shape: ev.shape,
+          background: ev.background ?? "",
+          layers: (ev.layers ?? []).map((one) => ({
+            dir: String(one.dir).replace(/^\/+|\/+$/gu, ""),
+            mayImport: Array.isArray(one.mayImport) ? [...one.mayImport] : [],
+          })),
+        };
         break;
       }
       // Who changed the review threshold, when, and from what: a config file on
