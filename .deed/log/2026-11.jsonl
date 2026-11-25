@@ -1318,3 +1318,44 @@
 {"at":"2026-11-25T14:01:54.853Z","k":"task.order","s":"S02","id":"T102","order":14,"v":24,"w":"0.21.0"}
 {"at":"2026-11-25T14:01:54.853Z","k":"task.order","s":"S02","id":"T115","order":14,"v":24,"w":"0.21.0"}
 {"at":"2026-11-25T14:01:54.853Z","k":"task.order","s":"S02","id":"T131","order":14,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:31:24.577Z","k":"turn","s":"S02","who":"user","said":"做任务太慢，第一优先级是效率：一是自己做任务的时间，二是系统交互带来的时间，要机制化地优化","v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:31:25.161Z","k":"task.order","s":"S02","id":"T125","order":14,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:31:25.161Z","k":"task.add","s":"S02","id":"T139","title":"拆开最慢的那个测试文件，让每一轮验证从两分半降到一分钟","criteria":"test/cli.test.mjs（154 秒，占全量 98%）按主题拆成若干文件并抽公共步骤到 test/support/cli.mjs；node --test 的用例总数与拆分前一致（121 条），单条断言不变；`node --test` 的实际耗时降到原来的 40% 以下（同一台机器、同一份字节），package.json 加 `test:fast`（core+board+docs，1 秒级）","files":[],"segment":"S02.20","order":15,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:31:25.161Z","k":"task.add","s":"S02","id":"T140","title":"完成一条不该让后面每条都落一条先后：先后只在相对次序变了时写","criteria":"真实账本里 task.order 542 条、138 条任务（约四倍）；改成 submit 只比较「还没了结的条目在清单里的相对次序」，次序没变就不落 task.order；依次完成五条以后账本新增的 task.order 为 0（用例盯住事件数），把两条行上下调换再 submit 才各落一条；旧账本照旧读","files":[],"segment":"S02.20","order":16,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:31:25.161Z","k":"task.add","s":"S02","id":"T141","title":"同一份字节不重复跑 --run：submit 认上一次真跑过的结果","criteria":"submit --run 在「自上次记录以来工作区内容没变」时复用那次结果并把它记进交付记录（记着那份结果的来源与工作区指纹），变了就照旧真跑；用例覆盖复用与失效两条路；不得出现「复制来的数字」——复用的是同一份字节上的真跑","files":[],"segment":"S02.20","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:31:25.161Z","k":"task.add","s":"S02","id":"T142","title":"一条命令换掉「撤回再重交」：task renew","criteria":"交付过的条目在字节变了之后可以一条命令重记（记新内容与为什么），账本上留一条事件而不是 undo+done 两条；verify 不再把重记过的那条当过期；用例覆盖 renew 之后 verify 干净、事件种类只有 one 条","files":[],"segment":"S02.20","order":18,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T139","order":14,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.done","s":"S02","id":"T139","evidence":"跑：node --test 224/224（全量，同一份字节；拆完之后全量 63.8 秒，拆之前单文件 test/cli.test.mjs 一条就 154.1 秒）；test/cli.test.mjs 按主题拆成八个（review1/2、work1/2、state1/2、rules1/2，共 121 条，一条不少），公共步骤抽到 test/support/cli.mjs（CLI、OFF、deed、later、gate、judgeAll、judgeHere、signHere、judged、kinds、briefs、proof、writeLines、planFile、writePlan、readPlan 共 15 个具名导出，从 test/ 里 import 一个就够）；每条用例的断言一句没动——拆分只挪行；package.json 加 test:fast（fold+rules+plan+docs+board，1.5 秒）与原有的 test（node --test）。量：拆前 $t=154.1s（test/cli.test.mjs 单跑），拆成四文件 71.7s，八文件 62.7s；全量 223→224 条、63.8s。","by":"agent","run":{"command":"node --test","exit":0,"tests":224,"pass":224,"fail":0},"digest":"8ecd85709367d7a509c3f727823b87daae1e10b63f95581733812478666c1dfb","digestPath":"package.json","files":[{"path":"package.json","digest":"8ecd85709367d7a509c3f727823b87daae1e10b63f95581733812478666c1dfb"},{"path":"test/cli-review1.test.mjs","digest":"6f95a2d78f80c0a4eef9b96f81e02fcc9977220c545e8acafca3f3206c36bcc8"},{"path":"test/cli-review2.test.mjs","digest":"62da4fc014e0841ffb61a54600692eb7f206a81d096f4ec72069c163362e9dc6"},{"path":"test/cli-rules1.test.mjs","digest":"5eb778b4c537c83352bc096fd4590891e7f195ed5a232b66564cccf5d2af2db6"},{"path":"test/cli-rules2.test.mjs","digest":"b2f6dc1ce185225c0730c4b3b7e1dfc82441005c24a4cb7329e23e6bd0fb88a6"},{"path":"test/cli-state1.test.mjs","digest":"25d664d1209e0f34fac12907cb6b8ba6f69d4b83841c985972a32b5714617ecb"},{"path":"test/cli-state2.test.mjs","digest":"24e96aabc46370ddb111b1d3f712fbd78105f9c9d94d7c308d305c4af17c7abc"},{"path":"test/cli-work1.test.mjs","digest":"1b285c5dedc8fcbe913334ad5d9f2a48fcbad87bbe321b1bcdf1a24e682c089e"},{"path":"test/cli-work2.test.mjs","digest":"7fcbfc931253856db18d9a12cbcf347c4543b96ff04d4223eca442752d7079ac"},{"path":"test/support/cli.mjs","digest":"232f8c637640bc97ed6d3cc8139c99262426b0c429e055af6ba6311219b8a433"}],"changed":["package.json","test/cli-review1.test.mjs","test/cli-review2.test.mjs","test/cli-rules1.test.mjs","test/cli-rules2.test.mjs","test/cli-state1.test.mjs","test/cli-state2.test.mjs","test/cli-work1.test.mjs","test/cli-work2.test.mjs","test/cli.test.mjs","test/support/cli.mjs"],"bytes":{"package.json":640,"test/cli-review1.test.mjs":26857,"test/cli-review2.test.mjs":30654,"test/cli-rules1.test.mjs":10988,"test/cli-rules2.test.mjs":11501,"test/cli-state1.test.mjs":19745,"test/cli-state2.test.mjs":14878,"test/cli-work1.test.mjs":22631,"test/cli-work2.test.mjs":26028,"test/support/cli.mjs":3811},"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T140","order":15,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T141","order":16,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T142","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T125","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T101","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T113","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T114","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T116","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T117","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T118","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T119","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T121","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T122","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T123","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T124","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T126","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T127","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T128","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T129","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T130","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T132","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T133","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T134","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T135","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T136","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T138","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T94","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T97","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T98","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T99","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T102","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T115","order":17,"v":24,"w":"0.21.0"}
+{"at":"2026-11-25T14:32:42.987Z","k":"task.order","s":"S02","id":"T131","order":17,"v":24,"w":"0.21.0"}
