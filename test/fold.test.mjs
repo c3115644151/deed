@@ -47,23 +47,27 @@ test("a segment exists only once a task arrives, and a judged one never reopens 
 });
 
 // 当前含义版本：从预备段里改出去会真挪（v14 起）。
-const carry = (n, id) => ({ v: 14, at: T(n), k: "task.carry", s: null, id });
+// 含义第 24 版起，改到下一段要有落脚的地方（清单里排好的那一段）；旧版本按当时那套读。
+const carry = (n, id, v = 24) => ({ v, at: T(n), k: "task.carry", s: null, id });
+const carryOld = (n, id) => carry(n, id, 14);
 const brief = (n, segment) => ({
   v: 1, at: T(n), k: "review.brief", s: null, segment, brief: "b.md", briefDigest: "a".repeat(64), guideDigest: "c".repeat(64),
 });
 // 第 11 版起：手上那份清单还在等结论时，新活自己开下一段。这条规矩按写它的版本重放。
 const add11 = (n, id) => ({ ...add(n, id), v: 11 });
 
-test("an entry not yet done moves to the next segment, and that segment takes what comes after it", () => {
+test("an entry not yet done moves to the planned next segment, and that segment takes what comes after it", () => {
   const doc = fold([
     turn(1), add(2, "T1"), add(3, "T2"), add(4, "T3"), done(5, "T1"),
-    carry(6, "T2"), carry(7, "T3"), add(8, "T4"),
+    { v: 24, at: T(6), k: "segment.plan", s: null, segment: "S01.2" },
+    carry(7, "T2"), carry(8, "T3"), add(9, "T4"),
   ]);
   const [session] = doc.sessions;
-  assert.equal(session.segments.length, 2, "一批挪动只开一段：十条未做的条目不该开出十个段");
-  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
-  assert.equal(session.tasks.find((one) => one.id === "T3").segment, "S01.2");
-  assert.equal(session.tasks.find((one) => one.id === "T4").segment, "S01.2", "新写的条目也跟着最新那一段走");
+  assert.equal(session.segments.length, 2, "一批挪动只落一段：十条未做的条目不该开出十个段");
+  for (const id of ["T2", "T3"])
+    assert.equal(session.tasks.find((one) => one.id === id).segment, "S01.2", id + " 落进清单排好的那一段");
+  // 手写的一条新活没写节，落在收活的那一段（S01.1）——排好的段只由清单往里放。
+  assert.equal(session.tasks.find((one) => one.id === "T4").segment, "S01.1");
   assert.equal(session.segments[0].closedAt, null, "原来那一段没被封：它只是不再收东西");
 });
 
@@ -100,40 +104,34 @@ test("a second brief supersedes the first one nobody answered: the segment stops
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.1");
 });
 
-test("there is one prep segment, and work written after it lands in it", () => {
+test("there is one next segment, and work written after it lands in it", () => {
   // 送审的那一批不再收活，接下来的活全进同一个预备段：后来的新活不该每批开一个新段。
   const doc = fold([
     turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
     add11(5, "T2"), add11(6, "T3"), add11(7, "T4"),
   ]);
   const session = doc.sessions[0];
-  assert.equal(session.segments.length, 2, "预备段只有一个：写几条新活都还是它");
-  assert.equal(session.segments[1].carried, true);
+  assert.equal(session.segments.length, 2, "下一段只有一个：写几条新活都还是它");
+  assert.equal(session.segments[1].plannedAt, null, "它是自己开的，不是清单排的");
   for (const id of ["T2", "T3", "T4"]) {
-    assert.equal(session.tasks.find((one) => one.id === id).segment, "S01.2", id + " 该在预备段里");
+    assert.equal(session.tasks.find((one) => one.id === id).segment, "S01.2", id + " 该在下一段里");
   }
 });
 
-test("改到下一段 out of a prep segment that has deliveries hands the work to a new one", () => {
-  // 预备段里既有交过的、也有没做的：这一段要送审，没做的挪进新开的预备段，
+test("改到下一段 out of a segment that already delivered hands the work to the planned one", () => {
+  // 那一段里既有交过的、也有没做的：这一段要送审，没做的挪进清单排好的那一节，
   // 这一段自己不再接新活——不然它永远出不了清单（清单要等交付完）。
   const doc = fold([
-    turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"),
-    add11(5, "T2"), add11(6, "T3"), done(7, "T2"),
-    carry(8, "T3"), add11(9, "T4"),
+    turn(1), add11(2, "T1"), add11(3, "T3"), done(4, "T1"), brief(5, "S01.1"),
+    { v: 24, at: T(6), k: "segment.plan", s: null, segment: "S01.2" },
+    carry(7, "T3"), add11(8, "T4"),
   ]);
   const session = doc.sessions[0];
   const t3 = session.tasks.find((one) => one.id === "T3");
   const t4 = session.tasks.find((one) => one.id === "T4");
-  const source = session.segments.find((one) => one.id === "S01.2");
-  assert.equal(t3.segment, t4.segment, "同批的活落在同一个新预备段里");
-  assert.equal(session.segments.find((one) => one.id === t3.segment).carried, true);
-  assert.equal(source.carried, false, "要送审的那一段不再是预备段");
-  assert.deepEqual(
-    session.tasks.filter((one) => one.segment === source.id).map((one) => one.id),
-    ["T2"],
-    "没做的都走了：这一段只剩交付过的（T1 在送审的那一段）",
-  );
+  assert.equal(t3.segment, "S01.2", "改到下一段落进清单排好的那一段");
+  // 清单发出去的那一段不再收新活：T4 自己开下一段（排在 S01.2 之后）。
+  assert.equal(t4.segment, "S01.3");
 });
 
 test("a carry row written before meaning 14 still reads as staying put", () => {
@@ -148,12 +146,20 @@ test("a carry row written before meaning 14 still reads as staying put", () => {
   assert.equal(session.tasks.find((one) => one.id === "T3").segment, "S01.2");
 });
 
-test("a prep segment with nothing delivered cannot hand work off to itself", () => {
-  // 原地改没有意义：那一段没有要审的东西，改出去只会再开一个空段。
+test("a carry needs a segment after this one to exist", () => {
+  // 站在最末那一段里写「改到下一段」：下一段由清单给，不能自己凭空开一个。
   assert.throws(
-    () => fold([turn(1), add11(2, "T1"), done(3, "T1"), brief(4, "S01.1"), add11(5, "T2"), carry(6, "T2")]),
-    /已经在预备段 S01\.2 里，而这一段还没有交过的活/u,
+    () => fold([turn(1), add11(2, "T1"), carry(3, "T1")]),
+    /改到下一段得先有下一段/u,
   );
+  // 清单排好了下一段，同一个动作就落得下。
+  const doc = fold([
+    turn(1), add11(2, "T1"), add11(3, "T2"),
+    { v: 24, at: T(4), k: "segment.plan", s: null, segment: "S01.2" },
+    { v: 24, at: T(5), k: "task.carry", s: null, id: "T2" },
+  ]);
+  const session = doc.sessions[0];
+  assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
 });
 
 test("a delivery does not move: 改到下一段 is for work not yet done", () => {
@@ -458,10 +464,11 @@ test("an entry carries the order it was written with, and can be reordered later
 test("the segment a taken-back carry emptied disappears with it", () => {
   const doc = fold([
     turn(1), add(2, "T1"), add(3, "T2"), done(4, "T1"),
-    carry(5, "T2"),
-    { v: 16, at: T(6), k: "task.undo", s: null, id: "T2", why: "排错了", by: "agent" },
+    { v: 24, at: T(5), k: "segment.plan", s: null, segment: "S01.2" },
+    carry(6, "T2"),
+    { v: 16, at: T(7), k: "task.undo", s: null, id: "T2", why: "排错了", by: "agent" },
   ]);
   const session = doc.sessions[0];
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.1");
-  assert.deepEqual(session.segments.map((one) => one.id), ["S01.1"], "只留下有条目的那一段");
+  assert.deepEqual(session.segments.map((one) => one.id), ["S01.1", "S01.2"], "清单排过的那一段留着：它不是空的格子");
 });

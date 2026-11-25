@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { nextAction, sessionById } from "../../core/rules.mjs";
+import { nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
 import { changedPaths, rel, writeSnapshot } from "../../lib/store.mjs";
 import { auditDelivered, pinSet, requireUnchanged, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
@@ -142,7 +142,49 @@ export default function submit(argv) {
           if (said && said !== (one.goal?.text ?? "")) specs.push({ k: "goal.set", s: one.id, text: said, by });
           if (plan.items.length === 0 && one.tasks.length === 0) fail("清单里一条都没有：先写一条再 submit");
           const known = new Map(one.tasks.map((t) => [t.id, t]));
+          // 清单的每一节是一个段：写了段号的落那一段，空着节的当场领一个新号（预备段）。
+          // 收活只有一段：这一段之外的段只能记条目，交付要等它轮到。
+          const bySection = new Map();
+          const take = one.segments.find((seg) => seg.closedAt === null && seg.plannedAt === null) ?? null;
+          // 同一批里新开的段也要占号：doc0 还没被这一批改过，只看它会开出两个同号的段。
+          let topNumber = one.segments.reduce((top, seg) => Math.max(top, Number(seg.id.split(".").pop()) || 0), 0);
+          const sectionTarget = (item) => {
+            if (bySection.has(item.section)) return bySection.get(item.section);
+            const title = String(item.sectionTitle ?? "").trim();
+            let id;
+            if (title) {
+              if (!one.segments.some((seg) => seg.id === title))
+                fail("清单里写的 ## 段 " + title + " 账本里没有：新的一段写成空标题的 ## 段，submit 时领号");
+              const home = one.segments.find((seg) => seg.id === title);
+              if (home.closedAt !== null) fail("段 " + title + " 已经关闭：新条目进不去，另开一段写");
+              id = title;
+            } else if (take && ![...bySection.values()].includes(take.id)) {
+              // 空标题的第一节就是现在收活的那一段：草稿里它本来写着段号，
+              // 手写一份没写号时按"手上那一段"理解，不然一条活都落不下去。
+              // 前面已经认领过它的话，再一个空节就是新的一段。
+              id = take.id;
+            } else {
+              topNumber += 1;
+              id = one.id + "." + topNumber;
+              specs.push({ k: "segment.plan", s: one.id, segment: id });
+            }
+            bySection.set(item.section, id);
+            return id;
+          };
           const mentioned = new Set();
+          // 先把各节对应的段定下来（该领号的先领）：条目按文件顺序落，而 改到下一段 依赖
+          // "下一段已经排好"，所以段的声明必须走在条目前面。每一节都排在队里——哪怕它只印着
+          // 历史条目（那一节对上的是已经关闭的段，从此不再认领"现在收活的那一段"）。
+          for (const sec of plan.sections) {
+            const takes = plan.items.some((item) => item.section === sec.index && item.box === "?");
+            const title = String(sec.title ?? "").trim();
+            if (title && !takes) {
+              if (!bySection.has(sec.index) && one.segments.some((seg) => seg.id === title)) bySection.set(sec.index, title);
+              continue;
+            }
+            if (!title && !takes) continue;
+            sectionTarget({ section: sec.index, sectionTitle: sec.title });
+          }
           let seq = Number(nextId(doc0, "T").slice(1));
           for (const item of plan.items) {
             if (item.box === "?") {
@@ -151,6 +193,7 @@ export default function submit(argv) {
               seq += 1;
               specs.push({
                 k: "task.add", s: one.id, id, title: item.title, criteria: item.criteria, files: [],
+                segment: sectionTarget(item),
                 order: placeOf(plan.items, item),
               });
               mentioned.add(id);
@@ -205,6 +248,14 @@ export default function submit(argv) {
               // 判过（accepted）的条目在清单里也是勾着的：它已经交过、也有人判过，
               // 再交一次既没有意义，也会撞上「已关闭的段不能再改」。
               if (task.status === "done" || task.status === "accepted") continue;
+              const take = takingSegment(one);
+              const home = one.segments.find((seg) => seg.id === task.segment);
+              if (!take || (home && home.plannedAt !== null && take.id !== task.segment))
+                fail(
+                  item.id + " 在段 " + task.segment + " 里，轮到它的那一段还没开" +
+                    (take ? "（现在收活的是 " + take.id + "：它判过、关闭之后这一段才接过活）" : "") +
+                    "：清单上这一节是排好的下一段，它只记条目，交付等轮到再做",
+                );
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
               // 一条交付总要指着点什么：既没量到改动、也没有文件可指时，写下去就是一条谁也核不了的空话。
               // 只删不改也算动了——那时 pins 是空的，但 changed 里有那条走了的路径，得放行。

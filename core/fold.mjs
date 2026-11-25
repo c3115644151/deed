@@ -74,12 +74,14 @@ function sessionOf(doc, ev) {
 // after a verdict, not a thing anyone schedules. 新活落进最新那个开段：一段送审之后
 // 还在等结论，它不再收东西，改到下一段的条目和新写的条目都往下走。
 function nextSegment(session, at, carried = false) {
+  // 号由已有的段推出来（最大号 +1）：旧账本里段号就是按这个走的，重放才落到同一段。
+  const top = session.segments.reduce((max, one) => Math.max(max, Number(one.id.split(".").pop()) || 0), 0);
   const segment = {
-    // 这一段是改到下一段的条目开的：它就是预备段，别为每一条开一个新段。
     carried,
-    id: `${session.id}.${session.segments.length + 1}`,
+    id: `${session.id}.${top + 1}`,
     openedAt: at,
     closedAt: null,
+    plannedAt: null,
     verdict: null,
     judgedAt: null,
     reviewAt: null,
@@ -119,28 +121,17 @@ export const frozenFor = (session, segmentId, meaning) => {
   return meaning >= MEANING.judgement && awaitingJudgement(session, segment);
 };
 
-// 预备段只有一个：已经接着活的那个就是它，后来改到下一段的、新写的都往里放。
-// 「改到下一段的条目」若每次都开一个新段，一次讨论改三批就成了三段，等结论期间谁也说不清
-// 下一批活算哪一段的。
-const livePrep = (session) =>
-  session.segments
-    .filter(
-      (one) =>
-        one.closedAt === null &&
-        one.carried &&
-        // 预备段一旦自己也送了审，它就不再是预备段：它是又一批在等结论的活。
-        !awaitingVerdict(session, one) &&
-        session.tasks.some((task) => task.segment === one.id),
-    )
-    // 接着往里放的是最后一个：从预备段里再改出去时，新开的那个才是"下一段"。
-    .at(-1) ?? null;
+// 下一个段：队列里最后一个还没关闭的段（清单排好的就是它）。
+const nextOpen = (session) => session.segments.filter((one) => one.closedAt === null).at(-1) ?? null;
 
-// 空着的预备段不是一个段：它是某次改段开出来又没接住活的格子，留着会让下一条新活落进
-// 一个谁也没打算做的段。
+// 空着的"下一段"不是一个段：它是某次改段开出来又没接住活的格子，留着会让下一条新活
+// 落进一个谁也没打算做的段。
 const settle = (session) => {
   session.segments = session.segments.filter(
     (one) =>
-      !(one.carried && one.closedAt === null && one.verdict === null) ||
+      // 清单排过的那一段即使还空着也算数；自己开出来的空格子不算——它会让下一条活
+      // 落进一个谁也没打算做的段。
+      !(one.plannedAt === null && one.closedAt === null && one.verdict === null) ||
       session.tasks.some((task) => task.segment === one.id) ||
       session.briefs.some((brief) => brief.segment === one.id),
   );
@@ -151,12 +142,15 @@ const settle = (session) => {
 // 「T8 退回 S01.1」）判成坏账——整本账再也重放不动，而那并不是当初写错。
 function segmentOf(session, at, v = 1) {
   settle(session);
-  const last = session.segments.filter((one) => one.closedAt === null).at(-1);
+  const open = session.segments.filter((one) => one.closedAt === null);
+  // 清单排过段以后，新活落在收活的那一段（排队中的段只由清单往里放）；
+  // 没排过段时按旧读法：落在最末那个未关闭段。
+  const planned = open.some((one) => one.plannedAt !== null);
+  const last = planned ? open.find((one) => one.plannedAt === null) ?? open[0] : open.at(-1);
   if (!last) return nextSegment(session, at);
   const waiting = awaitingVerdict(session, last) || (v >= MEANING.judgement && awaitingJudgement(session, last));
   if (v < 11 || !waiting) return last;
-  // 等结论时新写的活自己开一段，并记成预备段：它是最末那个开段，所以再没有第二处预备
-  // 可去——预备段一旦也送了审，它就只是又一批等结论的活，同样的判断在这里也成立。
+  // 等结论/等判决时新写的活自己开一段。
   return nextSegment(session, at, true);
 }
 
@@ -230,7 +224,12 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         if (taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了`);
         session.ids.add(ev.id);
-        const segment = segmentOf(session, ev.at, ev.v ?? 1);
+        // 清单已经把这条活排进某一段时，就落在那一段：它可能还在排队，
+        // 收不收活是规则的事，重放只负责把行读对。
+        const planned = ev.segment === undefined ? null : session.segments.find((one) => one.id === ev.segment) ?? null;
+        if (ev.segment !== undefined && !planned) noway(`账本里没有段 ${ev.segment}：条目不能落在没声明过的段上`);
+        if (planned && planned.closedAt !== null) noway(`段 ${planned.id} 已经关闭：新条目进不去`);
+        const segment = planned ?? segmentOf(session, ev.at, ev.v ?? 1);
         session.tasks.push({
           id: ev.id,
           title: ev.title,
@@ -328,10 +327,10 @@ export function fold(events) {
           const left = session.segments[where] ?? null;
           if (before && left === session.segments[session.segments.length - 1]) {
             task.segment = before.id;
-            before.carried = true;
             task.touchedAt = ev.at;
-            // 它走空的那一段就是个只剩计划的地方：段由条目生出来，条目回来了，段也就不该在。
-            if (!session.tasks.some((one) => one.segment === left.id))
+            // 它走空的那一段是个只剩计划的地方：自己开出来的段由条目生出来，条目回来了，
+            // 段也就不该在（清单里排过的那一段留着，它是账本上写下的计划）。
+            if (left.plannedAt === null && !session.tasks.some((one) => one.segment === left.id))
               session.segments = session.segments.filter((one) => one !== left);
             break;
           }
@@ -365,26 +364,42 @@ export function fold(events) {
 
         if (task.status !== "todo")
           noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能改到下一段`);
-        // 一批改到下一段会连着写好几十行：预备段接过活就接着往里放，
-        // 不然十三条未做的条目会开出十三个各含一条的段；第二批又开一个新的，就成了两个预备段。
-        const prep = livePrep(session);
-        // 旧行按它写的时候那套含义读：那时从预备段里改出去是原地不动（v14 之前）。
-        if (prep && prep.id === task.segment && meaningOf(ev) >= MEANING.carryOut) {
-          // 「改到下一段」说的是别处的段。已经站在预备段里再往里改就是原地不动：那一段
-          // 既有没做的、又永远出不了清单（清单要等交付完），于是它一路堆到收不了尾。
-          // 所以只在一种情况下这么写有意义：这一段已经有交过的活、正要送审。那时把没做的
-          // 挪进新开的预备段，而这一段从此不再接新活（它不是预备段了）。
-          const delivered = session.tasks.some(
-            (one) => one.segment === task.segment && (one.status === "done" || one.status === "accepted" || one.status === "dropped"),
-          );
-          if (!delivered)
+        // 新的写法（含义第 24 版起）：目标是下一个还没关闭的段——清单排好的那个就是它。
+        if (meaningOf(ev) >= MEANING.segmentsPlanned) {
+          const at0 = session.segments.findIndex((one) => one.id === task.segment);
+          const after = session.segments.slice(at0 + 1).find((one) => one.closedAt === null) ?? null;
+          if (after) task.segment = after.id;
+          else
             noway(
-              `${task.id} 已经在预备段 ${task.segment} 里，而这一段还没有交过的活：改到下一段说的是「这一段要送审了，没做的先挪开」——先在这一段做完，或者先交一条`,
+              task.id + " 已经在最末那一段 " + task.segment +
+                " 里：改到下一段得先有下一段——在清单里加一节 ## 段，submit 时领号",
             );
-          prep.carried = false;
-          task.segment = nextSegment(session, ev.at, true).id;
-        } else if (prep) task.segment = prep.id;
-        else task.segment = nextSegment(session, ev.at, true).id;
+        } else {
+          // 旧行按当时那套读法逐字重放（那时"下一段"是个自己开出来的格子）：
+          // 从它里面再改出去时原地不动，否则落进去，没有就开一个。
+          const prep =
+            session.segments
+              .filter(
+                (one) =>
+                  one.closedAt === null &&
+                  one.carried &&
+                  !awaitingVerdict(session, one) &&
+                  session.tasks.some((other) => other.segment === one.id),
+              )
+              .at(-1) ?? null;
+          if (prep && prep.id === task.segment && meaningOf(ev) >= MEANING.carryOut) {
+            const delivered = session.tasks.some(
+              (one) => one.segment === task.segment && (one.status === "done" || one.status === "accepted" || one.status === "dropped"),
+            );
+            if (!delivered)
+              noway(
+                `${task.id} 已经在下一段 ${task.segment} 里，而这一段还没有交过的活：先在这一段做完，或者先交一条`,
+              );
+            prep.carried = false;
+            task.segment = nextSegment(session, ev.at, true).id;
+          } else if (prep) task.segment = prep.id;
+          else task.segment = nextSegment(session, ev.at, true).id;
+        }
         task.touchedAt = ev.at;
         settle(session);
         break;
@@ -746,6 +761,15 @@ export function fold(events) {
       }
       // 免审段的结局。它不是审查结论：没人审过，所以只留下谁封的、凭什么说不用审，
       // 签收时这一段会被列出来——"没经过审查"是账本上能看见的事实，不是默认的沉默。
+      // 清单预排的那一段：先声明，次序就是账本里的次序；它此刻不收活。
+      case "segment.plan": {
+        const session = sessionOf(doc, ev);
+        if (session.segments.some((one) => one.id === ev.segment)) noway(`这个会话里已经有段 ${ev.segment}`);
+        const segment = nextSegment(session, ev.at);
+        segment.id = ev.segment;
+        segment.plannedAt = ev.at;
+        break;
+      }
       case "segment.seal": {
         const session = sessionOf(doc, ev);
         const segment = segmentById(session, ev.segment);

@@ -2143,15 +2143,17 @@ test("an entry still to be done is carried to the next segment from the plan", (
   deed(cwd, "task", "add", "下一段再做", "--criteria", "也做完");
   const plan = path.join(cwd, ".deed", "plan.md");
   deed(cwd, "plan", "--force");
+  // 改到下一段要有落脚的地方：清单里那一段先排出来，条目才挪得过去。
   fs.writeFileSync(
     plan,
-    fs.readFileSync(plan, "utf8").replace(/  标准：也做完\n/u, "  标准：也做完\n  改到下一段：这一段已经送审，下一段接着做\n"),
+    fs.readFileSync(plan, "utf8").replace(/  标准：也做完\n/u, "  标准：也做完\n  改到下一段：这一段已经送审，下一段接着做\n").trimEnd() +
+      "\n\n## 段\n- ? 下一段的一条\n  标准：也做完\n",
   );
   const run = deed(cwd, "submit");
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /改到下一段 · T2 · S01\.2/);
   const session = fold(readEvents(cwd)).sessions[0];
-  assert.equal(session.segments.length, 2, "改到下一段就是开下一段");
+  assert.equal(session.segments.length, 2, "改到下一段落进清单排好的那一段");
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2");
 
   // 交付过的条目改不了段：那等于把一条交付换个段说话，账本里没有这件事的位置。
@@ -2629,4 +2631,54 @@ test("review passing hands the segment back, and only the user's judgement close
   const row = readEvents(cwd).filter((one) => one.k === "verdict.pass").pop();
   assert.deepEqual([row.by, row.via, row.segment], ["user", "panel", "S01.1"], "账本读得出是谁在哪按的");
   assert.equal(judgeHere(cwd, "S01.1").status, 1, "判过的段不再判");
+});
+
+// 清单里的每一节就是一个段：空标题的节 submit 领号，成为排好的下一段；
+// 只有收活的那一段能交付，前一段判过它才轮到。
+test("the plan can line up several segments, and only the first takes work", () => {
+  const cwd = workspace("segments-queued");
+  deed(cwd, "init", "--said", "开始");
+  const plan = path.join(cwd, ".deed", "plan.md");
+  fs.writeFileSync(
+    plan,
+    [
+      "# 这一期要做成什么",
+      "把两批活分开排。",
+      "",
+      "## 段",
+      "- ? 先做这一条",
+      "  标准：在账本里",
+      "",
+      "## 段",
+      "- ? 下一段的一条",
+      "  标准：等轮到再做",
+      "",
+    ].join("\n"),
+  );
+  const first = deed(cwd, "submit", "--by", "agent");
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  const doc = fold(readEvents(cwd));
+  const one = doc.sessions[0];
+  assert.equal(one.segments.length, 2, "空标题的那一节领了一个新段");
+  assert.equal(one.segments[1].id, "S01.2");
+  assert.equal(one.tasks.find((t) => t.title === "先做这一条").segment, "S01.1");
+  assert.equal(one.tasks.find((t) => t.title === "下一段的一条").segment, "S01.2", "条目不挤进当前那段");
+  assert.equal(kinds(cwd).filter((k) => k === "segment.plan").length, 2, "两节都是账本上写下的行");
+
+  // 排好的那一段此刻不收活：交付与送审都被拒，理由指得出现在收活的是哪一段。
+  fs.writeFileSync(path.join(cwd, "proof.txt"), "p\n");
+  const queued = deed(cwd, "task", "done", "T2", "--evidence", "试试看", "--digest", "proof.txt");
+  assert.equal(queued.status, 1, "还没轮到的那一段不能交付");
+  assert.match(queued.stderr, /还没轮到/);
+  const early = deed(cwd, "review", "--segment", "S01.2", "--by", "qa");
+  assert.equal(early.status, 1);
+  assert.match(early.stderr, /还没轮到/);
+
+  // 第一段交付、审过、判过之后，第二段才接过活。
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "做完了", "--digest", "proof.txt").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
+  assert.equal(judgeHere(cwd, "S01.1").status, 0);
+  assert.match(deed(cwd, "state").stdout, /S01\.2/);
+  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "轮到它了", "--digest", "proof.txt").status, 0);
 });

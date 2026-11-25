@@ -121,3 +121,24 @@ test("the draft shows where a new entry will land when the open segment is waiti
   const shut = draft({ ...base, segments: [{ id: "S01.1", closedAt: "2026-11-24T00:00:00.000Z" }], briefs: [] });
   assert.match(shut, /## 下一段（这一段的活都结束了：写在这里的 \? 会开下一段）/);
 });
+
+// 节头说"这是哪一段"：写了段号的对上那一段，没写的节 submit 领号。
+test("a section says which segment it is, and an unnamed one asks for a number", () => {
+  const plan = parse(
+    section([
+      "# 这一期要做成什么",
+      "分开排。",
+      "",
+      "## 段 S01.1",
+      "- ? 甲",
+      "  标准：x",
+      "",
+      "## 段",
+      "- ? 乙",
+      "  标准：y",
+    ]),
+  );
+  assert.equal(plan.problems.length, 0);
+  assert.deepEqual(plan.sections.map((one) => one.title), ["S01.1", ""]);
+  assert.deepEqual(plan.items.map((item) => item.sectionTitle), ["S01.1", ""], "条目知道自己在哪一节");
+});

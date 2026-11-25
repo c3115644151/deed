@@ -50,6 +50,18 @@ export const currentSession = (doc) => {
 export const sessionById = (doc, id) => doc.sessions.find((one) => one.id === id) ?? null;
 
 export const openSegment = (session) => session?.segments.find((one) => one.closedAt === null) ?? null;
+// 收活的那一段就是队列里第一个还没关闭的段；排在它后面的段已经在账本里，
+// 但它们此刻不收活——前一段判过、关闭了，它才轮到。
+// 只有清单预排的段才排队：等结论/等判决时由新活开出来的段照样收活（它不是在排队，
+// 它是手上那批活停着、下一条活自然落进去）。
+export const takingSegment = (session) => {
+  const open = (session?.segments ?? []).filter((one) => one.closedAt === null);
+  return open.find((one) => one.plannedAt === null) ?? open[0] ?? null;
+};
+export const queuedSegments = (session) => {
+  const take = takingSegment(session);
+  return (session?.segments ?? []).filter((one) => one !== take && one.closedAt === null && one.plannedAt !== null);
+};
 
 // 清单、状态与面板印的顺序是同一件事：先按条目自己写的「先后」，没写的排在后面，
 // 其余的按写下的次序。顺序只是读起来的样子，它不进门、也不进结论。

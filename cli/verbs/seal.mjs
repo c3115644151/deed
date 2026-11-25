@@ -1,4 +1,4 @@
-import { nextAction, openSegment, sealBlockers } from "../../core/rules.mjs";
+import { nextAction, openSegment, sealBlockers, takingSegment } from "../../core/rules.mjs";
 import { parse, load, transact, targetSession, fail, guard, signer, auditSegment } from "../session.mjs";
 
 export default function seal(argv) {
@@ -20,6 +20,9 @@ export default function seal(argv) {
             (one.segments.map((s) => s.id + (s.closedAt ? "（已封存）" : "")).join("、") || "（一个都没有）"),
         );
       auditSegment(doc, one, seg);
+      const take = takingSegment(one);
+      if (seg.plannedAt !== null && take && take.id !== seg.id && seg.closedAt === null)
+        fail("段 " + seg.id + " 还没轮到：现在收活的是 " + take.id + "，它关闭之后才轮到这一段");
       const blockers = sealBlockers(doc.config, one, seg);
       if (blockers.length > 0) fail("这一段不能封存：" + blockers.join("；"));
       if (!flags.why) fail('封存要写清凭什么不用审：--why "…"');

@@ -21,6 +21,7 @@ import {
   reviewOf,
   reviewState,
   signBlockers,
+  takingSegment,
   userTurns,
 } from "../core/rules.mjs";
 
@@ -312,8 +313,11 @@ function segmentBlock(session, segment, index, config, zone) {
   const spent = costOf(session, segment);
   const state = reviewState(config, session, segment);
   const review = reviewOf(session, segment);
-  const here = openSegment(session)?.id === segment.id;
+  // 收活的那一段才叫"手上这一段"；清单排在后头的段在这儿是"等前面"。
+  const take = takingSegment(session);
+  const here = take?.id === segment.id;
   const stamp =
+    segment.closedAt === null && !here ? tag("quiet", "等前面") :
     segment.verdict === "pass" ? tag("pass", "判过") :
     segment.verdict === "exempt" ? tag("quiet", "免审") :
     segment.verdict === "rework" ? tag("fail", "打回") : tag(state === "pass" ? "quiet" : "grit", STAMP[state] ?? "要审");
@@ -391,6 +395,7 @@ function acceptScreen(doc, session, config, zone, on) {
   const tasks = session ? session.tasks : [];
   const asks = session ? pendingAsks(session) : [];
   const blocks = signBlockers(doc, session, config);
+  const taking = segments.find((one) => one.closedAt === null) ?? null;
   const unreviewed = segments.filter((segment) => segment.verdict === "exempt");
   const sealed = segments.filter((segment) => segment.closedAt !== null);
   const todo = tasks.filter((task) => task.status === "todo").length;
@@ -400,13 +405,16 @@ function acceptScreen(doc, session, config, zone, on) {
       const review = reviewOf(session, segment);
       const state = reviewState(config, session, segment);
       const count = countIn(session, segment);
+      const queued = segment.closedAt === null && taking !== segment;
       const waiting = segment.verdict === "pass" && segment.closedAt === null;
-      const word = waiting
+      const word = queued
+        ? "等前面"
+        : waiting
         ? "等判决"
         : review
           ? review.verdict === "pass" ? "审查通过" : "不合格"
           : segment.verdict === "exempt" ? "免审" : STAMP[state] ?? "要审";
-      const kind = waiting ? "grit" : review ? (review.verdict === "pass" ? "pass" : "fail") : segment.verdict === "exempt" ? "quiet" : "grit";
+      const kind = queued ? "quiet" : waiting ? "grit" : review ? (review.verdict === "pass" ? "pass" : "fail") : segment.verdict === "exempt" ? "quiet" : "grit";
       return (
         '<article class="vcard" data-kind="' + kind + '">' +
         '<div class="vhead"><span class="vid">' + esc(segment.id) + "</span>" +

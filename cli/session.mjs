@@ -106,8 +106,17 @@ const refuseFrozen = (doc, evs) => {
     if (!task) continue;
     // 撤回放弃、撤回一条改到下一段是记录层面的事：只有撤回一条交付才换掉审查者手上的文件。
     if (ev.k === "task.undo" && task.status !== "done" && task.status !== "accepted") continue;
-    if (!frozenFor(session, task.segment, EVENT_VERSION)) continue;
+    // 清单预排的那一段此刻只收条目：交付要等它轮到。
     const home = session.segments.find((one) => one.id === task.segment);
+    const take =
+      session.segments.find((one) => one.closedAt === null && one.plannedAt === null) ??
+      session.segments.find((one) => one.closedAt === null) ??
+      null;
+    if (home && home.plannedAt !== null && home.closedAt === null && take && take.id !== home.id)
+      fail(
+        task.segment + " 还没轮到（现在收活的是 " + take.id + "）：清单预排的那一段只记条目，前面这段判过、关闭之后它才接过活",
+      );
+    if (!frozenFor(session, task.segment, EVENT_VERSION)) continue;
     const waiting = home && home.verdict === "pass" && home.closedAt === null;
     fail(
       waiting
@@ -367,8 +376,9 @@ export function printState() {
     const taking = unclosed.filter((one) => one.verdict !== "pass").at(-1) ?? null;
     for (const other of unclosed.filter((one) => one !== taking)) {
       const c = countIn(open, other);
+      const label = other.verdict === "pass" ? "审查通过、等你判决" : "还没轮到、只记条目";
       console.log(
-        "  段 " + other.id + " · 审查通过、等你判决 · " + c.total + " 条（未做 " + c.todo + " · 已交付 " + (c.done + c.accepted) + "）",
+        "  段 " + other.id + " · " + label + " · " + c.total + " 条（未做 " + c.todo + " · 已交付 " + (c.done + c.accepted) + "）",
       );
     }
     const shown = taking ?? seg ?? open.segments[open.segments.length - 1];

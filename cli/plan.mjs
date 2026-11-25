@@ -45,6 +45,7 @@ const fieldOf = (word) => ({ 标准: "criteria", 交付: "claim", 理由: "why",
 // batch is allowed; that is the command's business, and fold has the last word.
 export function parse(text) {
   const items = [];
+  const sections = [];
   const problems = [];
   const goal = [];
   let where = null;
@@ -67,6 +68,8 @@ export function parse(text) {
       item = null;
       if (where === "segment") {
         section += 1;
+        // 节头写的是哪一段：写了 S02.21 就落那一段；空着的节 submit 领一个新号。
+        sections.push({ index: section, title: heading[2].replace(/^段\s*/u, "").trim() });
         started = true;
       }
       continue;
@@ -121,7 +124,12 @@ export function parse(text) {
   const ids = items.filter((one) => one.id).map((one) => one.id);
   const twice = ids.filter((id, at) => ids.indexOf(id) !== at);
   if (twice.length > 0) problems.push("同一个条目标了两次：" + [...new Set(twice)].join("、"));
-  return { goal: goal.join(" ").trim(), items, problems };
+  // 条目只知道自己属于第几节；节头把"第几节"翻成"哪一段"。
+  for (const item of items) {
+    const sec = sections.find((one) => one.index === item.section) ?? null;
+    item.sectionTitle = sec ? sec.title : "";
+  }
+  return { goal: goal.join(" ").trim(), items, sections, problems };
 }
 
 // 一组一行注释：markdown 里看不见它，纯文本里也只占一行——但读的人知道哪几条是做过的。
@@ -148,6 +156,9 @@ export function draft(session) {
     const tasks = session.tasks.filter((one) => one.segment === segment.id);
     if (tasks.length === 0) continue;
     out.push("## 段 " + segment.id);
+    // 还没轮到的那一段：条目写着，交付等前面的段判过。
+    if (segment.closedAt === null && session.segments.find((one) => one.closedAt === null) !== segment)
+      out.push("<!-- 还没轮到：前面那一段判过，这一段才收活 -->");
     // 印的次序：在做（最多一条）→ 等着（按你要的先后）→ 已完成 → 撤回或放弃。
     // 越往下越是过去的事；新活永远在最上面那一条。
     for (const group of groupsOf(tasks)) {

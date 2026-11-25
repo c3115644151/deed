@@ -14,6 +14,7 @@ import {
   periodState,
   segmentReviewers,
   stalePeriod,
+  takingSegment,
   tasksIn,
 } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
@@ -148,6 +149,15 @@ export default function review(argv) {
             : "现在没有待审的段",
         );
       if (seg.closedAt) fail("段 " + seg.id + " 已经封存，结论不能再落");
+      // 排在后头的段还没轮到：前一段判过、它接过活，才谈得上审它。
+      {
+        const take = takingSegment(one);
+        if (seg.plannedAt !== null && seg.closedAt === null && take && take.id !== seg.id)
+          fail(
+            "段 " + seg.id + " 还没轮到：现在收活的是 " + take.id +
+              "（清单里这一节是排好的下一段，它只记条目；前面那段判过、关闭之后这一段才接过活）",
+          );
+      }
       // 审查通过之后这一段在等你判决：再落一份结论等于重判已经过过的那一遍。
       if (seg.verdict === "pass") fail("段 " + seg.id + " 的审查已经通过了，在等你判决：结论已经落过，判完这一段才动");
       // 撤回一份还没被回答的清单：这一段的冻结到此为止，改完再出下一份。它不是"清单过期"
