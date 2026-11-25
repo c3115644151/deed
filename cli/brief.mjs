@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { digest } from "../core/digest.mjs";
-import { tasksIn,
-  edges,
-} from "../core/rules.mjs";
+import { tasksIn } from "../core/rules.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 
@@ -14,13 +12,11 @@ import { fileStamp, stamp0 } from "../lib/format.mjs";
 // 角色包：清单说"审什么"，这一份说"怎么审"。它和清单一起交出去，也一起
 // 记下 sha256——换掉其中任何一份，结论就落不下来。
 function guideText(subject, target, briefName) {
-  const verdict = target ? "deed review --segment " + target : "deed review --all";
+  const verdict = "deed review --segment " + target;
   return [
     "# 审查者 · " + subject,
     "",
-    target
-      ? "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。"
-      : "你要回答一件事：这一期各段的结论合起来，够不够得上它写下的目的。段里的条目由整体审判过；你要看的是它们之间\u3001与这一期那句话之间还有什么没对齐。",
+    "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。",
     "清单在同目录（" + briefName + "）。你判的是清单上那几条，不是整个项目。",
     "",
     "## 先读标准，再读代码",
@@ -57,12 +53,10 @@ function guideText(subject, target, briefName) {
     "",
     "有没达成的：",
     "",
-    "    " + verdict + " --by \"你是谁\" --verdict fail --rework " + (target ? "T1,T2" : "S0x.N") + " \\",
+    "    " + verdict + " --by \"你是谁\" --verdict fail --rework T1,T2 \\",
     "      --why \"一句话总结\" --finding \"…\" --finding \"…\"",
     "",
-    target
-      ? "被点名的条目回到未做（交付记录退回），其余保持交付；这一段不关闭，补完再交再审。"
-      : "被点名的段整段重开（段里的条目保持交付，谁也不重新交），那一段重新出清单、由它自己的审查者再审。",
+    "被点名的条目回到未做（交付记录退回），其余保持交付；这一段不关闭，补完再交再审。",
     "",
     "## 你不能",
     "",
@@ -75,7 +69,7 @@ function guideText(subject, target, briefName) {
   ].join("\n");
 }
 
-// 一条任务在清单上的样子：整体审和签收核对共用，两种清单说的应该是同一件事。
+// 一条任务在清单上的样子。
 // 一批 submit 里的几条交付共用一份工作区差，分不出哪条改了哪份。数出来说清楚，
 // 比让读的人自己发现「三份记录一模一样」好。
 // 批号说的是「这一批记账那一刻」；条数由记账时的账本记下。撤回同批的一条之后
@@ -183,104 +177,6 @@ export function planBrief(root, open, segment, at) {
     file = base(n) + ".md";
   }
   const guide = guideText("段 " + segment.id, segment.id, path.basename(file));
-  return {
-    file,
-    text,
-    digest: digest(text),
-    guideFile: base(n) + "-reviewer.md",
-    guideText: guide,
-    guideDigest: digest(guide),
-  };
-}
-
-// 签收核对的清单：目的在最上面（签收与这一份比的是它），下面是每一段的活与整体审结论。
-// 单段的一期出这一份就够了——整体审和签收核对本来就看同一批任务。
-export function planWhole(root, session, at) {
-  const p = ensureDirs(root);
-  // 签收核对以段为单位：清单列的是每一段的结论，不是段里每条任务的清单。
-  // 段里每一条标准的判断，整体审已经做过并留了依据；整期再审一遍等于把别人的
-  // 工作重做，也让「谁判了什么」变成两处都能改的事。
-  const verdicts = new Map(
-    session.reviews.filter((one) => one.scope !== "session" && !one.voidedAt).map((one) => [one.segment, one]),
-  );
-  const segLine = (segment) => {
-    const review = verdicts.get(segment.id) ?? null;
-    const count = tasksIn(session, segment).length;
-    if (review)
-      return (
-        "- " + segment.id + " · " +
-        (review.verdict === "pass" ? "整体审通过" : "整体审不合格") + " · " +
-        review.by + " · " + stamp0(review.at) + " · " +
-        count + " 条" + (review.findings.length > 0 ? " · " + review.findings.length + " 条发现" : "") +
-        (review.rework.length > 0 ? " · 退回 " + review.rework.join("、") : "")
-      );
-    if (segment.sealedBy)
-      return (
-        "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " +
-        stamp0(segment.closedAt) + " · " + count + " 条 · 审查设置说这一段不用审" +
-        (segment.sealedWhy ? "（" + segment.sealedWhy + "）" : "")
-      );
-    return "- " + segment.id + " · 没有整体审 · " + count + " 条";
-  };
-  const findings = session.segments.flatMap((segment) => {
-    const review = verdicts.get(segment.id);
-    if (!review || review.findings.length === 0) return [];
-    return ["", "  " + segment.id + " 的发现（" + review.by + "）", ...review.findings.map((one) => "  - " + one)];
-  });
-  const carried = session.segments.flatMap((segment) =>
-    tasksIn(session, segment)
-      .filter((task) => task.status === "deferred" || task.status === "dropped")
-      .map((task) =>
-        "- " + task.id + " · " + (task.status === "deferred" ? "延后" : "放弃") +
-        "（" + segment.id + "）· " + task.title + "：" + (task.deferredWhy ?? task.droppedWhy ?? "没有写理由"),
-      ),
-  );
-  const waiting = session.asks.filter((one) => one.resolvedAt === null);
-  // 这一期定过的边界与不做：签收核对的尺子不只有目的那句话，还有拍板时划下的线。
-  const lines = edges(session).map((one) => "- " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
-  const text = [
-    "# 签收核对清单 · " + session.id,
-    "",
-    "会话 " + session.id + " · " + session.segments.length + " 段 · 生成于 " + stamp0(at),
-    "",
-    "## 这一期要做成什么",
-    "",
-    session.goal
-      ? session.goal.text + "（" + session.goal.by + " · " + stamp0(session.goal.at) + "）"
-      : "（账本里还没写这一期要做成什么）",
-    "",
-    "## 各段的结论",
-    "",
-    ...session.segments.map(segLine),
-    ...findings,
-    "",
-    "## 这一期定过的边界与不做",
-    "",
-    ...(lines.length > 0 ? lines : ["- 没有划下过边界，也没有谈定不做的事"]),
-    "",
-    "## 段的结论之外，还留在这一期里的",
-    "",
-    ...(carried.length > 0 ? carried : ["- 没有延后或放弃的条目"]),
-    ...waiting.map((one) => "- 待裁 " + one.id + " · " + one.text),
-    "",
-    "## 怎么审",
-    "",
-    "1. 你手上是每一段自己的结论，不是段里每条任务的清单：段内每条标准判没判过，那一段的审查者已经判过、也留了依据。",
-    "2. 拿这一期写下的那句话当尺子：这些段合起来，兑现了没有；有没有两段互相打脸（同一件事两种说法、后一段假设前一段没做的行为、两段的门宽窄不一样）。",
-    "3. 看不出来的地方就去读代码与账本，别停在结论上：结论只有一句话，为什么这么判在它的发现里。",
-    "4. 结论落盘：deed review --all --by \"<你是谁>\" --verdict pass|fail；打回点名的是段（--rework S02.3 --why \"…\"），那一段整段重开，段里的条目由它自己的审查者重新看。",
-    "",
-    "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
-    "",
-  ].join("\n");
-  const base = (n) => path.join(p.review, session.id + "-all-" + fileStamp(at) + (n === 1 ? "" : "-" + n));
-  let n = 1;
-  let file = base(n) + ".md";
-  while (fs.existsSync(file) || fs.existsSync(base(n) + "-reviewer.md")) {
-    n += 1;
-    file = base(n) + ".md";
-  }
-  const guide = guideText("这一期 " + session.id, null, path.basename(file));
   return {
     file,
     text,

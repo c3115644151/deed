@@ -130,10 +130,10 @@ test("a period says what it is for, and the sentence can change", () => {
   assert.equal(deed(cwd, "goal", "--by", "user").status, 1, "目的要写成一句话");
 });
 
-// 多段的一期：段都封了还差一句落在整期上的结论；它拿目的当尺子，
-// 一次通过同时关闭还没关闭的段。
-test("a whole review reads the period, and its pass seals what it read", () => {
-  const cwd = workspace("whole-review");
+// 签收只看各段的结论与条件：最后一段放行之后，下一步就是签收，整期上不再另审一遍。
+// `deed review --all` 已经不是命令：那件事不存在了，开关也被拒。
+test("the last segment's verdict is the whole story, and --all is not a command any more", () => {
+  const cwd = workspace("two-segments-sign");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
@@ -142,73 +142,27 @@ test("a whole review reads the period, and its pass seals what it read", () => {
   deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "core/b.mjs");
   deed(cwd, "task", "done", "T2", "--evidence", "node --test", "--digest", proof(cwd));
   deed(cwd, "review", "--segment", "S01.2");
+  const state1 = deed(cwd, "state");
+  assert.match(state1.stdout, /S01.2/, "第二段还开着，下一步在那一段上");
   assert.equal(deed(cwd, "review", "--segment", "S01.2", "--by", "qa", "--verdict", "pass").status, 0);
-  const aimless = deed(cwd, "review", "--all");
-  assert.equal(aimless.status, 1, "没有目的，签收核对没有尺子");
-  assert.match(aimless.stderr, /还没写目的/);
-  assert.equal(deed(cwd, "goal", "把两段活收成一件", "--by", "user").status, 0);
-  assert.match(deed(cwd, "state").stdout, /deed review --all/, "段都封了，下一步是整期一句");
-  const handed = deed(cwd, "review", "--all");
-  assert.equal(handed.status, 0, handed.stderr);
-  assert.match(handed.stdout, /整期清单/);
-  const pair = briefs(cwd).filter((one) => one.includes("-all-"));
-  assert.equal(pair.length, 2, "整期清单也是清单加角色包");
-  const sheet = fs.readFileSync(path.join(cwd, ".deed", "review", pair.find((one) => !one.includes("-reviewer"))), "utf8");
-  assert.match(sheet, /## 各段的结论/, "整期清单列的是各段的结论");
-  assert.match(sheet, /- S01\.1 · 整体审通过 · qa · \d\d-\d\d \d\d:\d\d · 1 条/, "每一段一行：谁判的、什么时候、什么结论");
-  assert.doesNotMatch(sheet, /### T\d/, "段里的条目不再重列：那一段的审查者已经判过");
-  assert.match(sheet, /--rework S02\.3|--rework S0x\.N/, "打回点名的是段");
-  assert.match(sheet, /这一期要做成什么/, "尺子就是那一句目的");
-  const passed = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "pass");
-  assert.equal(passed.status, 0, passed.stdout + passed.stderr);
-  assert.match(passed.stdout, /签收核对通过/);
-  const review = fold(readEvents(cwd)).sessions[0].reviews.at(-1);
-  assert.equal(review.scope, "session");
-  assert.equal(review.segment, null);
-  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 0, "整期结论落了，签收才可行");
+  const state2 = deed(cwd, "state");
+  assert.match(state2.stdout, /下一步 · user · 签收/, "段都放行了，就轮到你一句话");
+  const gone = deed(cwd, "review", "--all");
+  assert.equal(gone.status, 1, "--all 不再是命令");
+  assert.match(gone.stderr, /--all/);
+  assert.equal(kinds(cwd).filter((one) => one === "review.brief").length, 2, "只有两段的清单，没有整期的那一份");
+  assert.equal(deed(cwd, "sign", "--words", "可以", "--by", "user").status, 0, "不用目的，也不用第二道结论");
 });
 
-// 签收核对打回可以点名上一段已经封存的任务：那一段要跟着打开，否则那一条连重新交付都做不了。
-// 签收核对退回的是段：它手上就是各段的结论，段内哪一条不行由那一段自己判。
-// 整段重开，段里的条目保持交付——重新看的是这一段的结论，不是让人再交一遍。
-test("a whole review sends back a segment, not the entries inside it", () => {
-  const cwd = workspace("whole-rework");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "goal", "把两段活收成一件", "--by", "user");
-  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
-  deed(cwd, "review", "--segment", "S01.1");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
-  deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "core/b.mjs");
-  deed(cwd, "task", "done", "T2", "--evidence", "node --test", "--digest", proof(cwd));
-  deed(cwd, "review", "--segment", "S01.2");
-  assert.equal(deed(cwd, "review", "--segment", "S01.2", "--by", "qa", "--verdict", "pass").status, 0);
-  deed(cwd, "review", "--all");
-  const byTask = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "第一段不对");
-  assert.equal(byTask.status, 1, "签收核对点不了条目");
-  assert.match(byTask.stderr, /不是段/);
-  const back = deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "S01.1", "--why", "第一段的结论没对上这一期的目的");
-  assert.equal(back.status, 0, back.stdout + back.stderr);
-  const session = fold(readEvents(cwd)).sessions[0];
-  assert.equal(session.segments[0].closedAt, null, "被点名的段整段重开");
-  assert.equal(session.tasks[0].status, "done", "段里的条目保持交付：没人要重交一遍");
-  assert.equal(session.segments[1].closedAt !== null, true, "没被点名的段不动");
-  assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1/, "下一步是给那一段重出清单");
-});
-
-// 一段的一期不审两遍：段放行就是这一期的结局，下一步直接是签收；
-// --all 指的是这一期，只有一段的期上它走错对象，被拒并指回整体审。
-test("a period with one segment has one verdict, and --all does not ask for a second", () => {
+// 一段的一期不审两遍：段放行就是这一期的结局，下一步直接是签收。
+test("a period with one segment has one verdict, and nothing else is asked for", () => {
   const cwd = workspace("single-whole");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test", "--digest", proof(cwd));
   const alone = deed(cwd, "review", "--all");
-  assert.equal(alone.status, 1, "这一期只有一段：它的审查就是整期的审查");
-  assert.match(alone.stderr, /只有一段/);
-  const both = deed(cwd, "review", "--all", "--segment", "S01.1");
-  assert.equal(both.status, 1, "一次只审一个对象");
-  assert.match(both.stderr, /一次只审一个对象/);
+  assert.equal(alone.status, 1, "整期上没有审查这件事");
+  assert.match(alone.stderr, /--all/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.brief").length, 0, "被拒的一个字都不写");
   deed(cwd, "review", "--segment", "S01.1");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass").status, 0);
@@ -1741,34 +1695,6 @@ test("one submit that delivers several entries says the changes belong to the ba
   assert.equal(alone.batch, undefined, "一条一批时不写批号");
 });
 
-// 审查设置说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
-// 免得账本上留一条看着像"这一期被签收核对过"的结论。
-
-test("a period with nothing to review is told it needs no whole conclusion", () => {
-  const cwd = workspace("whole-not-needed");
-  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
-  deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
-  deed(cwd, "goal", "把两份文档改完", "--by", "user");
-  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
-  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
-  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
-  assert.equal(deed(cwd, "seal", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
-
-  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
-  deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
-  deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
-  assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
-
-  const before = readEvents(cwd).length;
-  const said = deed(cwd, "review", "--all");
-  assert.equal(said.status, 0, said.stderr);
-  assert.match(said.stdout, /不需要整期结论/, "先把话说在前面");
-  assert.equal(readEvents(cwd).length, before, "不用审就不写账本");
-  assert.deepEqual(fs.existsSync(path.join(cwd, ".deed", "review")) ? fs.readdirSync(path.join(cwd, ".deed", "review")) : [], [], "也不生成清单与角色包");
-  assert.equal(deed(cwd, "state").stdout.includes("还没写目的"), false, "目的写着");
-});
-
 // 一段的改动全落在免审路径时，出清单是白费：账本上会多一条等人回答的清单，
 // 而这一段正确的结局是关闭（deed seal）。
 
@@ -1837,14 +1763,11 @@ test("a round belongs to the user, and an agent cannot open one", () => {
   assert.match(deed(cwd, "state").stdout, /· 2 轮 ·/);
 });
 
-// 一整期的结论判了不合格，免审的期上也一样：签收前得有人重出或推翻，
-// 不能因为「审查设置说不用审」就当它没发生。
-
-test("a standing whole-period failure still blocks the signature", () => {
-  const cwd = workspace("whole-fail-sign");
+// 两段都由 deed seal 关的期：没人需要写的东西，不该有人等到它——直接签收。
+test("a period whose segments all sat out review signs without anything else", () => {
+  const cwd = workspace("all-exempt-sign");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
   deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
-  deed(cwd, "goal", "把两份文档改完", "--by", "user");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
@@ -1854,40 +1777,10 @@ test("a standing whole-period failure still blocks the signature", () => {
   deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
   deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
   assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
-  // 两段都免审，整期清单本来就不该出：要证明整期不合格挡签收，得有一段是要审的
-  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "src", "a.mjs"), "export const a = 1;\n", "utf8");
-  deed(cwd, "task", "add", "改 src", "--criteria", "src/a.mjs 导出 a");
-  deed(cwd, "task", "done", "T3", "--evidence", "改好 src/a.mjs", "--digest", "src/a.mjs");
-  assert.equal(deed(cwd, "review", "--segment", "S01.3").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.3", "--by", "qa", "--verdict", "pass").status, 0);
-  assert.equal(deed(cwd, "review", "--all").status, 0);
-  assert.equal(deed(cwd, "review", "--all", "--by", "qa", "--verdict", "fail", "--rework", "S01.3", "--why", "文档写得不清楚").status, 0);
+  assert.match(deed(cwd, "state").stdout, /下一步 · user · 签收/);
   const signed = deed(cwd, "sign", "--words", "可以", "--by", "user");
-  assert.equal(signed.status, 1, "整期不合格还活着，签收要挡住");
-  assert.match(signed.stderr, /签收核对判了不合格/);
-  assert.match(signed.stderr, /judge --overturn/);
-});
-
-// 「各段都免审」那句话排在检查之后：还有段没封的一期上说它，是假话。
-
-test("the exempt notice waits until the checks it talks about are through", () => {
-  const cwd = workspace("whole-notice-order");
-  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
-  deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
-  deed(cwd, "goal", "把两份文档改完", "--by", "user");
-  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
-  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
-  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
-  assert.equal(deed(cwd, "seal", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
-  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
-  deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
-  deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md", "--digest", "docs/b.md");
-  const early = deed(cwd, "review", "--all");
-  assert.equal(early.status, 1);
-  assert.match(early.stderr, /还有段没封/);
-  assert.equal(early.stdout.includes("不需要整期结论"), false, "段没封的一期上不该说各段都免审");
+  assert.equal(signed.status, 0, signed.stderr);
+  assert.match(signed.stdout, /没经过审查 · S01.1/, "没人看过的段在签收这一刻摊开说");
 });
 
 // 一次 submit 不能既新增又交付同一条：任务得在交付之前记账。
@@ -2144,30 +2037,17 @@ test("an entry still to be done is carried to the next segment from the plan", (
   assert.doesNotMatch(refused.stderr, /没有要落的改动/u);
 });
 
-test("a segment nobody reviewed says in the brief why it was not reviewed", () => {
+// 没人审过的段不是被静默放过：签收那一刻，它和「凭什么不审」一起摊在眼前。
+test("a segment nobody reviewed says at signing why it was not reviewed", () => {
   const cwd = workspace("seal-why");
   deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
   deed(cwd, "goal", "把文档写完", "--by", "user");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   assert.equal(deed(cwd, "seal", "--why", "只改了文档，审查设置说不用审", "--by", "agent").status, 0);
-  deed(cwd, "task", "add", "写第二份文档", "--criteria", "读完能上手", "--files", "docs/b.md");
-  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
-  assert.equal(deed(cwd, "seal", "--why", "也只改了文档", "--by", "agent").status, 0);
-  // 整期里有一段要审，整期清单才出得来；免审那一段在它里面露面
-  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "src", "a.mjs"), "export const a = 1;\n", "utf8");
-  deed(cwd, "task", "add", "改 src", "--criteria", "src/a.mjs 导出 a");
-  deed(cwd, "task", "done", "T3", "--evidence", "改好 src/a.mjs", "--digest", "src/a.mjs");
-  assert.equal(deed(cwd, "review", "--segment", "S01.3").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.3", "--by", "qa", "--verdict", "pass").status, 0);
-  const whole = deed(cwd, "review", "--all");
-  assert.equal(whole.status, 0, whole.stderr);
-  const dir = path.join(cwd, ".deed", "review");
-  const file = fs.readdirSync(dir).filter((one) => one.startsWith("S01-all-") && !one.endsWith("-reviewer.md")).sort().pop();
-  const text = fs.readFileSync(path.join(dir, file), "utf8");
-  assert.match(text, /免审封存 · agent/, "没人看过的段要在整期清单里露面");
-  assert.match(text, /审查设置说这一段不用审（只改了文档，审查设置说不用审）/, "理由不能印成空括号");
+  const signed = deed(cwd, "sign", "--words", "可以", "--by", "user");
+  assert.equal(signed.status, 0, signed.stderr);
+  assert.match(signed.stdout, /没经过审查 · S01\.1（只改了文档，审查设置说不用审）/, "理由不能印成空括号");
 });
 
 // 老账本里可能有一条封存没写理由（早先的 CLI 不校验）：理由为空时只印那半句，
@@ -2189,23 +2069,11 @@ test("a sealed segment with no reason written says what it is, without empty bra
   delete ev.why;
   lines[at] = JSON.stringify(ev);
   fs.writeFileSync(file, lines.join("\n") + "\n");
-  deed(cwd, "task", "add", "写第二份文档", "--criteria", "读完能上手", "--files", "docs/b.md");
-  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
-  assert.equal(deed(cwd, "seal", "--why", "也只改了文档", "--by", "agent").status, 0);
-  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "src", "a.mjs"), "export const a = 1;\n", "utf8");
-  deed(cwd, "task", "add", "改 src", "--criteria", "src/a.mjs 导出 a");
-  deed(cwd, "task", "done", "T3", "--evidence", "改好 src/a.mjs", "--digest", "src/a.mjs");
-  assert.equal(deed(cwd, "review", "--segment", "S01.3").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.3", "--by", "qa", "--verdict", "pass").status, 0);
-  const whole = deed(cwd, "review", "--all");
-  assert.equal(whole.status, 0, whole.stderr);
-  const dir = path.join(cwd, ".deed", "review");
-  const latest = fs.readdirSync(dir).filter((one) => one.startsWith("S01-all-") && !one.endsWith("-reviewer.md")).sort().pop();
-  const text = fs.readFileSync(path.join(dir, latest), "utf8");
-  assert.match(text, /免审封存 · agent/, "这一行照旧要露面");
+  const signed = deed(cwd, "sign", "--words", "可以", "--by", "user");
+  assert.equal(signed.status, 0, signed.stderr);
+  assert.match(signed.stdout, /没经过审查 · S01\.1/, "这一行照旧要露面");
   // 理由缺的是 undefined 而不是空串：两种形状都不许露出来，否则守卫被删掉也没人知道
-  assert.doesNotMatch(text, /（）|undefined/u, "没有理由就不该有括号，也不该露出 undefined");
+  assert.doesNotMatch(signed.stdout, /（）|undefined/u, "没有理由就不该有括号，也不该露出 undefined");
 });
 
 test("a panel is replaced when any module it loaded changes, not only its own files", () => {

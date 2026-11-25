@@ -12,17 +12,14 @@ import {
   currentSession,
   goalOf,
   needsReview,
-  needsWhole,
   nextAction,
   openSegment,
   pendingAsks,
   reading,
   reviewOf,
   reviewState,
-  sessionReview,
   signBlockers,
   userTurns,
-  wholeState,
 } from "../core/rules.mjs";
 
 const esc = (value) =>
@@ -413,34 +410,14 @@ function acceptScreen(doc, session, config, zone, on) {
     .join("");
   const signed = session && session.sign;
   const goal = session ? goalOf(session) : null;
-  const wholeReview = session ? sessionReview(session) : null;
-  const whole = session ? wholeState(session) : null;
   const settled = session ? edges(session) : [];
-  const wholeWord = !needsWhole(config, session ?? { segments: [] })
-    ? null
-    : whole === "pass" ? { ok: true, label: "这一期签收核对过", why: wholeReview ? wholeReview.by + " · " + when(wholeReview.at, zone) : "" }
-    : whole === "nogoal" ? { ok: false, label: "还没写清这一期要做成什么", why: "deed goal" }
-    : whole === "stale" ? { ok: false, label: "签收核对的结论早于最后一次改动", why: "deed review --all" }
-    : { ok: false, label: "这一期还没有签收核对", why: "deed review --all" };
-  const wholeCard = wholeReview
-    ? '<article class="vcard" data-kind="' + (wholeReview.verdict === "pass" ? "pass" : "fail") + '">' +
-      '<div class="vhead"><span class="vid">整期</span>' +
-      '<span class="vword">' + (wholeReview.verdict === "pass" ? "放行" : "不合格") + "</span>" +
-      '<span class="vmeta">' + esc(wholeReview.by) + " · " + when(wholeReview.at, zone) + "</span>" +
-      '<span class="vcount">' + tasks.length + " 条 · " + (wholeReview.findings.length ? "点了 " + wholeReview.findings.length + " 条" : "没有发现") + "</span>" +
-      "</div>" +
-      '<p class="vbrief"><span class="k">清单</span>' + esc(String(wholeReview.brief).split(/[\\/]/).pop()) +
-      (wholeReview.rework && wholeReview.rework.length ? '　<span class="k">退回</span>' + esc(wholeReview.rework.join("、")) : "") + "</p>" +
-      (wholeReview.findings.length ? '<div class="fds">' + findingList(wholeReview.findings) + "</div>" : "") +
-      "</article>"
-    : "";
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="accept" id="screen-accept">' +
     screenHead("03", "验收", "判过什么、谁判的、还差谁一句话", sealed.length + " 段判过") +
     (goal ? '<p class="goal"><span class="k">这一期要做成什么</span>' + esc(goal) + "</p>" : "") +
     '<div class="cols">' +
     '<div class="col">' +
-    '<h3 class="colh">结论</h3>' + (wholeCard + cards || '<p class="quiet">还没有审查结论</p>') +
+    '<h3 class="colh">结论</h3>' + (cards || '<p class="quiet">还没有审查结论</p>') +
     (settled.length
       ? '<h3 class="colh">定过的边界与不做</h3><ul class="edges">' +
         settled.map((one) => '<li class="edge"><span class="ekind">' + (one.kind === "border" ? "边界" : "弃") + "</span>" + esc(one.text) +
@@ -454,7 +431,6 @@ function acceptScreen(doc, session, config, zone, on) {
     check(sealed.length === segments.length, "每一段都判过", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没判" : "") +
     check(todo === 0, "没有未做的条目", todo ? "还有 " + todo + " 条" : "") +
     check(asks.length === 0, "没有等裁定的问题", asks.length ? "还有 " + asks.length + " 条待裁（" + asks.map((one) => one.id).join("、") + "）" : "") +
-    (wholeWord ? check(wholeWord.ok, wholeWord.label, wholeWord.why) : "") +
     check(blocks.length === 0 && (!session || !!signed || sealed.length === segments.length), "没有挡住的项", blocks.length ? blocks.length + " 条，见下" : "") +
     "</ul>" +
     (signed

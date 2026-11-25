@@ -51,18 +51,16 @@ export const SPEC = {
   },
   goal: {
     flags: ["text", "why", "session", "by"],
-    usage: ['deed goal "<这一期要做成什么>" [--why "…"]   签收与签收核对都拿它当尺子'],
+    usage: ['deed goal "<这一期要做成什么>" [--why "…"]   签收拿它当尺子'],
   },
   review: {
-    flags: ["all", "segment", "verdict", "by", "finding", "rework", "why", "session"],
-    booleans: ["all"],
+    flags: ["segment", "verdict", "by", "finding", "rework", "why", "session"],
     repeat: ["finding"],
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
-      "deed review --all                      发整期清单（列各段的结论；段都封之后用它，一段的一期由那一段的结论回答）",
       'deed review --segment S01.1 --by "谁" --verdict pass [--finding "…"]   pass 直接关闭这一段',
       'deed review --segment S01.1 --by "谁" --verdict fail --rework T1,T2 --why "…" [--finding "…"]',
-      'deed review --all --by "谁" --verdict pass|fail [--rework S0x.N,…] [--why "…"]   结论落在整期（点名的是段）',
+      "                 审查只在段里做：签收看的是每一段的结论都放行、条件都满足，没有另一道整期审查",
     ],
   },
   seal: {

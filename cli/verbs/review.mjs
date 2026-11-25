@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { digest } from "../../core/digest.mjs";
-import { goalOf, lastBrief, lastSegmentChange, needsReview, needsWhole, nextAction, openSegment, periodChange, reading, tasksIn } from "../../core/rules.mjs";
+import { lastBrief, lastSegmentChange, needsReview, nextAction, openSegment, reading, tasksIn } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
-import { planBrief, planWhole, writeBrief } from "../brief.mjs";
-import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list, auditSegment, auditAll } from "../session.mjs";
+import { planBrief, writeBrief } from "../brief.mjs";
+import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list, auditSegment } from "../session.mjs";
 
 export default function review(argv) {
 
@@ -14,135 +14,6 @@ export default function review(argv) {
     guard(() => {
       const { doc } = load();
       const one = targetSession(doc, flags);
-      // 签收核对：对象是这一期的各段。清单列各段的结论（谁判的、什么时候、判定、发现、
-      // 退回的段），pass 时把还没封的段一起封，fail 点名退回的也是段。一段的一期不审
-      // 两遍：它的整体审就是签收核对，所以这里直接拒。
-      if (flags.all) {
-        if (flags.segment) fail("--all 说的是这一期，--segment 说的是某一段：一次只审一个对象");
-        if (one.segments.length === 1)
-          fail(
-            "这一期只有一段：" + one.segments[0].id + " 的审查就是这一期的审查（deed review --segment " + one.segments[0].id + "）",
-          );
-        const goal = goalOf(one);
-        if (!flags.verdict) {
-          if (!goal) fail('这一期还没写目的：先说清这一期要做成什么（deed goal "…"），签收核对才有尺子');
-          const openSegs = one.segments.filter((s) => s.closedAt === null);
-          if (one.segments.length !== 1 && openSegs.length > 0)
-            fail("还有段没封：" + openSegs.map((s) => s.id).join("、") + "：多段的一期先逐段封，最后签收核对");
-          const pending = one.tasks.filter((task) => task.status === "todo");
-          if (pending.length > 0)
-            fail("这一期还有没交付的（" + pending.map((task) => task.id).join("、") + "）：签收核对的清单等交付完再发");
-          // 审查设置说各段都不用审时，整期结论没人需要：允许出，但先把话说在前面，
-          // 免得账本上留下一条看着像「这一期被签收核对过」的结论。这句话排在检查
-          // 之后：还有段没封的期上说「各段都免审」是假话。
-          if (!needsWhole(doc.config, one)) {
-            console.log("审查设置说这一期的各段都不用审（段由 deed seal 关闭）：不需要整期结论，也不出整期清单");
-            console.log('  下一步：签收 deed sign --words "…" --by "…"');
-            return;
-          }
-          const last = one.briefs.filter((b) => b.scope === "session").at(-1) ?? null;
-          const answered = last && one.reviews.some((rv) => rv.scope === "session" && rv.brief === last.brief);
-          if (last && !answered) {
-            const file = path.resolve(ROOT, last.brief);
-            const pack = last.guide ? path.resolve(ROOT, last.guide) : null;
-            const intact =
-              fs.existsSync(file) &&
-              digest(fs.readFileSync(file)) === last.briefDigest &&
-              (!pack || (fs.existsSync(pack) && digest(fs.readFileSync(pack)) === last.guideDigest));
-            const moved = periodChange(one);
-            const stale = moved !== null && moved > last.at;
-            if (intact && stale) console.log("上一份整期清单(" + last.brief + ")出在这一期最近一次改动之前：另出一份");
-            else if (intact) {
-              console.log("整期清单 · " + last.brief + "（这一期已经出过，等结论落盘）");
-              console.log('  结论用 deed review --all --by "…" --verdict pass|fail');
-              return;
-            } else console.log("上一份清单(" + last.brief + " 与角色包)改过或丢了：另出一份，旧的那条账本记录留着（verify 会报）");
-          }
-          const plan = planWhole(ROOT, one, stamp());
-          const brief = rel(ROOT, plan.file);
-          const guide = rel(ROOT, plan.guideFile);
-          transact(
-            flags,
-            () => ({
-              k: "review.brief",
-              s: one.id,
-              scope: "session",
-              goal,
-              brief,
-              briefDigest: plan.digest,
-              guide,
-              guideDigest: plan.guideDigest,
-            }),
-            () => writeBrief(plan, brief),
-          );
-          const nth = one.briefs.filter((b) => b.scope === "session").length + 1;
-          console.log("整期清单 · " + brief + "（审什么）· 这一期的第 " + nth + " 份");
-          if (nth >= 3) console.log("  提示 · 这一期已经出过 " + (nth - 1) + " 份整期清单：先看上一份的审查者点了哪几段，别从头再写一份");
-          console.log("  角色包 · " + guide + "（怎么审）· 两份一起交给审查者");
-          console.log('  结论用 deed review --all --by "…" --verdict pass|fail');
-          return;
-        }
-        if (!flags.by) fail('review 要给结论就要写清谁审的：--by "…"');
-        auditAll(doc, one);
-        const waiting = one.tasks.filter((task) => task.status === "todo");
-        if (waiting.length > 0)
-          fail("这一期还有没交付的（" + waiting.map((task) => task.id).join("、") + "）：结论只能落在交付之后");
-        const handed = one.briefs.filter((b) => b.scope === "session").at(-1) ?? null;
-        if (!handed) fail("这一期还没有整期清单：先 deed review --all 出清单，再把结论落回来");
-        const file = path.resolve(ROOT, handed.brief);
-        if (!fs.existsSync(file)) fail("整期清单不在了（" + handed.brief + "）：先 deed review --all 重出一份");
-        if (digest(fs.readFileSync(file)) !== handed.briefDigest)
-          fail("整期清单被改过（" + handed.brief + "）：它不是审查者读到的那一份；重新出一次再审（deed review --all）");
-        if (handed.guide) {
-          const pack = path.resolve(ROOT, handed.guide);
-          if (!fs.existsSync(pack)) fail("角色包不在了（" + handed.guide + "）：先 deed review --all 重出一份");
-          if (digest(fs.readFileSync(pack)) !== handed.guideDigest)
-            fail("角色包被改过（" + handed.guide + "）：它不是审查者读到的那一份；重新出一次再审（deed review --all）");
-        }
-        const moved = periodChange(one);
-        if (moved !== null && moved > handed.at)
-          fail("这一期在清单出过之后又动过（" + handed.brief + "）：结论只能回答清单上那一份，deed review --all 另出一份再审");
-        const findings = list(flags.finding);
-        const rework = split(flags.rework).filter(Boolean);
-        if (flags.verdict === "fail") {
-          // 签收核对点的是段：它手上就是各段的结论，段里哪一条不行由那一段自己判。
-          if (rework.length === 0) fail("不合格要点名要重做的段：--rework S0x.N,S0x.M（不点名的结论没人能接）");
-          const unknown = rework.filter((id) => !one.segments.some((seg) => seg.id === id));
-          if (unknown.length > 0)
-            fail(
-              unknown.join("、") + " 不是段：签收核对退回的是段（" + one.segments.map((seg) => seg.id).join("、") + "），段里的条目由那一段的审查者点名",
-            );
-          if (!flags.why) fail('不合格要说清为什么：--why "一句话总结"（具体问题写在 --finding 里）');
-        } else if (rework.length > 0) {
-          fail("--rework 只跟 --verdict fail 一起用：pass 的意思是这一期过了，没有要退回的段");
-        }
-        const after = transact(flags, () => ({
-          k: "review.log",
-          s: one.id,
-          scope: "session",
-          by: flags.by,
-          verdict: flags.verdict,
-          brief: handed.brief,
-          briefDigest: handed.briefDigest,
-          goal: handed.goal ?? null,
-          findings,
-          ...(flags.verdict === "fail" ? { rework, why: flags.why } : {}),
-        })).doc;
-        if (flags.verdict === "pass") {
-          console.log("签收核对通过 · " + one.id + " · " + flags.by + " · 段已封存");
-          console.log("  清单 " + handed.brief);
-          for (const one2 of findings) console.log("  发现 · " + one2);
-        } else {
-          console.log("签收核对不合格 · " + one.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
-          console.log("  清单 " + handed.brief);
-          for (const one2 of findings) console.log("  发现 · " + one2);
-          console.log("  被点名的段整段重开（段里的条目保持交付）；先给它重出清单，再由它自己的审查者再审");
-        }
-        const step = nextAction(after, after.config);
-        console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
-        console.log("  " + step.command);
-        return;
-      }
       const seg = flags.segment ? one.segments.find((s) => s.id === flags.segment) : openSegment(one);
       if (!seg)
         fail(

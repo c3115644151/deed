@@ -13,7 +13,7 @@ import { digest } from "../core/digest.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
-import { costOf, edges, countIn, currentSession, debt, goalOf, needsWhole, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
+import { costOf, edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
 import { auditEvidence, staleEvidence } from "./audit.mjs";
@@ -330,11 +330,11 @@ export function printState() {
     console.log(
       "会话 " + open.id + " · 开于 " + stamp0(open.openedAt) + " · " + userTurns(open).length + " 轮 · " + open.segments.length + " 段",
     );
-    // 一期要做成什么：签收核对与签收都拿它当尺子，所以它得在状态里看得见。
+    // 一期要做成什么：签收拿它当尺子，所以它得在状态里看得见。
     const aim = goalOf(open);
     if (aim) console.log("  目的 · " + aim);
-    else if (open.segments.length > 1 && needsWhole(config, open))
-      console.log('  目的 · 还没有（deed goal "…"）：签收核对与签收都拿它当尺子');
+    else if (open.segments.length > 1)
+      console.log('  目的 · 还没有（deed goal "…"）：签收拿它当尺子');
     const shown = seg ?? open.segments[open.segments.length - 1];
     if (!shown) {
       console.log("  还没有段：范围说完就写第一条任务");
@@ -435,17 +435,3 @@ export const auditSegment = (doc, session, seg) => {
       "这一段有交付记录过期（" + stale.map((spot) => spot.id + " 记下 " + spot.path).join("、") + "），记下的内容已经变了：重新交付再关闭这一段",
     );
 };
-
-// 签收核对的同一件差事：抄一遍这一期全部任务，不再按段过滤。
-export const auditAll = (doc, session) => {
-  const audit = auditEvidence(ROOT, doc, session.id);
-  if (audit.outside.length > 0)
-    fail(
-      "这一期有交付记录指到工作区外面（" + audit.outside.map((spot) => spot.id + " → " + spot.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付",
-    );
-  if (audit.stale.length > 0)
-    fail(
-      "这一期有交付记录过期（" + audit.stale.map((spot) => spot.id + " 记下 " + spot.path).join("、") + "），记下的内容已经变了：重新交付再落结论",
-    );
-};
-

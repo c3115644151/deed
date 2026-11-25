@@ -4,18 +4,15 @@ import { fold } from "../core/fold.mjs";
 import {
   byOrder,
   edges,
-  needsWhole,
   needsReview,
   nextAction,
   reading,
   reviewOf,
   reviewState,
   costOf,
-  freshWholeBrief,
   pointsAtNothing,
   sealBlockers,
   signBlockers,
-  wholeState,
 } from "../core/rules.mjs";
 
 const config = { review: { required: ["src/**", "core/**", "apps/**"], exempt: ["docs/**", "*.md"] } };
@@ -138,26 +135,24 @@ test("signing waits for the judgement and for every open question", () => {
   assert.deepEqual(signBlockers(clean, clean.sessions[0], config), []);
 });
 
-// 多段的一期：段都封了还差一句落在整期上的结论；它要拿目的当尺子，
-// 而一段的一期不必再算一次——那一段的结论就是整期的结论。
-test("a period with more than one segment needs a conclusion on the period itself", () => {
+// 签收只看各段的结论与条件：段都封了就该签收，整期上没有第二道审查。
+// 旧账本里落过一句整期上的结论，它照读（历史事实），但不添任何门。
+test("every segment's verdict is the whole story: signing asks for nothing more", () => {
   const doc = fold([
     turn(1), goal(2),
     add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5),
     add(6, "T2", ["core/b.mjs"]), done(7, "T2"), sealed(8, "S01.2"),
   ]);
-  assert.equal(wholeState(doc.sessions[0]), "missing");
-  const step = nextAction(doc, config);
-  assert.equal(step.who, "reviewer");
-  assert.match(step.command, /deed review --all/);
-  const whole = fold([
+  assert.deepEqual(signBlockers(doc, doc.sessions[0], config), []);
+  assert.equal(nextAction(doc, config).what, "签收");
+  const withOldVerdict = fold([
     turn(1), goal(2),
     add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5),
     add(6, "T2", ["core/b.mjs"]), done(7, "T2"), sealed(8, "S01.2"),
-    { v: 5, at: T(9), k: "review.log", s: null, scope: "session", by: "qa", verdict: "pass", brief: "all.md", findings: [] },
+    { v: 9, at: T(9), k: "review.log", s: null, scope: "session", by: "qa", verdict: "pass", brief: "all.md", briefDigest: "a".repeat(64), findings: [] },
   ]);
-  assert.equal(wholeState(whole.sessions[0]), "pass");
-  assert.equal(nextAction(whole, config).what, "签收");
+  assert.deepEqual(signBlockers(withOldVerdict, withOldVerdict.sessions[0], config), [], "旧结论不给签收添门");
+  assert.equal(nextAction(withOldVerdict, config).what, "签收");
 });
 
 // 清单已经交出去，下一步就是落结论——哪怕在案的结论是旧的。
@@ -184,33 +179,20 @@ test("a brief handed out after the last change is answered, not replaced", () =>
   assert.equal(step.what, "落结论");
   assert.match(step.text, /S01\.1-2\.md/);
   assert.match(step.command, /--verdict pass/);
-  // 整期清单同理：交出去、没人回答，就是落结论；被回答了就不再算新鲜。
-  const whole = { ...fresh.sessions[0],
-    briefs: [...fresh.sessions[0].briefs,
-      { scope: "session", segment: null, brief: "S01-all-1.md", briefDigest: "e".repeat(64), at: T(13) },
-    ] };
-  assert.equal(freshWholeBrief(whole).brief, "S01-all-1.md");
-  const answered = { ...whole, reviews: [...whole.reviews,
-    { scope: "session", brief: "S01-all-1.md", verdict: "pass", at: T(14) }] };
-  assert.equal(freshWholeBrief(answered), null);
 });
 
-// 一段的一期不审两遍：那一段的结论已经回答了这一期。
-// 下一步也得照这个读——段封了就该签收，不能再要一句目的、再要一次签收核对。
+// 一段的一期不审两遍：那一段的结论就是这一期的结论。
+// 下一步也得照这个读——段封了就该签收，不再要一句落在整期上的话。
 test("one segment's verdict answers for the period, so no second pass is asked for", () => {
   const doc = fold([turn(1), goal(2), add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5)]);
-  assert.equal(wholeState(doc.sessions[0]), "pass");
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), []);
   assert.equal(nextAction(doc, config).what, "签收");
-  // 没有目的也一样：一段的一期不拿目的当尺子，写完目的也不该冒出一次重审。
   const bare = fold([turn(1), add(2, "T1", ["core/a.mjs"]), done(3, "T1"), sealed(4)]);
-  assert.equal(needsWhole(config, bare.sessions[0]), false);
   assert.equal(nextAction(bare, config).what, "签收");
   const aimed = fold([
     turn(1), add(2, "T1", ["core/a.mjs"]), done(3, "T1"), sealed(4), goal(5),
   ]);
-  assert.equal(wholeState(aimed.sessions[0]), "pass", "改目的不是改这一期做过的事");
-  assert.equal(nextAction(aimed, config).what, "签收");
+  assert.equal(nextAction(aimed, config).what, "签收", "改目的不是改这一期做过的事");
 });
 
 test("the next step names one actor and one action", () => {
@@ -228,9 +210,8 @@ test("the next step names one actor and one action", () => {
   const judged = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
   assert.equal(nextAction(judged, config).what, "签收");
 });
-// 一段都没人要审的一期，没有可比对的东西：签收核对的对象本来就是"审查者看过的那些段"。
-// 少了这一条，两段免审的期会被要一份没人能写的整期结论，签收永远差一格。
-test("a period whose segments all sat out review needs no conclusion on the period", () => {
+// 两段都由 deed seal 关的期也一样：没人需要写的东西，不该有人等到它。
+test("a period whose segments all sat out review signs without anything else", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
   const doc = fold([
     turn(1), goal(2),
@@ -242,7 +223,6 @@ test("a period whose segments all sat out review needs no conclusion on the peri
     seal(8, "S01.2"),
   ]);
   const session = doc.sessions[0];
-  assert.equal(needsWhole(config, session), false, "两段都免审：没有要审的东西可比对");
   assert.deepEqual(signBlockers(doc, session, config), []);
   assert.equal(nextAction(doc, config).what, "签收");
 });
@@ -274,7 +254,7 @@ test("a delivery that never weighed its files is not treated as a small one", ()
   assert.equal(needsReview(config, session, session.segments[0]), true, "称不出规模，就别指望它按 0 字节放行");
 });
 // 审查设置后来写细了，不回头改写已经封过的段：封存那一刻的决定留在账本上。
-// 少了这一条，一次收紧就能把「全部免审」的期重新算成少一份整期结论，
+// 少了这一条，一次收紧就能把「全部免审」的期重新算成要审，
 // 而签收清单里同时写着「没经过审查」——两句话互相打脸。
 test("a segment sealed before the gate got stricter is not pulled back into review", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
@@ -301,11 +281,10 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   assert.equal(reviewState(tight, session, first), "exempt");
   // 守卫读的是「真写下过一次封存」，所以两个字段都要当着：sealedBy 有名字、
   // closedAt 是那一刻。少了 closedAt 就不算封过——而且这个形状不是手改账本才有的：
-  // 签收核对把这一段点回来时，fail 分支就留着 sealedBy、把 closedAt 清成 null。
+  // 旧账本里那句整期上的不合格把它点回来时，fail 分支就留着 sealedBy、把 closedAt 清成 null。
   assert.equal(first.sealedBy, "agent", "封它的是 deed seal");
   assert.notEqual(first.closedAt, null, "账本上真写过一次封存");
   assert.equal(needsReview(tight, session, { ...first, closedAt: undefined }), true, "没有 closedAt 就不是封存");
-  assert.equal(needsWhole(tight, session), false, "没人审过的期不必再补一份整期结论");
   assert.deepEqual(signBlockers(doc, session, tight), []);
   assert.equal(nextAction(doc, config).what, "签收");
 });
@@ -327,7 +306,7 @@ test("a segment a reviewer passed is still weighed, so the exemption is only for
 // 半个封存的真实来路：签收核对把一条写在 deed seal 封过的段里的任务点回来，段被重新打开——
 // 留着 sealedBy（写过封存的人），closedAt 清成 null。这不是手改账本才出现的形状，
 // 而是 fail 分支每天都会造出来的；对它按审查设置重算是本意，所以这条用例要跟着它走。
-test("a whole-period rework reopens a sealed segment, and that half-seal is weighed again", () => {
+test("an old period verdict that named a segment reopens it, and that half-seal is weighed again", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
   const whole = (n) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail",
     brief: "b.md", briefDigest: "a".repeat(64), why: "S01.1 的结论没对上这一期", rework: ["S01.1"] });
@@ -343,25 +322,6 @@ test("a whole-period rework reopens a sealed segment, and that half-seal is weig
   assert.equal(needsReview(config, session, first), true, "半个封存不算封过：按今天的审查设置重算");
 });
 
-// 签收核对的对象是「审查者看过的那些段」：审过的段算数，不是按它交付的字节重量重算。
-// 少了这一条，段一旦被 pass 封住，它后来算不算「小改动」就会决定这一期还要不要签收核对——
-// 而真正该问的是有没有人看过。这条用例自己结束，不要借上面那条的夹具，否则一次变异会把两条
-// 用例一起带红，看不出是哪一条在守。
-test("a segment a reviewer read counts for the whole review, whatever its deliveries weigh later", () => {
-  const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
-  const light = (n, id, path) => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent",
-    digest: "a".repeat(64), digestPath: path, changed: [path], bytes: { [path]: 100 } });
-  const doc = fold([
-    turn(1), goal(2),
-    add(3, "T1", ["docs/a.md"]), light(4, "T1", "docs/a.md"), sealed(5, "S01.1"),
-    add(6, "T2", ["docs/b.md"]), light(7, "T2", "docs/b.md"), seal(8, "S01.2"),
-  ]);
-  const session = doc.sessions[0];
-  assert.equal(needsReview(config, session, session.segments[0]), false, "这一段的字节数出来确实很小");
-  assert.equal(needsWhole(config, session), true, "可它被人看过：签收核对还得有一句结论");
-  assert.equal(signBlockers(doc, session, config).some((one) => one.includes("签收核对")), true);
-});
-
 // 守卫的语义要直接写下来：只删东西的交付指着它动过的那条路径，不算「什么也没指着」。
 // 不写这条，两条删除用例删掉之后这半条守卫就没有任何用例看着（上一轮 T60 就是这么漏的）。
 test("a delivery that points at nothing is told apart from one that points at a path it removed", () => {
@@ -374,20 +334,26 @@ test("a delivery that points at nothing is told apart from one that points at a 
 });
 
 
-// 签收核对打回的是段：那一段还开着就是没结清，一天没人重新看过，这一期就还不算过。
-// 少了这条，签收核对判了不合格之后立刻再判一次通过就能把话绕过去。
-test("a whole-period failure stays open until the segment it named is reviewed again", () => {
-  const whole = (n, verdict, rework) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: verdict === "fail" ? "qa" : "qa2",
-    verdict, brief: verdict === "fail" ? "all-1.md" : "all-2.md", briefDigest: "a".repeat(64),
+// 旧账本里那句整期上的不合格照读：它点名的段重新打开，段里的条目保持交付。
+// 它是历史决定，不是今天还要再走一道的门——新账本里这种行已经产生不出来了（含义第 18 版）。
+test("an old period verdict is history: the segment it named reopens, nothing else", () => {
+  const whole = (n, verdict, rework) => ({ v: 9, at: T(n), k: "review.log", s: null, scope: "session", by: "qa",
+    verdict, brief: "all-" + n + ".md", briefDigest: "a".repeat(64),
     ...(verdict === "fail" ? { rework, why: "那一段的结论没对上这一期" } : {}) });
-  const base = [turn(1), goal(2),
+  const doc = fold([turn(1), goal(2),
     add(3, "T1", ["core/a.mjs"]), done(4, "T1", "core/a.mjs"), sealed(5, "S01.1"),
     add(6, "T2", ["core/b.mjs"]), done(7, "T2", "core/b.mjs"), sealed(8, "S01.2"),
     whole(9, "fail", ["S01.1"]),
-  ];
-  const doc = fold(base);
+  ]);
   assert.equal(doc.sessions[0].segments[0].closedAt, null, "被点名的段重开了");
-  assert.throws(() => fold([...base, whole(10, "pass")]), /还没结清|没有可结清的东西/, "那一段没重新判过，这一期不能就这么过去");
+  const reopened = fold([...[turn(1), goal(2),
+    add(3, "T1", ["core/a.mjs"]), done(4, "T1", "core/a.mjs"), sealed(5, "S01.1"),
+    add(6, "T2", ["core/b.mjs"]), done(7, "T2", "core/b.mjs"), sealed(8, "S01.2"),
+    whole(9, "fail", ["S01.1"])],
+    { v: 18, at: T(10), k: "review.log", s: null, segment: "S01.1", by: "qa2", verdict: "pass", brief: "b.md", briefDigest: "a".repeat(64), findings: [] },
+  ]);
+  assert.deepEqual(signBlockers(reopened, reopened.sessions[0], config), [], "段重新判过，签收不再差什么");
+  assert.equal(nextAction(reopened, config).what, "签收");
 });
 
 test("a segment says what it cost: briefs handed out, deliveries taken back, minutes it stayed open", () => {

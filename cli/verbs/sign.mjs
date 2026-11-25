@@ -15,7 +15,10 @@ export default function sign(argv) {
       // 没人审过的段不能被静默放过：签收这一刻把它们摆出来。
       const unread = exemptSegments(one);
       if (unread.length > 0)
-        console.log("  没经过审查 · " + unread.map((s) => s.id + "（" + s.sealedWhy + "）").join("、"));
+        console.log(
+          "  没经过审查 · " +
+            unread.map((s) => (s.sealedWhy ? s.id + "（" + s.sealedWhy + "）" : s.id)).join("、"),
+        );
       const owed = debt(one);
       if (owed.deferred.length + owed.dropped.length > 0)
         console.log("  带着走的未结项 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));

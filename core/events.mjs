@@ -37,7 +37,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 17;
+export const EVENT_VERSION = 18;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -57,6 +57,9 @@ export const MEANING = {
   undoCarry: 16,
   // 条目可以带一个「先后」：同段里谁先做。它只决定印出来的顺序，不进门也不进结论。
   order: 17,
+  // 审查只在段里做：签收看的是每段的结论都放行、条件都满足，整期上不再有第二份结论能落。
+  // 旧账本里落过的那几行照读（历史事实），既不挡签收，也不再产生新的。
+  noWholeReview: 18,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -218,7 +221,10 @@ export function validateEvent(ev, at) {
     // Handing the brief out is a fact, not a side effect: without it the
     // ledger cannot say which document a verdict answered.
     case "review.brief":
-      // 签收核对的清单覆盖整期，没有"段"这一格；整体审的必须有。
+      // 审查只在段里做：清单必须说清是哪一段的。整期清单是第 17 版之前的写法，
+      // 旧账本里读得出来，新行不再产生。
+      if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview)
+        throw new Error("审查清单落在段上：整期上不再出清单（签收只看各段的结论与条件）");
       if (ev.scope === "session") need(ev, "goal");
       else need(ev, "segment");
       need(ev, "brief");
@@ -232,6 +238,8 @@ export function validateEvent(ev, at) {
       }
       break;
     case "review.log":
+      if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview)
+        throw new Error("审查结论落在段上：整期上不再有第二份结论（签收只看各段的结论与条件）");
       if (ev.scope !== "session") need(ev, "segment");
       need(ev, "by");
       need(ev, "verdict");
