@@ -74,6 +74,18 @@ test("a segment waiting for a verdict takes no new work: the next entry opens a 
   assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
 });
 
+test("a line that landed while the segment was frozen still replays: freeze is a write-side gate", () => {
+  // 冻结是「别在审的时候改」，不是「把写下去的行判成坏账」。读的一侧一律照读：
+  // 拦在 fold 里时，任一条交付落在一份没人回答的清单之后，整本账就重放不动，
+  // 面板整页停在「账本里有读不动的行」。
+  const doc = fold([
+    turn(1), add11(2, "T1"), { ...brief(3, "S01.1"), v: 19 }, { ...done(4, "T1"), v: 19 },
+  ]);
+  const task = doc.sessions[0].tasks[0];
+  assert.equal(task.status, "done");
+  assert.equal(task.evidence.length, 1);
+});
+
 test("a second brief supersedes the first one nobody answered: the segment stops waiting", () => {
   // 一段发过好几份清单是常态（前一份写得不对、或者作者改了字节另出一份）。
   // 「有哪一份没被回答」当在等结论，往后再出一份、被回答，这一段也永远解不开。

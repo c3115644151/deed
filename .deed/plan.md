@@ -282,7 +282,10 @@
   标准：`deed review --segment S0x.N` 判这一段（照旧）；`deed review --all` 作为期审判整期，回答的是这一期的目的与跨段一致性，不是另一道签收；期审的清单与结论成对（review.brief 与 review.log 记 scope:"session"），旧账本里早先的 session 结论仍只作历史、不挡签收；每一段都有结局、无未做、无已交付未判之后才出期审清单，期审 pass 才轮到签收，fail 点名哪一段就重开那一段；`deed state` 在段全关之后先给「出期审清单／落期审结论」，面板同步；EVENT_VERSION 升 1、旧行照读；有用例（段没关全不出发期审清单；期审 pass 之后签收可行；期审 fail 点名一段则那一段重新打开）
 - [x] T128 一段发过多份清单时，只有最后那份算还在等结论
   标准：`awaitingVerdict` 只看这一段手上的最后一份清单（scope:segment 的最后一条 review.brief）；前一份没人回答不再让这一段继续冻结、也不再让新活自己开段；再出一份、被回答之后这一段回到执行态，冻结算的是同一句；旧账本照读；有用例（同一段发过两份、第一份没人回答、第二份被判 → 段不再等结论、新活落回这一段；把判断改回「有任何一份没被回答」即红）
-  交付：跑：node --test 216/216（全量；这个数就是 --run 当场采到的）；core/fold.mjs 的 awaitingVerdict 只看这一段最后那一份清单——前一份没人回答不再让这一段继续冻结、也不再让新活自己开段，再出一份被回答之后这段回到执行态（cli/session.mjs 的冻结与 cli/plan.mjs 的落点读的是同一句）；新增 test/fold.test.mjs 的 a second brief supersedes the first one nobody answered；变异：把判断改回 some → 那条红（fold 37 过 1 败），还原后 fold 38/38
+  交付：core/fold.mjs:98-105 的 awaitingVerdict 只看这一段最后那一份清单：前一份没人回答不再让这一段继续冻结、也不再让新活自己开段；冻结算的是同一句；新增 test/fold.test.mjs 的 a second brief supersedes the first one nobody answered，变异把判断改回 some 时那条红（fold 37 过 1 败），还原后 fold 38/38；这一条走 task done，全量 216/216 是同一份字节上跑过的，但没被 --run 采进账本
+- [x] T129 冻结只拦写：账本里已经落下的行一律照读，重放不因这一段后来送了审就判它坏账
+  标准：冻结的拒绝发生在落盘前一刻（cli/session.mjs 的 refuseFrozen：task.done 与「撤回一条已交付」两类事件），core/fold.mjs 不再为冻结抛错；一份没人回答的清单出现在某条交付之后，整本账仍能重放、面板仍出正常页；交付与撤回交付在写的一侧仍被真拒并说清出路；有用例（重放含「清单已发出＋之后又落一条交付」的账本不抛；把判断加回 fold 即红）
+  交付：跑：node --test 217/217（全量，数由 --run 采）；core/fold.mjs 的 task.done／task.undo／task.order 三处不再为冻结抛错，改由 cli/session.mjs 的 refuseFrozen 在落盘前一刻拦（task.done 与「撤回一条已交付」两类），措辞与原来一致；新增 test/fold.test.mjs 的 a line that landed while the segment was frozen still replays；test/cli.test.mjs 的 a frozen segment refuses… 仍红着盯住写的一侧；面板重启后 7317 出的是正常页（461349 字节）
 - [x] T122 撤回一条「改到下一段」，走空的段跟着消失
   标准：`deed task undo T<号> --why "…"` 能撤回一条 carry——条目回到它原来那一段，那一段重新成为预备段；被走空的那一段从段列表里消失（段由条目生出来，不是计划）；撤销一条从未挪过的条目仍被拒并说清；有用例（挪出去再撤回来，段列表只剩一条；把删段那一行改掉，那一条红）
   交付：跑：node --test test/fold.test.mjs 37/37（两条新用例：撤回之后段列表只剩一条、没撤过可撤的仍被拒）；core/fold.mjs 的 task.undo 在条目还没交过、站在最末一段时把它送回上一段，把那一段的 carried 置回 true，并把走空的那一段从重放结果里删掉；变异：把删段那一行改成 void left → 那一条红

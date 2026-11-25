@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { digest } from "../core/digest.mjs";
-import { fold } from "../core/fold.mjs";
+import { fold, frozenFor } from "../core/fold.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { costOf, edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
@@ -95,6 +95,26 @@ export const load = () => {
 // commit runs only after the line is on disk: derived state (the workspace
 // snapshot) may not move for an event that was refused before appending.
 // mayBind：唯一允许在没接过的目录里写的东西是"把审查设置落进账本"（init 自己）。
+
+// 冻结只拦写的一侧：账本里的行已经是发生的事实，重放不因为「这一段后来送了审」就把它
+// 判成坏账（那样一次重放失败，面板整页都读不动）。落盘前一刻在这里拦，一条都不写。
+const refuseFrozen = (doc, evs) => {
+  for (const ev of evs) {
+    if (ev.k !== "task.done" && ev.k !== "task.undo") continue;
+    const session = ev.s ? sessionById(doc, ev.s) : currentSession(doc);
+    const task = session?.tasks.find((one) => one.id === ev.id);
+    if (!task) continue;
+    // 撤回放弃、撤回一条改到下一段是记录层面的事：只有撤回一条交付才换掉审查者手上的文件。
+    if (ev.k === "task.undo" && task.status !== "done" && task.status !== "accepted") continue;
+    if (!frozenFor(session, task.segment, EVENT_VERSION)) continue;
+    fail(
+      ev.k === "task.done"
+        ? `${task.segment} 的清单已经发出去、还没人回答：这一段在审，不能交付（要改先把清单撤回：deed review --segment ${task.segment} --withdraw --why "…"）`
+        : `${task.segment} 在审：撤回交付会换掉审查者手上那两份文件，等结论或先撤回清单`,
+    );
+  }
+};
+
 export function transact(flags, build, commit, mayBind = false) {
   // 接过的目录才谈得上写：没接过就先拒绝，连 .deed/ 也不该留下——
   // 拿锁会顺手把目录建出来，而被拒的动作不该在工作区里留下任何痕迹。
@@ -111,6 +131,7 @@ export function transact(flags, build, commit, mayBind = false) {
     // 没有审查设置的账本谁也没法判：还没接过的目录只能由 init 先落基线。
     if (!doc.config && stamped.k !== "config.change")
       fail("这个目录还没接 deed：先 deed init（没有审查设置的账本，读不出状态，也判不了任何一段）");
+    refuseFrozen(doc, [stamped]);
     const after = fold([...events, stamped]);
     append(ROOT, stamped);
     if (commit) commit(stamped);
@@ -144,6 +165,7 @@ export function transactMany(flags, buildAll, commit) {
       one.w = currentVersion() || undefined;
       return one;
     });
+    refuseFrozen(doc, stamped);
     const after = fold([...events, ...stamped]);
     appendMany(ROOT, stamped);
     if (commit) commit(stamped, after);

@@ -896,3 +896,33 @@
 {"at":"2026-11-25T02:17:46.609Z","k":"task.order","s":"S02","id":"T117","order":33,"v":19,"w":"0.18.0"}
 {"at":"2026-11-25T02:17:46.609Z","k":"task.order","s":"S02","id":"T94","order":34,"v":19,"w":"0.18.0"}
 {"at":"2026-11-25T02:22:24.254Z","k":"task.done","s":"S02","id":"T128","evidence":"core/fold.mjs:98-105 的 awaitingVerdict 只看这一段最后那一份清单：前一份没人回答不再让这一段继续冻结、也不再让新活自己开段；冻结算的是同一句；新增 test/fold.test.mjs 的 a second brief supersedes the first one nobody answered，变异把判断改回 some 时那条红（fold 37 过 1 败），还原后 fold 38/38；这一条走 task done，全量 216/216 是同一份字节上跑过的，但没被 --run 采进账本","by":"agent","digest":"963132476d9502fe06943996d55bd64c4b1b2e249f819f10c1fcd1dc98dac5c2","digestPath":"core/fold.mjs","files":[{"path":"core/fold.mjs","digest":"963132476d9502fe06943996d55bd64c4b1b2e249f819f10c1fcd1dc98dac5c2"},{"path":"test/fold.test.mjs","digest":"d28c8484b064033f7b827464eb91d60c9f7bd2a63bf6b868e945eb69f1df2ecd"},{"path":"cli/session.mjs","digest":"ab8b24b52f883e57e7a0d9d9f01238a2cb66d706244846d95e54e518ec6bc8a8"}],"changed":[],"bytes":{"core/fold.mjs":42806,"test/fold.test.mjs":26762,"cli/session.mjs":20633},"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:22:55.711Z","k":"review.brief","s":"S02","segment":"S02.19","brief":".deed/review/S02.19-11251022.md","briefDigest":"bd579eb4b71ada28f929e82a9fa31bbe05e758f644e6e42f97c865b1e102eac8","guide":".deed/review/S02.19-11251022-reviewer.md","guideDigest":"bd5cdbd1ad82405bc4fbefdea4dbe38c777834b62bd1de888644c9b0aa3eb284","v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.add","s":"S02","id":"T129","title":"冻结只拦写：账本里已经落下的行一律照读，重放不因这一段后来送了审就判它坏账","criteria":"冻结的拒绝发生在落盘前一刻（cli/session.mjs 的 refuseFrozen：task.done 与「撤回一条已交付」两类事件），core/fold.mjs 不再为冻结抛错；一份没人回答的清单出现在某条交付之后，整本账仍能重放、面板仍出正常页；交付与撤回交付在写的一侧仍被真拒并说清出路；有用例（重放含「清单已发出＋之后又落一条交付」的账本不抛；把判断加回 fold 即红）","files":[],"order":8,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T122","order":9,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T121","order":10,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T118","order":11,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T119","order":12,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T120","order":13,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T115","order":14,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T102","order":15,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T98","order":16,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T99","order":17,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T97","order":18,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T79","order":19,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T80","order":20,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T81","order":21,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T82","order":22,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T83","order":23,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T87","order":24,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T88","order":25,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T89","order":26,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T90","order":27,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T91","order":28,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T92","order":29,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T93","order":30,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T113","order":31,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T114","order":32,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T116","order":33,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T117","order":34,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:32:06.720Z","k":"task.order","s":"S02","id":"T94","order":35,"v":19,"w":"0.18.0"}
+{"at":"2026-11-25T02:34:49.659Z","k":"task.done","s":"S02","id":"T129","evidence":"跑：node --test 217/217（全量，数由 --run 采）；core/fold.mjs 的 task.done／task.undo／task.order 三处不再为冻结抛错，改由 cli/session.mjs 的 refuseFrozen 在落盘前一刻拦（task.done 与「撤回一条已交付」两类），措辞与原来一致；新增 test/fold.test.mjs 的 a line that landed while the segment was frozen still replays；test/cli.test.mjs 的 a frozen segment refuses… 仍红着盯住写的一侧；面板重启后 7317 出的是正常页（461349 字节）","by":"agent","run":{"command":"node --test","exit":0,"tests":217,"pass":217,"fail":0},"digest":"4e594a4d5167e4b6c5abf4bc7466edb67836f27c7f5a3d19c6d10068ccbb21c1","digestPath":"cli/session.mjs","files":[{"path":"cli/session.mjs","digest":"4e594a4d5167e4b6c5abf4bc7466edb67836f27c7f5a3d19c6d10068ccbb21c1"},{"path":"core/fold.mjs","digest":"65bcdb1526c0e1aaf1f93bdd16e8a7d36ad8b809e36fbde65a5b48eac3dbb77b"},{"path":"docs/DESIGN.md","digest":"158ac3a2f973f8444f7b6e43e04eb77d5ba9f8eb41eaff1b4df8d35580ff5715"},{"path":"test/fold.test.mjs","digest":"19c799f082efb4801a8d932442524e45d24d5df825c73f723c9bf198e752012d"}],"changed":["cli/session.mjs","core/fold.mjs","docs/DESIGN.md","test/fold.test.mjs"],"bytes":{"cli/session.mjs":21919,"core/fold.mjs":42295,"docs/DESIGN.md":52881,"test/fold.test.mjs":27399},"v":19,"w":"0.18.0"}

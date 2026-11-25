@@ -106,7 +106,7 @@ export const awaitingVerdict = (session, segment) => {
 
 // 清单没被回答之前，这一段是冻结的：要么审，要么先把清单撤回再改。从账本含义第 19 版
 // 起这么读；旧行按当时的样子重放——那时边审边改是允许的，拿今天的话去判它们是坏账。
-const frozenFor = (session, segmentId, meaning) =>
+export const frozenFor = (session, segmentId, meaning) =>
   meaning >= MEANING.freeze && awaitingVerdict(session, session.segments.find((one) => one.id === segmentId));
 
 // 预备段只有一个：已经接着活的那个就是它，后来改到下一段的、新写的都往里放。
@@ -247,10 +247,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
-        if (frozenFor(session, task.segment, meaningOf(ev)))
-          noway(
-            `${task.segment} 的清单已经发出去、还没人回答：这一段在审，不能交付（要改先把清单撤回：deed review --segment ${task.segment} --withdraw --why "…"）`,
-          );
+        // 冻结不在这里拦：账本里的行是已经发生的事实，重放不因为「这一段后来送了审」
+        // 就把它判成坏账——读的一侧只读，拦在写的一侧（cli/session.mjs 的 refuseFrozen）。
         task.touchedAt = ev.at;
         if (task.status !== "todo" && task.status !== "done")
           noway(`任务 ${task.id} 不在未做状态：${task.status}`);
@@ -298,13 +296,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
-        // 冻结挡的是"把审查者手上那两份文件换掉"：撤回一条交付就是了。撤回放弃、撤回一条
-        // 改到下一段不改这里的字节，那是记录层面的事，照收。
-        if (
-          (task.status === "done" || task.status === "accepted") &&
-          frozenFor(session, task.segment, meaningOf(ev))
-        )
-          noway(`${task.segment} 在审：撤回交付会换掉审查者手上那两份文件，等结论或先撤回清单`);
+        // 撤回放弃、撤回一条改到下一段不改这里的字节，是记录层面的事；撤回一条交付会换掉
+        // 审查者手上的文件——那一半拦在写的一侧。
         task.touchedAt = ev.at;
         // 撤回也可以是撤回一条放弃/延后：账本只追加，撤的是它此刻的效力，不是那一行
         // 记录。放弃错了却只能新开一条，等于让账本里的错口径一直挂着，而新开的那条
@@ -390,8 +383,6 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         editable(session, task);
-        if (frozenFor(session, task.segment, meaningOf(ev)))
-          noway(`${task.segment} 在审：延后与放弃也是改这一段的内容，等结论或先撤回清单`);
         task.order = ev.order;
         task.touchedAt = ev.at;
         break;
