@@ -322,7 +322,10 @@
   标准：submit --run 在「自上次记录以来工作区内容没变」时复用那次结果并把它记进交付记录（记着那份结果的来源与工作区指纹），变了就照旧真跑；用例覆盖复用与失效两条路；不得出现「复制来的数字」——复用的是同一份字节上的真跑
 - [ ] T142 一条命令换掉「撤回再重交」：task renew
   标准：交付过的条目在字节变了之后可以一条命令重记（记新内容与为什么），账本上留一条事件而不是 undo+done 两条；verify 不再把重记过的那条当过期；用例覆盖 renew 之后 verify 干净、事件种类只有 one 条
-<!-- 已完成（26 条）：交过的，往下沉 -->
+<!-- 已完成（27 条）：交过的，往下沉 -->
+- [x] T145 结构检查对着范式判格：必需格、目录归属、extras 豁免
+  标准：core/checks.mjs 有 PARADIGM（software/document/data/work/free）；结构检查四步：范式要求的格都在、声明的目录都在盘上、盘上每个顶层目录都有归属（认领或 extras）、跨格方向按 mayImport；layers 写 role=dir，role 缺省取 dir；project.declare 收 role 与 extras；deed project 支持 --extras；缺格/无归属/方向反三种失败各有具体 detail 与修法；本仓声明 tests=test、extras=docs,examples,support 后 3/3；沿用三种状态的语义，未通过不挡任何动作
+  交付：node --test 215/215（全量；checks 11 条含缺格、无归属目录、extras 豁免、目录名与格名不同）；npm run test:fast 103/103；本仓重新声明 --layers "core=core:,lib=lib:core,app=cli:core+lib+board,board=board:core+lib,tests=test:core+lib+app+board" --extras "docs,examples,support" → deed check 3/3（5 个目录认领 5 格，方向都对）；顺手删掉仓根一个误建的 %SystemDrive% 目录（正是「无归属目录」那种野地）
 - [x] T144 体检层：这个工作区还是不是一个项目，用一张有序的检查表算出来
   标准：core/checks.mjs 是纯函数（账本 + 目录快照 → 逐条结论），CHECKS 有序、每行登记"事实/判定/修法/能力"；三种结论 pass/fail/na，未声明项目时项目级检查一律 na 且不算未结项；projectState 给 declared/shape/passed/total/missing 且会随树走样退回去；project.declare 事件（含义 25）进账本，认可不落盘；deed check 只读、exit 0、逐条印结论与修法；deed state 顶上印"项目 · 形态 · k/n"或"没有声明（工作区模式）"；未通过不挡三种状态；既有用例全绿
   交付：node --test 212/212（全量，含新 test/checks.test.mjs 8 条与 cli-state2 的 standing 用例）；core/checks.mjs 的 CHECKS 三行（工作区/树/背景）各有 事实·判定·修法·能力 四样，checkAll/projectState 不读盘不读钟；lib/tree.mjs 只提供目录与相对 import；deed check 只读、未通过也 exit 0，逐条印 ✓/✗/— 与修法；deed state 顶上那行随说了算的账本变（本仓已声明 software，4 层方向都对，3/3）；project.declare 是含义第 25 版的事件，package 0.22.0；DESIGN §13、README 命令表与事件表、规则块三份同步
