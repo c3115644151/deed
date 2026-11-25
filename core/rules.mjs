@@ -413,6 +413,27 @@ export const pressure = (session) => {
   return { segment: segment.id, tasks: count.total, undecided: count.done };
 };
 
+// 一次只做一件事：这一段的条目按状态分四组，正在做的最多一条，其余都在等。
+// 已经了结的排在新待办之后（做完的在前、撤回与放弃的在最后）——清单往下读，
+// 越往下越是过去的事；新活永远在看得见的那一段里。
+export const groupsOf = (tasks) => {
+  const ordered = byOrder(tasks);
+  const newestFirst = (list) =>
+    [...list].sort((a, b) => String(b.touchedAt ?? "").localeCompare(String(a.touchedAt ?? "")));
+  const todo = ordered.filter((one) => one.status === "todo");
+  const settled = newestFirst(ordered.filter((one) => one.status === "done" || one.status === "accepted"));
+  const closed = newestFirst(ordered.filter((one) => one.status === "dropped" || one.status === "deferred"));
+  return [
+    { key: "doing", label: "在做", tasks: todo.slice(0, 1) },
+    { key: "waiting", label: "等着", tasks: todo.slice(1) },
+    { key: "settled", label: "已完成", tasks: settled },
+    { key: "closed", label: "撤回或放弃", tasks: closed },
+  ].filter((one) => one.tasks.length > 0);
+};
+
+// 这一刻在做的是哪一条：下一步与清单说的是同一条。
+export const doingOf = (tasks) => groupsOf(tasks).find((one) => one.key === "doing")?.tasks[0] ?? null;
+
 export function nextAction(doc, config) {
   const session = currentSession(doc);
   if (!session) {

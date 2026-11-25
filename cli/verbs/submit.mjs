@@ -12,8 +12,18 @@ import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, un
 // 命令不报条数时留 null——「没有数」与「数对不上」是两件事。
 // 顺序只有一个来源：条目在它那一节里的位置。把行上下挪一下，位置就变了；
 // 不另设「先后：」这样的数——两处说顺序，早晚会打架。
+// 位置只数"还没了结"的条目：做完的、撤回的都沉在清单下半截，它们挪动不该改
+// 别人手上那一份先后——否则每交一条，后面十条都要落一条新的先后记录。
 const placeOf = (items, item) =>
-  items.filter((one) => one.section === item.section && one.at <= item.at).length;
+  Math.max(
+    1,
+    items.filter(
+      (one) =>
+        one.section === item.section &&
+        one.at <= item.at &&
+        (one.box === " " || one.box === "?"),
+    ).length,
+  );
 
 const summary = (text) => {
   const num = (name) => {
@@ -235,10 +245,16 @@ export default function submit(argv) {
               specs.push({ k: "task.defer", s: one.id, id: item.id, why: item.later });
             }
           }
-          // 一批交付不止一条时，工作区只量了一次差：谁改了什么分不出来。
-          // 给它们同一个批号，账本上写着「这几条共用一份差」，而不是谎称各记各的。
+          // 一次只做一件事：一次 submit 只收一条交付。同一批里落下好几条，改动的归属
+          // 就分不出来（工作区只量了一次差），账本上只能写「这几条共用一份差」——
+          // 那是替读账本的人猜。做完一条就勾一条，是这里的规矩，也是它的用法。
           const dones = specs.filter((spec) => spec.k === "task.done");
-          if (dones.length > 1) for (const spec of dones) spec.batch = true;
+          if (dones.length > 1)
+            fail(
+              "这一批勾了 " + dones.length + " 条交付（" + dones.map((one) => one.id).join("、") + "）：一次只交一条——" +
+                "先交此刻在做的那一条（deed state 说是 " + dones[0].id + "），写完 交付： 提交一次，再做下一条。" +
+                "账本一个字都没动",
+            );
           // 量差到记账之间，工作区可能被别的东西写过：记账之前再核一遍每条交付要记的路径。
           // 这一处能真拒——抛在 build 里，一条事件都不落。
           requireUnchanged(ROOT, pins);

@@ -6,6 +6,7 @@
 
 import {
   byOrder,
+  groupsOf,
   costOf,
   countIn,
   edges,
@@ -188,7 +189,7 @@ function discussScreen(session, zone, on) {
       '<span class="qmeta">' + when(ask.at, zone) + (got.length ? " · 攒到 " + got.length + " 句" : "") + "</span></div>" +
       '<p class="atext">' + esc(ask.text) + "</p>" +
       (got.length
-        ? '<ol class="clues">' + got.map((turn) =>
+        ? '<ol class="clues">' + [...got].reverse().map((turn) =>
             '<li class="clue"><span class="cclock">' + when(turn.at, zone) + "</span>" + esc(turn.said) + "</li>",
           ).join("") + "</ol>"
         : "") +
@@ -206,13 +207,14 @@ function discussScreen(session, zone, on) {
     screenHead("01", "讨论", "你说的每一句，和还没定下的那些", turns.filter((one) => one.who === "user").length + " 轮 · " + open.length + " 条等你定") +
     '<div class="cols">' +
     '<div class="col logs">' +
-    (turns.length ? '<ol class="turns">' + turns.map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
+    // 最新的在最上面：往下翻只会离现在更远。轮次、题、段、卡片都按这一条印。
+    (turns.length ? '<ol class="turns">' + [...turns].reverse().map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
     "</div>" +
     '<aside class="side">' +
     '<h3 class="colh">等你定</h3>' +
-    (open.length ? '<ol class="qlist">' + open.map(card).join("") + "</ol>" : '<p class="quiet">没有等你的题</p>') +
+    (open.length ? '<ol class="qlist">' + [...open].reverse().map(card).join("") + "</ol>" : '<p class="quiet">没有等你的题</p>') +
     (settled.length
-      ? '<h3 class="colh">已经定下的</h3><ul class="qlist">' + settled.map((ask) =>
+      ? '<h3 class="colh">已经定下的</h3><ul class="qlist">' + [...settled].reverse().map((ask) =>
           '<li class="qa quiet" data-state="' + esc(ask.state) + '">' +
           '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
           '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span></div>" +
@@ -346,7 +348,15 @@ function segmentBlock(session, segment, index, config, zone) {
       ? '<div class="fds"><p class="fdshead"><span class="k">审查者点了 ' + review.findings.length +
         ' 条</span><span class="fx">点开看依据</span></p>' + findingList(review.findings) + "</div>"
       : "") +
-    '<div class="tasks">' + tasks.map((task) => taskRow(task, zone)).join("") + "</div>" +
+    // 段里的条目与清单同一个次序：在做（一条）→ 等着 → 已完成 → 撤回或放弃。
+    '<div class="tasks">' +
+      groupsOf(tasks)
+        .map((group) =>
+          '<p class="tgroup" data-group="' + group.key + '">' + group.label + " · " + group.tasks.length + " 条</p>" +
+          group.tasks.map((task) => taskRow(task, zone)).join(""),
+        )
+        .join("") +
+      "</div>" +
     "</article>"
   );
 }
@@ -361,7 +371,7 @@ function executeScreen(session, config, zone, on) {
     screenHead("02", "执行", open ? "这一段开着 · " + open.id : "没有开着的段", (tasks.length - todo) + " / " + tasks.length + " 已交付") +
     '<div class="segs">' +
     (segments.length
-      ? segments.map((segment, index) => segmentBlock(session, segment, index + 1, config, zone)).join("")
+      ? [...segments].reverse().map((segment, index) => segmentBlock(session, segment, segments.length - index, config, zone)).join("")
       : '<p class="quiet">清单是空的：还没有一条任务</p>') +
     "</div></section>"
   );
@@ -383,7 +393,8 @@ function acceptScreen(doc, session, config, zone, on) {
   const unreviewed = segments.filter((segment) => segment.verdict === "exempt");
   const sealed = segments.filter((segment) => segment.closedAt && segment.verdict !== "exempt");
   const todo = tasks.filter((task) => task.status === "todo").length;
-  const cards = segments
+  const cards = [...segments]
+    .reverse()
     .map((segment) => {
       const review = reviewOf(session, segment);
       const state = reviewState(config, session, segment);
@@ -750,6 +761,8 @@ html[data-theme="light"] body {
 }
 
 /* ----------------------------------------------------------------- tasks */
+.tgroup { margin: 14px 0 6px; font-size: 11px; letter-spacing: .08em; color: var(--dim2); text-transform: uppercase; }
+.tgroup[data-group="doing"] { color: var(--accent); }
 .tasks { display: flex; flex-direction: column; }
 .task { border-bottom: 1px solid var(--line); }
 .task:last-child { border-bottom: 0; }

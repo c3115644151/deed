@@ -296,6 +296,26 @@ test("the turns are the axis, and a question collects the words that came in whi
   assert.ok(html.indexOf("两个都谈谈") < html.indexOf('<aside class="side">'), "主轴在前，题在后");
 });
 
+// 三块屏都从新往旧排：往下翻只会离现在更远。
+test("every list on the page runs newest first", () => {
+  const html = render();
+  const turns = [...html.matchAll(/<p class="tsaid">([^<]*)<\/p>/g)].map((m) => m[1]);
+  // 讨论屏：只有一轮，先确认它在；再拿执行屏的段来验次序
+  const segs = [...html.matchAll(/<span class="vid">(S01\.\d)<\/span>/g)].map((m) => m[1]);
+  const exec = [...html.matchAll(/<article class="seg"[^>]*data-seg="(S01\.\d)"/g)].map((m) => m[1]);
+  const order = exec.length ? exec : segs;
+  assert.deepEqual(order, [...order].sort().reverse(), "段从新到旧排：" + order.join(","));
+
+  // 轮次：造两轮，最新的那一条要在前面
+  const twoTurns = fold([
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先说的话" },
+    { v: 1, at: T(2), k: "turn", s: null, who: "user", said: "后说的话" },
+  ]);
+  const page = renderBoard(twoTurns, config, { zone, events: 2 });
+  const said = [...page.matchAll(/<p class="tsaid">([^<]*)<\/p>/g)].map((m) => m[1]);
+  assert.deepEqual(said, ["后说的话", "先说的话"], "最新的那轮在最上面");
+});
+
 test("the accept screen lists the borders a decision drew", () => {
   // 签收前要看得见这一期定过哪些不许做的事；它不是任务，所以不在执行屏上。
   const events = [

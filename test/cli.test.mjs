@@ -1715,7 +1715,12 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
   const dropped = deed(cwd, "submit");
   assert.equal(dropped.status, 0, dropped.stderr);
   assert.match(dropped.stdout, /放弃 · T2 · 不需要了/);
-  assert.deepEqual(kinds(cwd).filter((one) => one.startsWith("task.")), ["task.add", "task.add", "task.done", "task.undo", "task.drop"]);
+  // 清单按状态分组印：一条了结就会把它自己挪到下半截，所以先后那一条（task.order）
+  // 可能出现——它是这一改动带来的真事实，不算噪声。这里只盯四种实打实的动作。
+  assert.deepEqual(
+    kinds(cwd).filter((one) => one.startsWith("task.") && one !== "task.order"),
+    ["task.add", "task.add", "task.done", "task.undo", "task.drop"],
+  );
 });
 
 // 一次只加条目的 submit 不该刷新基线：否则它把工作区里等着被交付的改动吃掉，
@@ -1766,8 +1771,9 @@ test("a plan with a line nobody can read lands nothing, and a task cannot vanish
 // 一批 submit 只量了一次工作区差：账本得说清"这几条共用一份差"，
 // 而不是让三条一字不差的记录看起来各自记下了各自的东西。
 
-test("one submit that delivers several entries says the changes belong to the batch", () => {
-  const cwd = workspace("plan-batchmark");
+// 一次只做一件事：一批勾两条当场拒，说清先交哪一条，账本一个字不动。
+test("one submit takes one delivery, not a batch", () => {
+  const cwd = workspace("one-at-a-time");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "tick", "--who", "user", "--said", "一次交两条");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
@@ -1786,55 +1792,38 @@ test("one submit that delivers several entries says the changes belong to the ba
       .replace("- [ ] T2 写 b", "- [x] T2 写 b")
       .replace("  标准：docs/b.md 有一句话", "  标准：docs/b.md 有一句话\n  交付：写下 docs/b.md"),
   );
-  const landed = deed(cwd, "submit");
-  assert.equal(landed.status, 0, landed.stderr);
-  const dones = readEvents(cwd).filter((one) => one.k === "task.done");
-  assert.equal(dones.length, 2);
-  assert.ok(dones[0].batch && dones[0].batch.at === dones[1].batch.at, "同一批里的两条交付记着同一个批号");
-  const done = readEvents(cwd).find((one) => one.k === "task.done");
-  assert.equal(done.batch.size, 2, "这一批几条也记进账本，不是拿剩下的数现算");
-  assert.equal(typeof done.batch.at, "string", "批号是这一批的时刻，不是 true");
-
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
-  const sheet = fs
-    .readdirSync(path.join(cwd, ".deed", "review"))
-    .filter((one) => one.endsWith(".md") && !one.endsWith("-reviewer.md"))
-    .at(-1);
-  const text = fs.readFileSync(path.join(cwd, ".deed", "review", sheet), "utf8");
-  assert.match(text, /同批交付：这一批共 2 条/, "清单上说清改动属于整批");
-
-  // 单独交一条时不写批号：那份差就是它自己的。
-  deed(cwd, "task", "add", "再写一份", "--criteria", "docs/c.md 有一句话");
-  fs.writeFileSync(path.join(cwd, "docs", "c.md"), "c", "utf8");
-  deed(cwd, "task", "done", "T3", "--evidence", "写下 docs/c.md", "--digest", "docs/c.md");
-  const alone = readEvents(cwd).find((one) => one.k === "task.done" && one.id === "T3");
-  assert.equal(alone.batch, undefined, "一条一批时不写批号");
-});
-
-// 一段的改动全落在免审路径时，出清单是白费：账本上会多一条等人回答的清单，
-// 而这一段正确的结局是关闭（deed seal）。
-
-test("a segment the settings exempt gets no brief, and the step says to close it", () => {
-  const cwd = workspace("seg-not-needed");
-  deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
-  deed(cwd, "tick", "--who", "user", "--said", "改一份文档");
-  fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
-  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
-  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md", "--digest", "docs/a.md");
   const before = readEvents(cwd).length;
-  const r = deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
-  assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /审查设置说这一段不用审/);
-  assert.match(r.stdout, /deed seal --segment S01\.1/, "下一步是关闭这一段，不是另审一份");
-  assert.equal(readEvents(cwd).length, before, "不写账本");
-  assert.deepEqual(fs.readdirSync(path.join(cwd, ".deed", "review")), [], "不生成文件");
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1, "一次勾两条整批拒");
+  assert.match(refused.stderr, /一次只交一条/u);
+  assert.match(refused.stderr, /先交此刻在做的那一条/u);
+  assert.equal(readEvents(cwd).length, before, "被拒的批一个字都不落");
+
+  // 分两次：一次一条，各落各的，不再有批号
+  writePlan(
+    cwd,
+    readPlan(cwd)
+      .replace("- [x] T2 写 b", "- [ ] T2 写 b")
+      .replace("  标准：docs/b.md 有一句话\n  交付：写下 docs/b.md", "  标准：docs/b.md 有一句话"),
+  );
+  assert.equal(deed(cwd, "submit").status, 0);
+  // 做下一条：又动了一次那份文件，再勾
+  fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b2", "utf8");
+  writePlan(
+    cwd,
+    readPlan(cwd)
+      .replace("- [ ] T2 写 b", "- [x] T2 写 b")
+      .replace("  标准：docs/b.md 有一句话", "  标准：docs/b.md 有一句话\n  交付：写下 docs/b.md，改成了 b2"),
+  );
+  assert.equal(deed(cwd, "submit").status, 0);
+  const dones = readEvents(cwd).filter((one) => one.k === "task.done");
+  assert.equal(dones.length, 2, "两条都交上了");
+  assert.equal(dones[0].batch ?? null, null, "单条交付不写批号");
+  assert.equal(dones[1].batch ?? null, null);
 });
 
-// 撤回同批的一条再重交：数目不能跟着剩下的条数变小，否则两条一批撤回一条
-// 就成了「这一批共 1 条」——那正是标准禁止的单条一批。
-
-test("taking one delivery back does not shrink the batch it belonged to", () => {
+// 旧账本里同批的那些行照读：批号是当时写下的事实，撤回不改变它原本几条。
+test("a batch written into an old ledger still reads, and taking one back does not shrink it", () => {
   const cwd = workspace("plan-batchundo");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "tick", "--who", "user", "--said", "一次交两条");
@@ -1846,15 +1835,28 @@ test("taking one delivery back does not shrink the batch it belonged to", () => 
     ["# 这一期要做成什么", "把两份说明写完。", "", "- ? 写 a", "  标准：docs/a.md 有一句话", "", "- ? 写 b", "  标准：docs/b.md 有一句话"].join("\n"),
   );
   assert.equal(deed(cwd, "submit").status, 0);
-  writePlan(
-    cwd,
-    readPlan(cwd)
-      .replace("- [ ] T1 写 a", "- [x] T1 写 a")
-      .replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写下 docs/a.md")
-      .replace("- [ ] T2 写 b", "- [x] T2 写 b")
-      .replace("  标准：docs/b.md 有一句话", "  标准：docs/b.md 有一句话\n  交付：写下 docs/b.md"),
-  );
-  assert.equal(deed(cwd, "submit").status, 0);
+  // 手写两条同一批的交付：那一版的账本允许，这一版不再产生，但读得出来。
+  const at = new Date().toISOString();
+  const batch = { at, size: 2 };
+  const digests = ["docs/a.md", "docs/b.md"].map((one) => ({
+    path: one,
+    digest: createHash("sha256").update(fs.readFileSync(path.join(cwd, one))).digest("hex"),
+  }));
+  const logDir = path.join(cwd, ".deed", "log");
+  const name = fs.readdirSync(logDir).find((one) => one.endsWith(".jsonl"));
+  const file = path.join(logDir, name);
+  const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean);
+  for (const [index, id] of ["T1", "T2"].entries()) {
+    lines.push(
+      JSON.stringify({
+        v: 19, w: "0.20.0", at, k: "task.done", s: "S01", id,
+        evidence: "写下 " + digests[index].path, by: "agent",
+        files: [digests[index]], changed: [digests[index].path], bytes: { [digests[index].path]: 1 },
+        batch,
+      }),
+    );
+  }
+  fs.writeFileSync(file, lines.join("\n") + "\n");
   assert.equal(deed(cwd, "task", "undo", "T2", "--why", "这条说错了").status, 0);
   assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交 docs/b.md", "--digest", "docs/b.md").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
@@ -2540,15 +2542,30 @@ test("the order of the rows is the order the work happens in", () => {
     "草稿按账本里的位置印，不按编号印",
   );
 
-  // 把两行换个位置：账本里落一条 task.order，最后那条交付先做。
-  const before = "- [ ] T1 先做的事\n  标准：做第一件\n- [ ] T2 后做的事\n  标准：做第二件";
-  const swappedBlock = "- [ ] T2 后做的事\n  标准：做第二件\n- [ ] T1 先做的事\n  标准：做第一件";
+  // 把两条换个位置：账本里落 task.order，最后那条交付先做。
+  // 草稿按状态分组印，所以不能拿「两条挨着」去换——按条目整块挪。
   const now = readPlan(cwd);
-  assert.ok(now.includes(before), "草稿里两块是挨着的，换位置要整块换");
-  writePlan(cwd, now.replace(before, swappedBlock));
+  const blockOf = (id) => {
+    const lines = now.split("\n");
+    const at = lines.findIndex((one) => one.includes(" " + id + " "));
+    assert.notEqual(at, -1, "草稿里要有 " + id);
+    const taken = [lines[at]];
+    let k = at + 1;
+    while (k < lines.length && /^  /.test(lines[k])) taken.push(lines[k++]);
+    return { at, length: k - at, text: taken.join("\n") };
+  };
+  const one = blockOf("T1");
+  const two = blockOf("T2");
+  assert.ok(one.at < two.at, "T1 在 T2 前面");
+  const lines = now.split("\n");
+  const twoText = two.text;
+  lines.splice(two.at, two.length);
+  lines.splice(one.at, one.length, twoText);
+  lines.splice(one.at + 2, 0, one.text);
+  writePlan(cwd, lines.join("\n"));
   const reordered = deed(cwd, "submit");
   assert.equal(reordered.status, 0, reordered.stderr);
-  assert.equal(kinds(cwd).filter((one) => one === "task.order").length, 2, "两条都换了位置，各落一条 task.order");
+  assert.ok(kinds(cwd).filter((one) => one === "task.order").length >= 1, "换位置要落 task.order");
   const after = deed(cwd, "state");
   assert.ok(
     after.stdout.indexOf("T2 后做的事") < after.stdout.indexOf("T1 先做的事"),

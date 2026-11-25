@@ -7,7 +7,7 @@
 // the work was.
 
 import { awaitingVerdict } from "../core/fold.mjs";
-import { byOrder } from "../core/rules.mjs";
+import { groupsOf } from "../core/rules.mjs";
 
 export const HEAD = "# 这一期要做成什么";
 
@@ -124,6 +124,14 @@ export function parse(text) {
   return { goal: goal.join(" ").trim(), items, problems };
 }
 
+// 一组一行注释：markdown 里看不见它，纯文本里也只占一行——但读的人知道哪几条是做过的。
+const GROUP_NOTE = {
+  doing: "：只做这一条，做完立刻勾上，再动下一条",
+  waiting: "：上面那条做完再动",
+  settled: "：交过的，往下沉",
+  closed: "：不做了的，沉到最后",
+};
+
 const bullet = (task) => {
   if (task.status === "dropped") return "~~ " + task.id + " " + task.title;
   // 判过的条目也算交过了：草稿把它们画成未勾选，下一次 submit 就会当成
@@ -137,17 +145,21 @@ const bullet = (task) => {
 export function draft(session) {
   const out = [HEAD, session.goal?.text ?? "（还没写：一句话说清这一期要做成什么）", ""];
   for (const segment of session.segments) {
-    // 印的顺序就是该做的顺序：账本里的位置（task.order），没排过的按写下的先后。
-    const tasks = byOrder(session.tasks.filter((one) => one.segment === segment.id));
+    const tasks = session.tasks.filter((one) => one.segment === segment.id);
     if (tasks.length === 0) continue;
     out.push("## 段 " + segment.id);
-    for (const task of tasks) {
-      out.push(bullet(task));
-      out.push("  标准：" + task.criteria);
-      const last = task.evidence[task.evidence.length - 1];
-      if (last) out.push("  交付：" + last.claim);
-      if (task.status === "deferred") out.push("  延后：" + (task.deferredWhy ?? ""));
-      if (task.status === "dropped") out.push("  理由：" + (task.dropWhy ?? task.deferredWhy ?? ""));
+    // 印的次序：在做（最多一条）→ 等着（按你要的先后）→ 已完成 → 撤回或放弃。
+    // 越往下越是过去的事；新活永远在最上面那一条。
+    for (const group of groupsOf(tasks)) {
+      out.push("<!-- " + group.label + "（" + group.tasks.length + " 条）" + GROUP_NOTE[group.key] + " -->");
+      for (const task of group.tasks) {
+        out.push(bullet(task));
+        out.push("  标准：" + task.criteria);
+        const last = task.evidence[task.evidence.length - 1];
+        if (last) out.push("  交付：" + last.claim);
+        if (task.status === "deferred") out.push("  延后：" + (task.deferredWhy ?? ""));
+        if (task.status === "dropped") out.push("  理由：" + (task.dropWhy ?? task.deferredWhy ?? ""));
+      }
     }
     out.push("");
   }

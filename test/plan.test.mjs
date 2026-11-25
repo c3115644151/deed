@@ -81,13 +81,19 @@ test("reading the draft back gives the ledger the same items", () => {
   const back = parse(text);
   assert.deepEqual(back.problems, []);
   assert.equal(back.goal, "把清单做成一个文件。");
+  // 印出来的次序就是做事的次序：在做 → 等着 → 已完成 → 撤回或放弃。
   assert.deepEqual(
     back.items.map((one) => [one.id, one.box]),
-    [["T1", "x"], ["T2", " "], ["T3", " "], ["T4", "~"]],
+    [["T2", " "], ["T1", "x"], ["T3", " "], ["T4", "~"]],
   );
-  assert.equal(back.items[0].claim, "npm test 129/129");
-  assert.equal(back.items[2].later, "等下一轮");
-  assert.equal(back.items[3].why, "想法变了");
+  const at = (id) => back.items.find((one) => one.id === id);
+  assert.equal(at("T1").claim, "npm test 129/129");
+  assert.equal(at("T3").later, "等下一轮");
+  assert.equal(at("T4").why, "想法变了");
+  assert.match(text, /<!-- 在做（1 条）/, "正在做的那一组写着它是什么");
+  assert.ok(text.indexOf("<!-- 在做") < text.indexOf("T2 还没做"), "在做排在等着之前");
+  assert.ok(text.indexOf("T2 还没做") < text.indexOf("T1 已经交付"), "等着排在已完成之前");
+  assert.ok(text.indexOf("T1 已经交付") < text.indexOf("T3 延后了"), "已完成排在撤回或放弃之前");
 });
 
 // 清单里写着哪一节，不等于新条目就落进那一段：一段送审还在等结论时它不再收东西。
