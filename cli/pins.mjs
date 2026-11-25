@@ -72,7 +72,11 @@ export function movedSince(root, files = []) {
 // 量差之后、记账之前再核一次：变了就不记账（这一处能真拒——抛在 build 里，一条都不落）。
 export function requireUnchanged(root, files = []) {
   const moved = movedSince(root, files);
-  if (moved.length === 0) return;
+  if (moved.length === 0) {
+    // 收据由做这件事的函数自己印：核过却没人说，接线掉了也看不出来。
+    if (files.length > 0) console.log("记账之前再核一遍 · " + files.length + " 条没有变");
+    return;
+  }
   throw new Error(
     "记账之前这些路径变了：" +
       moved

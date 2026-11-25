@@ -232,9 +232,8 @@
 - [x] T100 审查者说那条没人看着的分支，其实是一条死路：删掉它，而不是给它补用例
   标准：core/fold.mjs 的 segmentOf 在等结论时不查 livePrep（预备段就是最末那个开段，查也查不到第二处）；这条删除有用例看着——把搬运改回每次开新段，test/fold.test.mjs 的预备段用例仍红；全量测试全绿；HANDOFF 的「下一步」不再写已经做完的事
   交付：core/fold.mjs:138-146 的 segmentOf 只问最末那个开段是否在等结论，不再问 livePrep——那是同一个判断的第二处，预备段就是最末那个开段，问也问不出第二个答案；test/fold.test.mjs 的预备段用例照旧看着这条判断；HANDOFF 的「现在到哪一步」只剩一句指向 deed state 与 deed plan --print，五波表已经不在那份文件里
-- [x] T103 材料只在真要判时才出：不用审的段与整期不生成清单
+- [ ] T103 材料只在真要判时才出：不用审的段与整期不生成清单
   标准：deed review --segment 与 deed review --all 出清单之前先算 needsReview／needsWhole；算下来不用审就不写账本、不生成清单与角色包，打印门槛的原话并把下一步指到 deed seal 或签收，exit 0；要审时行为与现在一致；有用例（免审段调用之后账本没有新的 review.brief，.deed/review 下没有新文件）
-  交付：跑：node --test 207/207 全过（其中 test/cli.test.mjs 117 条，含 a segment the settings exempt gets no brief 那条）；这一轮的字节上 deed review 仍先算门槛再出清单，免审段不写账本、不生成文件，下一步指到 seal／签收
 - [x] T104 轮次只算你和用户的一轮：我自己的进展不进轮次
   标准：turn 只记你和用户之间的一轮（--who 只接受 user，我自开一轮被拒并说明进展该记在交付记录／结论／裁定里）；state、面板、清单里的「轮 N」只数用户轮；旧账本里的非用户轮照读但不计入轮次计数；以后接物理 hook 时也不录我的自述；有用例（我自开一轮被拒、轮数不变；旧账本里已有的非用户轮不计入）
   交付：core/rules.mjs 的 userTurns 只数 --who user 的行；tick --who agent 在临时工作区 exit 1 并报「轮次只记你和用户之间的一轮」，turn 事件与总事件都不变；旧账本里的非用户轮按含义第 12 版丢
@@ -286,6 +285,11 @@
 - [x] T129 冻结只拦写：账本里已经落下的行一律照读，重放不因这一段后来送了审就判它坏账
   标准：冻结的拒绝发生在落盘前一刻（cli/session.mjs 的 refuseFrozen：task.done 与「撤回一条已交付」两类事件），core/fold.mjs 不再为冻结抛错；一份没人回答的清单出现在某条交付之后，整本账仍能重放、面板仍出正常页；交付与撤回交付在写的一侧仍被真拒并说清出路；有用例（重放含「清单已发出＋之后又落一条交付」的账本不抛；把判断加回 fold 即红）
   交付：跑：node --test 217/217（全量，数由 --run 采）；core/fold.mjs 的 task.done／task.undo／task.order 三处不再为冻结抛错，改由 cli/session.mjs 的 refuseFrozen 在落盘前一刻拦（task.done 与「撤回一条已交付」两类），措辞与原来一致；新增 test/fold.test.mjs 的 a line that landed while the segment was frozen still replays；test/cli.test.mjs 的 a frozen segment refuses… 仍红着盯住写的一侧；面板重启后 7317 出的是正常页（461349 字节）
+- [x] T130 记账之前那一次核对，收据由核对的函数自己印：接线掉了用例就红
+  标准：`requireUnchanged` 核过时自己印「记账之前再核一遍 · N 条没有变」，调用处不再另印一句（印在调用处的收据只能证明调用处那行还在，证明不了核对真跑过）；`deed submit` 与 `deed task done` 两条路都有 CLI 用例盯住这一行；把两处 `requireUnchanged(ROOT, pins)` 任意一处注掉，对应用例当场红；有用例覆盖（本段实测：注掉两处后 one delivery pins every file 与 a plan lands as one batch 两条都红）
+  交付：跑：node --test 217/217（全量，数由 --run 采）；收据挪进 cli/pins.mjs 的 requireUnchanged 自己印（记账之前再核一遍 · N 条没有变），cli/verbs/submit.mjs 与 cli/verbs/task.mjs 不再另印一句；test/cli.test.mjs 的 one delivery pins every file 与 a plan lands as one batch 各加一条断言；变异：把两处 requireUnchanged(ROOT, pins) 注掉 → 那两条用例都红（pass 0 / fail 2），还原后两条都绿
+- [ ] T131 这一段自己的交付记录不许是「只是说法」：六条按今天的字节重交，数由 --run 采
+  标准：`S02.19` 的清单上不再有「只是说法：这条没配命令核过」；`T100`／`T104`／`T107`／`T109`／`T110`／`T112` 六条撤回后按当天字节重交，记录里的数与 `--run` 采到的一致；清单上那三个 207/207 不再出现在现行交付里；重出清单后由审查者复核
 - [x] T122 撤回一条「改到下一段」，走空的段跟着消失
   标准：`deed task undo T<号> --why "…"` 能撤回一条 carry——条目回到它原来那一段，那一段重新成为预备段；被走空的那一段从段列表里消失（段由条目生出来，不是计划）；撤销一条从未挪过的条目仍被拒并说清；有用例（挪出去再撤回来，段列表只剩一条；把删段那一行改掉，那一条红）
   交付：跑：node --test test/fold.test.mjs 37/37（两条新用例：撤回之后段列表只剩一条、没撤过可撤的仍被拒）；core/fold.mjs 的 task.undo 在条目还没交过、站在最末一段时把它送回上一段，把那一段的 carried 置回 true，并把走空的那一段从重放结果里删掉；变异：把删段那一行改成 void left → 那一条红

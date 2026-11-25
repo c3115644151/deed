@@ -1487,6 +1487,11 @@ test("one delivery pins every file it says it produced", () => {
   const done = deed(cwd, "task", "done", "T1", "--evidence", "两份都写了", "--digest", "a.md", "--digest", "b.md");
   assert.equal(done.status, 0, done.stdout + done.stderr);
   assert.match(done.stdout, /记下 a\.md [0-9a-f]{12}、b\.md [0-9a-f]{12}/, "两枚都要报出来");
+  assert.match(
+    done.stdout,
+    /记账之前再核一遍 · 2 条没有变/,
+    "量差之后、记账之前要再核一遍：没有这一句，接线掉了一眼看不出来",
+  );
   assert.equal(deed(cwd, "verify").status, 0);
 
   const review = deed(cwd, "review");
@@ -1674,6 +1679,7 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
   assert.equal(second.status, 0, second.stderr);
   assert.match(second.stdout, /交付 · T1 · 写了 docs\/a.md/);
   assert.match(second.stdout, /记账之后核对 · 1 条都对得上当时那份内容/, "记账之后要核一遍：没有这一句就没人知道它跑过");
+  assert.match(second.stdout, /记账之前再核一遍 · \d+ 条没有变/, "记账之前那一次核对也要说得出来：接线掉了它就不会印");
   const done = readEvents(cwd).find((one) => one.k === "task.done" && one.id === "T1");
   assert.ok(done.files.some((one) => one.path === "docs/a.md"), "勾上就是交付：submit 按工作区自己称，记下动过的文件");
   assert.equal(done.evidence, "写了 docs/a.md", "交付记录就是清单上那一行");

@@ -59,7 +59,6 @@ export default function task(argv) {
             const taken = scanned;
             // 量差之后、记账之前再核一遍：这一处能真拒，一条事件都不落。
             requireUnchanged(ROOT, pins);
-            if (pins.length > 0) console.log("记账之前再核一遍 · " + pins.length + " 条没有变");
             return {
               k: "task.done",
               s: flags.session ?? null,

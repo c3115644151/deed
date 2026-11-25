@@ -242,8 +242,6 @@ export default function submit(argv) {
           // 量差到记账之间，工作区可能被别的东西写过：记账之前再核一遍每条交付要记的路径。
           // 这一处能真拒——抛在 build 里，一条事件都不落。
           requireUnchanged(ROOT, pins);
-          // 核过就说一句，否则没人知道这一步真跑过（把这一行删掉，用例会红）。
-          if (pins.length > 0) console.log("记账之前再核一遍 · " + pins.length + " 条没有变");
           const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
           if (gone.length > 0)
             fail("清单里少了 " + gone.map((t) => t.id).join("、") + "：账本里有的条目不能自己消失——不做了就写 ~~ " + gone[0].id + " " + gone[0].title + "，再加一行 理由：");
