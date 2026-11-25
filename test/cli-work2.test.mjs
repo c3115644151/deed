@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -178,7 +177,7 @@ test("an entry still to be done is carried to the next segment from the plan", (
   const cwd = workspace("carry-plan");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "先做这一件", "--criteria", "能跑", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "跑了 1/1", "--digest", proof(cwd));
+  deed(cwd, "task", "done", "T1", "--evidence", "跑了 1/1");
   deed(cwd, "task", "add", "下一段再做", "--criteria", "也做完");
   const plan = path.join(cwd, ".deed", "plan.md");
   deed(cwd, "plan", "--force");
@@ -318,35 +317,8 @@ test("a delivery that says what it will show has to show it when the ledger is w
 });
 
 
-test("a delivery is refused when a pinned path moved before it was written down", () => {
-  const cwd = workspace("moved-refuse");
-  fs.writeFileSync(path.join(cwd, "a.md"), "one");
-  const pin = { path: "a.md", digest: createHash("sha256").update("one").digest("hex") };
-  assert.doesNotThrow(() => requireUnchanged(cwd, [pin]), "没变的路径不该拦");
-  fs.writeFileSync(path.join(cwd, "a.md"), "two");
-  assert.throws(() => requireUnchanged(cwd, [pin]), /记账之前这些路径变了：a\.md/);
-});
 
-test("what a batch of deliveries points at is checked once the ledger has them", () => {
-  // 记账之后那一刻的核对：这条交付还指得到那份内容吗？变了要能分开说「变了」与「不在了」，
-  // 一条谁也没指着的交付要单独说成「空交付」——两种都不是可以放过去的样子。
-  const cwd = workspace("audit-delivered");
-  fs.writeFileSync(path.join(cwd, "a.md"), "one");
-  const pin = { path: "a.md", digest: createHash("sha256").update("one").digest("hex") };
-  const done = (files) => ({ k: "task.done", id: "T1", files });
-  assert.deepEqual(auditDelivered(cwd, [done([pin])]), [], "对得上就说没事");
-  assert.deepEqual(auditDelivered(cwd, [{ k: "task.add", id: "T2" }]), [], "不是交付的行不归它管");
-  fs.writeFileSync(path.join(cwd, "a.md"), "two");
-  const moved = auditDelivered(cwd, [done([pin])]);
-  assert.equal(moved.length, 1);
-  assert.equal(moved[0].id, "T1");
-  assert.equal(moved[0].path, "a.md");
-  assert.equal(moved[0].empty, false);
-  assert.equal(moved[0].now, createHash("sha256").update("two").digest("hex"));
-  const empty = auditDelivered(cwd, [done([])]);
-  assert.equal(empty.length, 1, "谁也没指着的交付也要说出来");
-  assert.equal(empty[0].empty, true);
-});
+
 
 
 // 放弃错了只有新开一条，账本里的错口径就永远挂着；撤回一条放弃是一条新事实，
@@ -481,7 +453,7 @@ test("the plan can line up several segments, and only the first takes work", () 
 
   // 排好的那一段此刻不收活：交付与送审都被拒，理由指得出现在收活的是哪一段。
   fs.writeFileSync(path.join(cwd, "proof.txt"), "p\n");
-  const queued = deed(cwd, "task", "done", "T2", "--evidence", "试试看", "--digest", "proof.txt");
+  const queued = deed(cwd, "task", "done", "T2", "--evidence", "试试看");
   assert.equal(queued.status, 1, "还没轮到的那一段不能交付");
   assert.match(queued.stderr, /还没轮到/);
   const early = deed(cwd, "review", "--segment", "S01.2", "--by", "qa");
@@ -489,11 +461,11 @@ test("the plan can line up several segments, and only the first takes work", () 
   assert.match(early.stderr, /还没轮到/);
 
   // 第一段交付、审过、判过之后，第二段才接过活。
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "做完了", "--digest", "proof.txt").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "做完了").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
   assert.match(deed(cwd, "state").stdout, /S01\.2/);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "轮到它了", "--digest", "proof.txt").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "轮到它了").status, 0);
 });
 

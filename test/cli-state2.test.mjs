@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -69,7 +68,7 @@ test("evidence that starts with -- is a missing quote, not a word", () => {
   assert.match(bare.stderr, /--evidence/);
   assert.equal(kinds(cwd).filter((one) => one === "task.done").length, 0, "被拒的交付一个字节也没写进去");
   assert.equal(
-    deed(cwd, "task", "done", "T1", "--evidence=--dry-run 跑了 3 条", "--digest", proof(cwd)).status,
+    deed(cwd, "task", "done", "T1", "--evidence=--dry-run 跑了 3 条").status,
     0,
     "写成 --k=v 就说得清",
   );
@@ -130,7 +129,7 @@ test("--version answers with the version this program ships as", () => {
 // 2) --help for a verb with no arguments
 test("asking a verb that takes no arguments answers with its line, not the whole page", () => {
   const cwd = workspace("usage-noargs");
-  for (const verb of ["state", "verify", "doctor"]) {
+  for (const verb of ["state", "doctor"]) {
     const run = deed(cwd, verb, "--help");
     assert.equal(run.status, 0);
     assert.equal(run.stdout.trim(), "deed " + verb, verb + " --help 只该打这一行");
@@ -161,7 +160,7 @@ test("the word --help inside evidence is evidence", () => {
   const cwd = workspace("help-in-words");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  const done = deed(cwd, "task", "done", "T1", "--evidence", "跑过 review --help 与 task --help，都只打用法", "--digest", proof(cwd));
+  const done = deed(cwd, "task", "done", "T1", "--evidence", "跑过 review --help 与 task --help，都只打用法");
   assert.equal(done.status, 0, "交付记录里出现 --help 不该被当成在问用法");
   assert.match(done.stdout, /交付 · T1/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 1);
@@ -204,7 +203,7 @@ test("a batch written into an old ledger still reads, and taking one back does n
   }
   fs.writeFileSync(file, lines.join("\n") + "\n");
   assert.equal(deed(cwd, "task", "undo", "T2", "--why", "这条说错了").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交 docs/b.md", "--digest", "docs/b.md").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交 docs/b.md").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
   const sheet = fs
     .readdirSync(path.join(cwd, ".deed", "review"))
@@ -246,7 +245,7 @@ test("removing a file nobody can weigh is not a small change", () => {
   // 一万五千字节落在免审路径上，够小，够免审。
   fs.writeFileSync(path.join(cwd, "docs", "big.md"), "x".repeat(15000));
   deed(cwd, "task", "add", "写一份一万五的文档", "--criteria", "它在", "--files", "docs/big.md");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "写了 docs/big.md", "--digest", "docs/big.md").status, 0);
+  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "写了 docs/big.md").status, 0);
   assert.match(deed(cwd, "state").stdout, /免审（全部落在 exempt）/u, "一万五千字节落在免审路径上，本来不用审");
 
   deed(cwd, "task", "add", "再把它删掉", "--criteria", "它不在了", "--files", "docs/big.md");
@@ -266,7 +265,7 @@ test("a verb that takes no flags still says so instead of ignoring them", () => 
   // 只读动词以前不过开关表：拼错的开关被当成没写，命令照常 exit 0。
   const cwd = workspace("readonly-flags");
   deed(cwd, "init", "--said", "起点");
-  for (const verb of ["state", "verify", "doctor"]) {
+  for (const verb of ["state", "doctor"]) {
     const one = deed(cwd, verb, "--digset", "a.md");
     assert.equal(one.status, 1, verb + " 带了不认的开关却说没事：" + one.stdout);
     assert.match(one.stderr, /不认 --digset/);

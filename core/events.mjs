@@ -184,10 +184,9 @@ export function validateEvent(ev, at) {
             throw new Error("task.done 的 run." + key + " 要是条数或 null");
       }
       if (ev.files !== undefined) {
-        if (!Array.isArray(ev.files)) throw new Error("task.done 的 files 要是 {path, digest} 数组");
+        if (!Array.isArray(ev.files)) throw new Error("task.done 的 files 要是 [{ path }] 数组");
         for (const one of ev.files) {
-          if (!one || typeof one.path !== "string" || typeof one.digest !== "string")
-            throw new Error("task.done 的 files 每一项都要有 path 与 digest");
+          if (!one || typeof one.path !== "string") throw new Error("task.done 的 files 每一项都要有 path");
         }
       }
       // 说得出会看到什么的那几条，真跑过才算数：账本记下命令与它必须印出的那段话。
@@ -211,8 +210,7 @@ export function validateEvent(ev, at) {
       if (ev.undoes !== undefined) {
         if (!Array.isArray(ev.undoes)) throw new Error("task.undo 的 undoes 要是数组");
         for (const one of ev.undoes) {
-          if (!one || typeof one.path !== "string" || typeof one.digest !== "string")
-            throw new Error("task.undo 的 undoes 每一项都要有 path 与 digest");
+          if (!one || typeof one.path !== "string") throw new Error("task.undo 的 undoes 每一项都要有 path");
         }
       }
       break;
@@ -257,14 +255,8 @@ export function validateEvent(ev, at) {
       // 清单是交给某一双手的：没写交给谁，事后没人说得清这一份是谁在读。
       if (meaningOf(ev) >= MEANING.periodReview) need(ev, "by");
       need(ev, "brief");
-      if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
-        throw new Error("review.brief 的 briefDigest 要是清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
-      // 角色包和清单成对交出去：两份都记下指纹，谁改了哪一份都查得出来。
-      if (ev.guide !== undefined) {
-        need(ev, "guide");
-        if (!/^[0-9a-f]{64}$/.test(String(need(ev, "guideDigest"))))
-          throw new Error("review.brief 的 guideDigest 要是角色包的 sha256（64 位小写 hex）：" + ev.guideDigest);
-      }
+      // 角色包和清单成对交出去：两份一起给审查者，结论回答的是这两份。
+      if (ev.guide !== undefined) need(ev, "guide");
       break;
     case "review.log":
       if (ev.scope === "session" && meaningOf(ev) >= MEANING.noWholeReview && meaningOf(ev) < MEANING.periodReview)
@@ -278,8 +270,6 @@ export function validateEvent(ev, at) {
       // The brief is outside the ledger, so the only way a verdict can be held
       // to the words the reviewer read is its sha256. A line without one is a
       // conclusion nobody can check.
-      if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
-        throw new Error("review.log 的 briefDigest 要是清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
       // 不合格必须点名：一条结论要么放行，要么说清哪几条要重做。
       // 只说"不合格"而不点名，接到这条记录的人还得回来猜。
       // 第 3 版才并进来（打回不再是另一条命令），所以只查从这一版起写的行：
@@ -300,14 +290,8 @@ export function validateEvent(ev, at) {
             throw new Error(`review.log 的 results 判定只能是 met／unmet／unknown：${one.verdict}`);
           if (seen.has(one.id)) throw new Error(`review.log 的 results 里 ${one.id} 出现了两次：一条标准只有一个判定`);
           seen.add(one.id);
-          if (one.files !== undefined) {
-            if (!Array.isArray(one.files)) throw new Error("review.log 的 results 里 files 要是 [{ path, digest }] 数组");
-            for (const file of one.files) {
-              if (!file || typeof file.path !== "string" || !file.path.trim()) throw new Error("review.log 的 results 里 files 每条都要有 path");
-              if (!/^[0-9a-f]{64}$/.test(String(file.digest ?? "")))
-                throw new Error(`review.log 的 results 里 ${file.path} 的 digest 要是 64 位小写 hex`);
-            }
-          }
+          if (one.files !== undefined && !Array.isArray(one.files))
+            throw new Error("review.log 的 results 里 files 要是数组");
         }
       }
       // 被点名之后改主意不做的条目，放行时要把这件事与理由一起记下来：它是这条
@@ -324,8 +308,6 @@ export function validateEvent(ev, at) {
       need(ev, "brief");
       need(ev, "why");
       need(ev, "by");
-      if (!/^[0-9a-f]{64}$/.test(String(need(ev, "briefDigest"))))
-        throw new Error("review.withdraw 的 briefDigest 要是那份清单的 sha256（64 位小写 hex）：" + ev.briefDigest);
       break;
     case "verdict.pass":
       need(ev, "segment");

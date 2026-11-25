@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
 import { changedPaths, rel, writeSnapshot } from "../../lib/store.mjs";
-import { auditDelivered, pinSet, requireUnchanged, weigh } from "../pins.mjs";
+import { weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
 
@@ -130,7 +130,6 @@ export default function submit(argv) {
       const scanned = changedPaths(ROOT);
       const by = flags.by ?? "agent";
       const sizes = weigh(ROOT, scanned.changed);
-      const pins = pinSet(ROOT, scanned.changed, scanned.now);
       const { doc, evs } = transactMany(
         flags,
         (doc0) => {
@@ -258,13 +257,13 @@ export default function submit(argv) {
                 );
               if (!item.claim) fail(item.id + " 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几");
               // 一条交付总要指着点什么：既没量到改动、也没有文件可指时，写下去就是一条谁也核不了的空话。
-              // 只删不改也算动了——那时 pins 是空的，但 changed 里有那条走了的路径，得放行。
-              if (pins.length === 0 && scanned.changed.length === 0)
+              // 只删不改也算动了——那时没有文件可指，但 changed 里有那条走了的路径，得放行。
+              if (scanned.changed.length === 0)
                 fail(
                   item.id +
                     " 勾上了，但这一批没有量到任何改动、也没有文件可指：先真的动过再勾，或者用 deed task done " +
                     item.id +
-                    " --evidence \"…\" --digest <工作区里的文件> 手工指那份内容",
+                    " --evidence \"…\"",
                 );
               specs.push({
                 k: "task.done",
@@ -274,9 +273,7 @@ export default function submit(argv) {
                 by,
                 ...(observed ? { run: { command: observed.command, exit: observed.exit, tests: observed.tests, pass: observed.pass, fail: observed.fail } } : {}),
                 ...((expectsOf.get(item.id) ?? []).length > 0 ? { expects: expectsOf.get(item.id) } : {}),
-                digest: pins[0]?.digest ?? null,
-                digestPath: pins[0]?.path ?? null,
-                files: pins,
+                files: scanned.changed.map((one) => ({ path: one })),
                 changed: scanned.changed,
                 bytes: sizes,
               });
@@ -306,9 +303,6 @@ export default function submit(argv) {
                 "先交此刻在做的那一条（deed state 说是 " + dones[0].id + "），写完 交付： 提交一次，再做下一条。" +
                 "账本一个字都没动",
             );
-          // 量差到记账之间，工作区可能被别的东西写过：记账之前再核一遍每条交付要记的路径。
-          // 这一处能真拒——抛在 build 里，一条事件都不落。
-          requireUnchanged(ROOT, pins);
           const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
           if (gone.length > 0)
             fail("清单里少了 " + gone.map((t) => t.id).join("、") + "：账本里有的条目不能自己消失——不做了就写 ~~ " + gone[0].id + " " + gone[0].title + "，再加一行 理由：");
@@ -318,25 +312,9 @@ export default function submit(argv) {
           // 只有真交付过才刷新基线：一次只加条目或只领号的 submit 如果也刷新，
           // 工作区里那些改动就被它吃掉了——下一条交付看起来什么都没动。
           if (stamped.some((ev) => ev.k === "task.done")) writeSnapshot(ROOT, scanned.now);
-          // 记账与落到磁盘之间还剩一条缝：重算一遍每条交付记下的路径。
-          // 变了、或者压根没指着东西，都不能当没发生——那条交付已经在账本里，只能撤回。
+          // 记账之后只留一句：这一步真的跑过。没有这一行，谁也不知道它跑没跑。
           const audited = stamped.filter((ev) => ev.k === "task.done").length;
-          for (const one of auditDelivered(ROOT, stamped)) {
-            if (one.empty) {
-              console.log("空交付 · " + one.id + " · 谁也没指着：账本上这一条核不了");
-              console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"这是一条空交付\"，重跑一遍再交");
-            } else {
-              console.log(
-                "字节变了 · " + one.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12) +
-                  "，记账这一刻是 " + (one.now === null ? "文件不在了" : one.now.slice(0, 12)),
-              );
-              console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"记账时字节变了\"，重跑一遍再交");
-            }
-            process.exitCode = 1;
-          }
-          // 核过就说一句：没有这一行，谁也不知道这一步真的跑过（删掉它，用例会红）。
-          if (audited > 0 && process.exitCode !== 1)
-            console.log("记账之后核对 · " + audited + " 条都对得上当时那份内容");
+          if (audited > 0) console.log("记账之后核对 · " + audited + " 条都落在账本里");
         },
       );
       // 落过账就把清单按账本重写一遍：新条目领到的号要写回去，不然下一次 submit

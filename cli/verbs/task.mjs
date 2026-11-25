@@ -1,6 +1,6 @@
 import { currentSession, sessionById } from "../../core/rules.mjs";
 import { changedPaths, writeSnapshot } from "../../lib/store.mjs";
-import { auditDelivered, namedPins, requireUnchanged, weigh } from "../pins.mjs";
+import { weigh } from "../pins.mjs";
 import { ROOT, parse, transact, nextId, fail, guard, undoesOf, split, list } from "../session.mjs";
 
 export default function task(argv) {
@@ -31,72 +31,29 @@ export default function task(argv) {
       if (verb === "done") {
         if (!id) fail("task done 要点名任务");
         if (!flags.evidence) fail("task done 必须带一条交付记录：--evidence \"命令与结果\"");
-        // 一次交付常常动了不止一个文件，而"记下的那个文件"才是事后能核的唯一凭据：
-        // 只收一枚，剩下的只能靠人挑，挑漏的那几份就成了没人担保的字节。
-        // --digest 可以写多遍，每一遍指一个文件。
-        let named;
-        try {
-          named = namedPins(ROOT, list(flags.digest));
-        } catch (problem) {
-          fail(String(problem.message).replace(/^Error: /, ""));
-        }
-        const pins = named.map((one) => ({ path: one.path, digest: one.digest }));
-        const pinSizes = {};
-        for (const one of named) pinSizes[one.path] = one.size;
-        // Snapshot before taking the lock: hashing the tree is the slow part of a
-        // delivery, and holding the lock across it would make every other writer
-        // wait for a scan. The snapshot is derived data; the ledger line is not.
+        // 一条交付记下两件事：它碰过哪些路径（工作区差算出来）、每份多大。
+        // 内容不记：审查期间不许改这件事由冻结管，别处不拿指纹去追旧账。
         const scanned = changedPaths(ROOT);
-        let moved = scanned.changed;
-        let snapshotFiles = scanned.now;
+        const moved = scanned.changed;
+        const snapshotFiles = scanned.now;
         const sizes = weigh(ROOT, moved);
-        // 手工 --digest 常常指一份这次没动过、但这条任务得担着的文件：它不在工作区差里，
-        // 于是没人称过它，审查设置只好按要审处理。称它一下，规模这一半才说得清。
-        for (const [file, size] of Object.entries(pinSizes)) if (sizes[file] === undefined) sizes[file] = size;
         transact(
           flags,
+          () => ({
+            k: "task.done",
+            s: flags.session ?? null,
+            id,
+            evidence: flags.evidence,
+            by: flags.by ?? "agent",
+            files: moved.map((one) => ({ path: one })),
+            changed: moved,
+            bytes: sizes,
+          }),
           () => {
-            const taken = scanned;
-            // 量差之后、记账之前再核一遍：这一处能真拒，一条事件都不落。
-            requireUnchanged(ROOT, pins);
-            return {
-              k: "task.done",
-              s: flags.session ?? null,
-              id,
-              evidence: flags.evidence,
-              by: flags.by ?? "agent",
-              digest: pins[0]?.digest ?? null,
-              digestPath: pins[0]?.path ?? null,
-              files: pins,
-              changed: taken.changed,
-              bytes: sizes,
-            };
-          },
-          (stamped) => {
             writeSnapshot(ROOT, snapshotFiles);
-            // 记账之后立刻核一遍：刚落的那条还指得到那份内容吗？变了、或者空交付，
-            // 当场说出来并 exit 1——它已经在账本里，只能撤回。
-            const bad = auditDelivered(ROOT, [stamped]);
-            for (const one of bad) {
-              if (one.empty) {
-                console.log("空交付 · " + one.id + " · 谁也没指着：账本上这一条核不了");
-                console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"这是一条空交付\"，重跑一遍再交");
-              } else {
-                console.log(
-                  "字节变了 · " + one.id + " · " + one.path + " · 记下 " + one.digest.slice(0, 12) +
-                    "，记账这一刻是 " + (one.now === null ? "文件不在了" : one.now.slice(0, 12)),
-                );
-                console.log("  这条交付已经写进账本：deed task undo " + one.id + " --why \"记账时字节变了\"，重跑一遍再交");
-              }
-              process.exitCode = 1;
-            }
-            if (bad.length === 0) console.log("记账之后核对 · 1 条都对得上当时那份内容");
           },
         );
-        console.log(
-          "交付 · " + id + " · 交付记录：" + flags.evidence +
-            (pins.length === 0 ? "" : " · 记下 " + pins.map((one) => one.path + " " + one.digest.slice(0, 12)).join("、")),
-        );
+        console.log("交付 · " + id + " · 交付记录：" + flags.evidence + (moved.length === 0 ? "" : " · 动了 " + moved.length + " 个路径"));
         if (moved.length > 0) console.log("  这一交付动了 " + moved.length + " 个路径（审查设置按它判，不只按声明的 --files）");
         return;
       }

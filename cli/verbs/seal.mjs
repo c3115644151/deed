@@ -1,5 +1,5 @@
 import { nextAction, openSegment, sealBlockers, takingSegment } from "../../core/rules.mjs";
-import { parse, load, transact, targetSession, fail, guard, signer, auditSegment } from "../session.mjs";
+import { parse, load, transact, targetSession, fail, guard, signer } from "../session.mjs";
 
 export default function seal(argv) {
 
@@ -19,7 +19,6 @@ export default function seal(argv) {
             "：账本里的段是 " +
             (one.segments.map((s) => s.id + (s.closedAt ? "（已封存）" : "")).join("、") || "（一个都没有）"),
         );
-      auditSegment(doc, one, seg);
       const take = takingSegment(one);
       if (seg.plannedAt !== null && take && take.id !== seg.id && seg.closedAt === null)
         fail("段 " + seg.id + " 还没轮到：现在收活的是 " + take.id + "，它关闭之后才轮到这一段");

@@ -10,7 +10,6 @@ import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
-import { auditDelivered, movedSince, requireUnchanged } from "../cli/pins.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -63,9 +62,9 @@ test("a directory with no ledger cannot be written into, or read as if it were f
   assert.equal(state.stdout.includes("这个目录还没接 deed · 先 deed init"), true);
   assert.equal(/下一步/.test(state.stdout), false, "没有审查设置时不该给下一步");
 
-  const verify = deed(cwd, "verify");
-  assert.equal(verify.status, 1);
-  assert.equal(verify.stdout.trim(), "这个目录还没接 deed：deed init 之后才有账本和交付记录可查");
+  const doctor = deed(cwd, "doctor");
+  assert.equal(doctor.status, 0, "医生在没有账本时只说这一句，不报错");
+  assert.match(doctor.stdout, /没有账本：deed init 之后才有/);
   assert.equal(fs.existsSync(path.join(cwd, ".deed")), false, "读也不行：看别人的目录不该建出 .deed/");
 });
 
@@ -73,28 +72,13 @@ test("a directory with no ledger cannot be written into, or read as if it were f
 test("a take-back's shape is checked where it is written", () => {
   const base = { k: "task.undo", id: "T1", why: "说错了话", by: "agent" };
   assert.ok(validateEvent({ ...base, undoes: [] }), "什么也没记下的交付，撤回时是空数组");
-  assert.ok(validateEvent({ ...base, undoes: [{ path: "a.txt", digest: "a".repeat(64) }] }));
+  assert.ok(validateEvent({ ...base, undoes: [{ path: "a.txt" }] }), "账本只记被撤那条指着哪个文件");
   assert.throws(() => validateEvent({ ...base, undoes: "a.txt" }), /undoes 要是数组/);
-  assert.throws(() => validateEvent({ ...base, undoes: [{ path: "a.txt" }] }), /path 与 digest/);
+  assert.throws(() => validateEvent({ ...base, undoes: [{}] }), /path/);
 });
 
 
-test("a pin in a closed segment stops blocking, but it still gets reported", () => {
-  const cwd = workspace("shut-pins");
-  fs.writeFileSync(path.join(cwd, "thing.txt"), "v1");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "记下内容", "--criteria", "文件在", "--files", "thing.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "第一版", "--digest", "thing.txt");
-  deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
-  const passed = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met");
-  assert.equal(passed.status, 0, passed.stderr);
-  assert.equal(judgeHere(cwd, "S01.1").status, 0, "判过这一段才是真的关了");
-  fs.writeFileSync(path.join(cwd, "thing.txt"), "v2");
-  const after = deed(cwd, "verify");
-  assert.equal(after.status, 0, after.stdout + after.stderr);
-  assert.doesNotMatch(after.stdout, /交付记录过期 · T1/, "已关闭的段里没人能再交付，追旧记录只会留一笔结不掉的未结项");
-  assert.match(after.stdout, /已关闭的段里有 1 条记下的字节已经变了/, "跳过整条会让「字节变了」变成没人看的一格");
-});
+
 
 
 test("a flag given twice is refused instead of quietly keeping the last one", () => {
@@ -124,16 +108,7 @@ test("a round belongs to the user, and an agent cannot open one", () => {
 // 审查设置的一半是规模，而手工 --digest 常常指一份这次没动、但这条任务得担着的文件：
 // 它不在工作区差里，不称就一直「称不出」，审查设置只好按要审算。
 
-test("pinning a file that did not move this time still weighs it", () => {
-  const cwd = workspace("weigh-pin");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "T1", "--criteria", "做完的标准");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "第一次", "--digest", proof(cwd)).status, 0);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "重新记同一份", "--digest", "proof.txt").status, 0);
-  const last = readEvents(cwd).filter((one) => one.k === "task.done").at(-1);
-  assert.deepEqual(last.changed, [], "这一次什么都没动");
-  assert.equal(last.bytes["proof.txt"], fs.statSync(path.join(cwd, "proof.txt")).size);
-});
+
 
 
 // 开关写错一个字：要认出来、说出写错的是哪个、猜最近的那个；一路静默吞掉是最坏的一种。
@@ -141,14 +116,14 @@ test("a flag one letter off is refused, and the nearest name is guessed", () => 
   const cwd = workspace("spec-guess");
   deed(cwd, "init", "--said", "起点");
   deed(cwd, "task", "add", "一件事", "--criteria", "做完");
-  const behind = deed(cwd, "task", "done", "T1", "--evidence", "跑了", "--digset", "proof.txt");
+  const behind = deed(cwd, "task", "done", "T1", "--evidence", "跑了", "--criterias", "proof.txt");
   assert.equal(behind.status, 1, behind.stdout);
-  assert.match(behind.stderr, /不认 --digset/);
-  assert.match(behind.stderr, /--digest/);
+  assert.match(behind.stderr, /不认 --criterias/);
+  assert.match(behind.stderr, /--criteria/);
   // 开关写在子命令的位置上：先说开关错在哪，不拿"子命令不存在"糊过去。
-  const upfront = deed(cwd, "task", "--digset", "proof.txt");
+  const upfront = deed(cwd, "task", "--criterias", "proof.txt");
   assert.equal(upfront.status, 1, upfront.stdout);
-  assert.match(upfront.stderr, /--digest/);
+  assert.match(upfront.stderr, /--criteria/);
 });
 
 
@@ -181,18 +156,5 @@ test("a sealed segment with no reason written says what it is, without empty bra
 });
 
 
-test("a path that moved between the scan and the ledger write is caught, and a gone one says gone", () => {
-  // 量差到记账之间工作区可能被别的东西写过：那条判断要能分开"变了"与"不在了"，
-  // 因为两者都算变了，但说出来的话不一样。
-  const cwd = workspace("moved");
-  fs.writeFileSync(path.join(cwd, "a.md"), "one");
-  const pin = { path: "a.md", digest: createHash("sha256").update("one").digest("hex") };
-  assert.deepEqual(movedSince(cwd, [pin]), []);
-  fs.writeFileSync(path.join(cwd, "a.md"), "two");
-  const moved = movedSince(cwd, [pin]);
-  assert.equal(moved.length, 1);
-  assert.equal(moved[0].path, "a.md");
-  assert.equal(moved[0].now, createHash("sha256").update("two").digest("hex"));
-  fs.rmSync(path.join(cwd, "a.md"));
-  assert.equal(movedSince(cwd, [pin])[0].now, null, "文件不在了要说成不在了，不是没说变");
-});
+
+

@@ -336,7 +336,7 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
   run("task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/a.mjs");
   fs.mkdirSync(path.join(root, "core"), { recursive: true });
   fs.writeFileSync(path.join(root, "core", "a.mjs"), "a\n");
-  run("task", "done", "T1", "--evidence", "写完了", "--digest", "core/a.mjs");
+  run("task", "done", "T1", "--evidence", "写完了");
   // 审查通过只把这一段交回来：判决那一按才是它的结局。
   assert.equal(run("review", "--segment", "S01.1", "--by", "qa").status, 0);
   assert.equal(run("review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);

@@ -16,7 +16,6 @@ import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
-import { auditEvidence, staleEvidence } from "./audit.mjs";
 import { stamp0 } from "../lib/format.mjs";
 
 export const ROOT = process.cwd();
@@ -184,50 +183,6 @@ export function transactMany(flags, buildAll, commit) {
     if (commit) commit(stamped, after);
     return { doc: after, evs: stamped };
   });
-}
-
-// 「先做后记」：一条交付记下的文件，如果它最后一次写入的时刻早于这条任务
-// 被写进账本的时刻，那这条任务是追认已经做完的事，不是先答应再做。账本里的时刻
-// 改不了；这里拿文件的写入时刻对一次，只报事实——不是坏账，是账本和事实对不上。
-export function lateWork(root, doc) {
-  const git = (args) => {
-    const one = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-    return one.status === 0 ? one.stdout.trim() : null;
-  };
-  // 只在 git 工作区里比。mtime 只在能被 git 解释的工作树里代表「写下来的时刻」：
-  // 从别处拷来的、解压出来的、检出出来的目录，mtime 是文件被挪进来的时刻，比任务被记下
-  // 的时刻早晚都没有意义。没有 git 就整段不报，也不报错。
-  if (git(["rev-parse", "--is-inside-work-tree"]) !== "true") return [];
-  const seen = new Map();
-  // 比的是文件的最后写入时刻：提交时刻总在任务被记下之后（先写、再记、再提交），
-  // 拿它来比永远看不出这件事。代价是 clone 出来的工作副本 mtime 全是检出时刻，
-  // 这条检查在那种副本上不报——报不出来的方向是安静，不是诬告。
-  const when = (file) => {
-    if (!seen.has(file)) {
-      try {
-        seen.set(file, fs.statSync(path.resolve(root, file)).mtimeMs);
-      } catch {
-        seen.set(file, null);
-      }
-    }
-    return seen.get(file);
-  };
-  const late = [];
-  for (const session of doc.sessions) {
-    for (const task of session.tasks) {
-      const last = task.evidence[task.evidence.length - 1];
-      if (!last) continue;
-      const recorded = Date.parse(task.createdAt);
-      if (!Number.isFinite(recorded)) continue;
-      for (const pin of last.files ?? []) {
-        const written = when(pin.path);
-        if (written === null || written >= recorded) continue;
-        late.push({ id: task.id, path: pin.path, written, recorded });
-        break;
-      }
-    }
-  }
-  return late;
 }
 
 export const session = (doc) => {
@@ -416,8 +371,6 @@ export function printState() {
     console.log("  签收 " + (blockers.length === 0 ? "可行" : "差：" + blockers.join("；")));
     const watch = pressure(open);
     if (watch && watch.tasks > 3) console.log("  提示 · 这一段已经 " + watch.tasks + " 条，还压着 " + watch.undecided + " 条待判");
-    const stale = staleEvidence(ROOT, doc, open.id);
-    if (stale.length > 0) console.log("  交付记录过期 · " + stale.map((one) => one.id).join("、") + "（记下的文件变了，deed verify 看细节）");
   }
   for (const one of doc.sessions)
     if (one.closedAt)
@@ -429,7 +382,7 @@ export function printState() {
   const drift = configDrift(doc.config, readConfigFile(ROOT));
   if (drift.length > 0)
     console.log(
-      "  审查设置 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；deed verify 看细节，改审查设置用 deed init --force … --why）",
+      "  审查设置 文件与账本不一致 · " + drift.map((one) => one.key).join("、") + "（规则只认账本；改审查设置用 deed init --force … --why）",
     );
   const step = nextAction(doc, config);
   console.log("");
@@ -458,15 +411,3 @@ export function optionalBlock(config) {
   ];
 }
 
-// 落结论前只问一件事：交付记录有没有指到工作区外面——deed 只认工作区里的文件。
-// 不在这里比字节：这一段在等结论时是冻结的，作者换不掉审查者手上那两份文件；
-// 真有别的进程改了盘，那是 verify 该报的账，不该把一句"过不过"的判断挂在哈希上。
-export const auditSegment = (doc, session, seg) => {
-  const inSegment = new Set(tasksIn(session, seg).map((task) => task.id));
-  const audit = auditEvidence(ROOT, doc, session.id);
-  const outside = audit.outside.filter((spot) => inSegment.has(spot.id));
-  if (outside.length > 0)
-    fail(
-      "这一段有交付记录指到工作区外面（" + outside.map((spot) => spot.id + " → " + spot.path).join("、") + "）：deed 只认工作区里的文件，改回来重新交付",
-    );
-};

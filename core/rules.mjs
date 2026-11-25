@@ -172,7 +172,7 @@ export function needsReview(config, session, segment) {
     // 小改动才谈得上免审：声明过的路径之外，规模由数得出来的事实说话。
     const size = sizeOf([task], task.sizes ?? {});
     // 称不出规模就不算小：免审是给「数出来确实很小」的改动留的，不是给「说不清多大」的。
-    // 交付那一刻会替它称（工作区差里的与 --digest 指的都称），所以这条只堵老账本和漏称。
+    // 交付那一刻会替它称（工作区差里那些文件），所以这条只堵老账本和漏称。
     // 交付自己记下、却没称过的文件，就是说不清多大：按要审算，别按 0 字节放行。
     // 只声明过、这次没交付到的不算——路径本身已经把话说了。
     const pinned = [...new Set((task.evidence ?? []).flatMap((proof) => (proof.files ?? []).map((one) => one.path)))];
@@ -257,8 +257,8 @@ export function reviewState(config, session, segment) {
 // 这个判断只在这里写一遍：签收、下一步、verify 报的空交付都从它出。
 export const pointsAtNothing = (proof) =>
   !proof ||
-  ((proof.files ?? []).length === 0 &&
-  !(proof.digest && proof.path) &&
+  ((proof.files ?? []).length === 0 && !proof.path &&
+
   (proof.changed ?? []).length === 0);
 
 // 复核得靠内容：要审的段里，每条现行交付都得指着点什么。

@@ -1,7 +1,7 @@
 # 这份示例是什么
 
 一个照着 `deed` 规则长出来的工作区：账本在 `.deed/log/`，审查清单与角色包在 `.deed/review/`——
-发清单这件事本身记在账本里（`review.brief` + 两份 sha256），结论只回答发出去的那两份。
+发清单这件事本身记在账本里（`review.brief` + 那两份路径），结论只回答发出去的那两份。
 审查设置也在账本里（`.deed/config.json` 只是它的镜像；规则读的是 `config.change` 重放出来的那份）。
 它演示五件事：一段被审查者放行后封存、一次判不合格点名退回后的重交与重审、清单发出与被回答的两步、
 一条被延后的任务、一条还没裁的问题。
@@ -20,7 +20,7 @@ node examples/rebuild.mjs      # 从空账本重跑一遍，覆盖这里的 .dee
 ```
 cd examples/contract
 node ../../cli/deed.mjs state
-node ../../cli/deed.mjs verify
+node ../../cli/deed.mjs doctor
 node ../../cli/deed.mjs serve --port 7419
 ```
 
