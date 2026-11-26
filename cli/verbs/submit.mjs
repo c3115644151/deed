@@ -128,7 +128,7 @@ export default function submit(argv) {
 
       // 称重与快照在锁外做：跑一遍工作区是慢的那一半，锁里只做判与落。
       const scanned = changedPaths(ROOT);
-      const by = flags.by ?? "agent";
+      const by = "agent";
       const sizes = weigh(ROOT, scanned.changed);
       const { doc, evs } = transactMany(
         flags,

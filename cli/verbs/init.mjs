@@ -60,7 +60,7 @@ export default function init(argv) {
           from,
           to,
           why: flags.why ?? "init 收下的审查设置",
-          by: flags.by ?? "user",
+          by: "agent",
         }),
         undefined,
         true, // 审查设置落盘之前这个目录还不算接过：init 是唯一的例外

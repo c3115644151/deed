@@ -290,10 +290,9 @@ const REVIEW_LABEL = {
   stale: "结论过期 · 审的是旧内容，要重审",
 };
 
-// 账本替人签过名：判决和签收以前默认写 by: "user"，于是 agent 交付、判决、
-// 签收一条龙之后，记录上写着是用户按的。名字现在必须由写者给；只有真的在终端
-// 里敲（stdin 与 stdout 都是 tty）才允许默认 "user"——那是"有个人在键盘前"这个
-// 事实，不是"这个人是用户"这个推断。
+// 旧账本替人签过名：判决和签收以前默认写 by: "user"，于是 agent 交付、判决、签收
+// 一条龙之后，记录上写着是用户按的。现在名字由通道决定——命令写的行是 agent 做的，
+// 面板按的行是人按的（via:"panel"），没有参数可填，也没有推断。
 export function printState() {
   const { doc, events } = load();
   const config = doc.config;

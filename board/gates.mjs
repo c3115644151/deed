@@ -28,7 +28,6 @@ export function gatesOf(doc, config = doc.config) {
         open: true,
         why: "",
         segment: shut.id,
-        by: shut.reviewedBy ?? null,
         at: shut.reviewedAt ?? null,
       }
     : { open: false, why: "没有等你判决的段" };

@@ -44,7 +44,7 @@ export default function task(argv) {
             s: flags.session ?? null,
             id,
             evidence: flags.evidence,
-            by: flags.by ?? "agent",
+            by: "agent",
             files: moved.map((one) => ({ path: one })),
             changed: moved,
             bytes: sizes,
@@ -68,7 +68,7 @@ export default function task(argv) {
           if (!task) fail("这个会话里没有任务 " + id);
           const undoes = undoesOf(task);
           return {
-            k: "task.undo", s: flags.session ?? null, id, why: flags.why, by: flags.by ?? "agent",
+            k: "task.undo", s: flags.session ?? null, id, why: flags.why, by: "agent",
             ...(undoes === null ? {} : { undoes }),
           };
         });
