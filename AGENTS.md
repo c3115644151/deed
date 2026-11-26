@@ -17,7 +17,7 @@
 
 ## 文档
 
-`README.md`（对外入口）、`docs/DESIGN.md`（行为权威）、`docs/INSTALL.md`；辅助 `docs/research.md`、`docs/deed-architecture.html`（由 candidate.json 重出，别手改）。新增文档先问三条：哪一格的事实、谁读了会改变哪个动作、多久过期（见 `docs/README.md`）。过程材料不进仓库，只留结论。
+`README.md`（对外入口）、`docs/DESIGN.md`（行为权威）、`docs/INSTALL.md`；辅助 `docs/research.md`、`docs/deed-architecture.html`（由 candidate.json 重出，别手改）。`adapters/` 是客户端适配器（DSH 一份），不属于 CLI 包、不进 npm 发布：它只调命令，不碰账本格式。新增文档先问三条：哪一格的事实、谁读了会改变哪个动作、多久过期（见 `docs/README.md`）。过程材料不进仓库，只留结论。
 
 ## 边界
 

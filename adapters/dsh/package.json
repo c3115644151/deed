@@ -1,0 +1,17 @@
+{
+  "name": "deed-dsh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "deed 的 DeepSeek Harness 适配器：原文交来、惯例入系统段、条件成立时自动起审查者",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

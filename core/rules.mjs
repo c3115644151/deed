@@ -198,7 +198,7 @@ export const lastBrief = (session, segmentId) =>
 
 // 手上那份清单还新鲜吗：发出去之后这一段没有再动过，也还没有人回答。
 // 新鲜的、没人回答的那份，下一步是落结论——再发一份只会让审查者去读旧纸。
-const freshBrief = (session, segment) => {
+export const freshBrief = (session, segment) => {
   const handed = lastBrief(session, segment.id);
   if (!handed) return null;
   // 撤回过的清单不再是"手上这一份"：它作废了，下一步是重新发一份。
@@ -307,6 +307,42 @@ export const periodFresh = (session) => {
   const brief = lastPeriodBrief(session);
   return Boolean(brief) && brief.answeredBy === null && brief.withdrawnAt === undefined;
 };
+
+// 「现在该谁审、清单在哪」：宿主插件拿这一句决定起不起一个审查者，所以它只读、不记账，
+// 也不回答"人该按哪一下"——判决与签收是人的手，这里永远不提。
+// hand 是复用的名字：同一个段的重审交给同一个审查者（它手上还留着上一份），
+// 期审每次一个新名字（它问的是另一个问题，不该带着上一期的结论）。
+export function reviewDue(doc, config = null) {
+  const session = currentSession(doc);
+  if (!session || session.closeKind) return null;
+  if (session.segments.length === 0) return null;
+  const handOf = (key) => "r-" + String(key).toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-|-$/gu, "");
+
+  // 各段都关了才谈期审：那之前插队等于用一份期审清单答一个还没成形的问题。
+  if (needsPeriodReview(session)) {
+    const state = periodState(session);
+    if (state === "pass" || state === "stale") return null;
+    const hand = handOf("period-" + session.id);
+    const handed = lastPeriodBrief(session);
+    if (periodFresh(session))
+      return { kind: "period", segment: null, needs: "verdict", hand, brief: handed.brief, guide: handed.guide ?? null };
+    return { kind: "period", segment: null, needs: "brief", hand };
+  }
+
+  const segment = openSegment(session);
+  if (!segment) return null;
+  // 审查通过之后这一段在等人判：那一刻没有审查者的活。
+  if (segment.verdict === "pass") return null;
+  // 审查设置说这一段不用审：它的结局是 agent 封存，不是一份没人答的卷子。
+  if (config && !needsReview(config, session, segment)) return null;
+  // 还有没交的条目：清单上写的东西还没成形，出了也是旧的。
+  if (tasksIn(session, segment).some((one) => one.status === "todo")) return null;
+  const hand = handOf(segment.id);
+  const handed = freshBrief(session, segment);
+  if (handed)
+    return { kind: "segment", segment: segment.id, needs: "verdict", hand, brief: handed.brief, guide: handed.guide ?? null };
+  return { kind: "segment", segment: segment.id, needs: "brief", hand };
+}
 
 export function signBlockers(doc, session, config = null) {
   if (!session) return ["现在没有在推进的会话"];

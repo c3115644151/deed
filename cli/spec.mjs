@@ -12,9 +12,11 @@ export const SPEC = {
     ],
   },
   say: {
-    flags: ["session"],
+    flags: ["session", "from"],
     usage: [
       'deed say "…" [--session S01]   记下一轮：只记你和用户之间那一轮，said 是位置参数',
+      "                 没有位置参数时读 stdin（钩子交来的原文走这条路：引号与换行不被拆坏）",
+      'deed say --from dsh:<会话>:<消息号> [--session S01]   原文由宿主交来：记 via:"hook"，同一个消息号只记一次',
       '                 我自己的进展写进交付记录或结论，不记成轮次',
     ],
   },
@@ -59,9 +61,9 @@ export const SPEC = {
     ],
   },
   review: {
-    flags: ["segment", "verdict", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip"],
+    flags: ["segment", "verdict", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip", "due", "auto"],
     repeat: ["finding", "result"],
-    booleans: ["withdraw", "all", "skip"],
+    booleans: ["withdraw", "all", "skip", "due", "auto"],
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
       'deed review --segment S01.1 --skip --why "…"   封一个免审段（没人审过，落款留着）',
@@ -72,6 +74,8 @@ export const SPEC = {
       "deed review --all              期审：各段都关了之后判这一期做成的样子",
       'deed review --all --verdict pass|fail [--rework S01.7] [--why "…"]   期审的结论；不合格点名的是段号',
       'deed review --segment S01.1 --withdraw --why "…"   撤回这份还没被回答的清单，这一段回到执行态',
+      "deed review --due     只读：现在该谁审、清单在哪，机器读的一行 JSON（宿主插件用它决定起不起审查者）",
+      '                 写下一份清单时带 --auto：这一次不是人敲的，账本上记 via:"auto"',
       "                 审查只在段里做：签收看的是每一段的结论都放行、条件都满足，没有另一道整期审查",
     ],
   },

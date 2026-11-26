@@ -8,6 +8,7 @@ import {
   needsReview,
   nextAction,
   openSegment,
+  reviewDue,
   sealBlockers,
   stalePeriod,
   takingSegment,
@@ -27,6 +28,14 @@ export default function review(argv) {
       const { doc } = load();
 
       const one = targetSession(doc, flags);
+    // ---- 现在该谁审：deed review --due ------------------------------------------------
+    // 宿主插件问这一句：有没有该审的、清单在哪、交给哪个名字（段复用、期新开）。
+    // 只读：不写账本、不生成文件、不起面板。没有活时印 {"kind":null}，机器读得懂。
+    if (flags.due) {
+      const due = reviewDue(doc, doc.config);
+      console.log(JSON.stringify(due ?? { kind: null }));
+      return;
+    }
     // ---- 免审段：deed review --skip ----------------------------------------------------
     // 审查设置说这一段不用审，于是没有结论可落——但段仍然要封，不然它永远开着，
     // 谁也签不了收。封存要写清凭什么不用审：账本上"没人看过"必须留字，不能变成默认的沉默。
@@ -92,6 +101,7 @@ export default function review(argv) {
             scope: "session",
             goal: session.goal?.text ?? "这一期没有写下目的",
             by: "agent",
+            ...(flags.auto ? { via: "auto" } : {}),
             brief,
             guide,
           }),
@@ -231,7 +241,7 @@ export default function review(argv) {
         const guide = rel(ROOT, plan.guideFile);
         transact(
           flags,
-          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, guide, by: "agent" }),
+          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, guide, by: "agent", ...(flags.auto ? { via: "auto" } : {}) }),
           () => writeBrief(plan, brief),
         );
         // 账本里已有几份，加上手上这份：一次审只回答一份清单。

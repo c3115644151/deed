@@ -48,7 +48,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 28;
+export const EVENT_VERSION = 29;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -102,6 +102,10 @@ export const MEANING = {
   // 待裁这个概念不存在了：它只是用户两次按钮时的交流，不再是对象、不进账本。
   // 旧账本里的 ask.* 照读（那时是真事），新行一律拒。
   askRetired: 28,
+  // 原文可以由宿主交来（钩子），不是 agent 复述：这一条起轮次能带 via/origin/mid。
+  // 人的话仍然是人的话（who:"user"）；通道写着它怎么到的（via:"hook"），
+  // mid 是宿主给的消息号，重复交来的同一句按它认。旧行没有这三样，照读。
+  turnOrigin: 29,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -153,6 +157,18 @@ export function validateEvent(ev, at) {
       // 说错了，是一行会被误读的事实。
       if (ev.did !== undefined && typeof ev.did !== "boolean" && typeof ev.did !== "string")
         throw new Error("turn 的 did 要写成一句话，或者 true/false");
+      // 第 29 版起原文可以由宿主交来：通道（via）、谁交的（origin）、它的消息号（mid）。
+      // mid 是重复交来的同一句的认据——没有它，钩子重启一次就会把同一句记两遍。
+      if (meaning >= MEANING.turnOrigin) {
+        if (ev.via !== undefined && typeof ev.via !== "string")
+          throw new Error("turn 的 via 要写成一句话（例如 hook）");
+        if (ev.origin !== undefined && typeof ev.origin !== "string")
+          throw new Error("turn 的 origin 要写成一句话（例如 dsh）");
+        if (ev.mid !== undefined && typeof ev.mid !== "string")
+          throw new Error("turn 的 mid 要写成一句话：它是宿主给这条消息的号");
+        if (ev.via === "hook" && typeof ev.mid !== "string")
+          throw new Error("钩子交来的原文要带 mid：没有消息号，重复交来的一句没法认出来");
+      }
       break;
     case "task.add":
       need(ev, "id");

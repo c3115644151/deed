@@ -1,0 +1,4 @@
+# deed 的适配器：一行，随时可拆。
+- insert:
+    - id: deed-dsh
+      name: deed-dsh
