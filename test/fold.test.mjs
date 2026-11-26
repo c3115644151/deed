@@ -235,8 +235,8 @@ test("only a turn opens a period; a task cannot invent one", () => {
 test("a duplicate id is refused instead of shadowing the first one", () => {
   assert.throws(() => fold([turn(1), add(2, "T1"), add(3, "T1")]), /已经有 T1/);
   assert.throws(
-    () => fold([turn(1), { v: 1, at: T(2), k: "ask.raise", s: null, id: "A1", text: "t", reading: "r", why: "w" }, add(3, "A1")]),
-    /已经有 A1/,
+    () => fold([turn(1), { v: 28, at: T(2), k: "point.add", s: null, id: "P1", text: "t" }, add(3, "P1")]),
+    /已经有 P1/,
   );
 });
 
@@ -277,11 +277,6 @@ test("a refused event leaves the document exactly as it was", () => {
 
 test("signing refuses to close a period with work still owed", () => {
   assert.throws(() => fold([turn(1), add(2, "T1"), sign(3)]), /没结清/);
-  const asked = [
-    turn(1), add(2, "T1"), done(3, "T1"), judgePass(4, "S01.1"),
-    { v: 1, at: T(5), k: "ask.raise", s: null, id: "A1", text: "要不要兼容旧账", reading: "不兼容", why: "不确定" },
-  ];
-  assert.throws(() => fold([...asked, sign(6)]), /待裁项/);
 });
 
 // 更早的账本里那些没点名的结论一样挡着 pass：规则是在案那条说了什么，

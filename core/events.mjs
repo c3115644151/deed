@@ -48,7 +48,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 27;
+export const EVENT_VERSION = 28;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -99,6 +99,9 @@ export const MEANING = {
   askNoWhy: 26,
   // 讨论域三层：要点（无状态）、议题（两次由人确认：成立、锁定出口）、原文留给宿主注入。
   discussionTopics: 27,
+  // 待裁这个概念不存在了：它只是用户两次按钮时的交流，不再是对象、不进账本。
+  // 旧账本里的 ask.* 照读（那时是真事），新行一律拒。
+  askRetired: 28,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -237,6 +240,8 @@ export function validateEvent(ev, at) {
       need(ev, "id");
       break;
     case "ask.raise":
+      if (meaningOf(ev) >= MEANING.askRetired)
+        throw new Error("ask.raise 已经不存在：待裁只是用户两次确认议题时的交流，不再是账本里的对象");
       need(ev, "id");
       need(ev, "text");
       need(ev, "reading");
@@ -244,10 +249,14 @@ export function validateEvent(ev, at) {
       if (meaningOf(ev) < MEANING.askNoWhy) need(ev, "why");
       break;
     case "ask.resolve":
+      if (meaningOf(ev) >= MEANING.askRetired)
+        throw new Error("ask.resolve 已经不存在：待裁只是用户两次确认议题时的交流，不再是账本里的对象");
       need(ev, "id");
       need(ev, "decision");
       break;
     case "ask.withdraw":
+      if (meaningOf(ev) >= MEANING.askRetired)
+        throw new Error("ask.withdraw 已经不存在：待裁只是用户两次确认议题时的交流，不再是账本里的对象");
       need(ev, "id");
       need(ev, "why");
       break;
@@ -257,6 +266,8 @@ export function validateEvent(ev, at) {
         throw new Error("point.add 是含义第 27 版才有的事件：v 要写 " + MEANING.discussionTopics);
       need(ev, "id");
       need(ev, "text");
+      if (ev.by !== undefined)
+        throw new Error("要点不记名字：它是从这一轮里留下的判断，不是谁交的活");
       break;
     // 议题：agent 统合要点开一份草稿，之后两次由人在面板上确认。
     case "topic.create":

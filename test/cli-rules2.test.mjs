@@ -115,10 +115,10 @@ test("a round belongs to the user, and an agent cannot open one", () => {
 test("a flag one letter off is refused, and the nearest name is guessed", () => {
   const cwd = workspace("spec-guess");
   deed(cwd, "init", "--said", "起点");
-  const behind = deed(cwd, "ask", "一件事", "--readings", "我理解成", "x");
+  const behind = deed(cwd, "point", "一件事", "--topics", "I1", "x");
   assert.equal(behind.status, 1, behind.stdout);
-  assert.match(behind.stderr, /不认 --readings/u);
-  assert.match(behind.stderr, /--reading/u);
+  assert.match(behind.stderr, /不认 --topics/u);
+  assert.match(behind.stderr, /--topic/u);
   // 开关写在子命令的位置上：先说开关错在哪，不拿"子命令不存在"糊过去。
   const upfront = deed(cwd, "submit", "--runs", "node --test");
   assert.equal(upfront.status, 1, upfront.stdout);

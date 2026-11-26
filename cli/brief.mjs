@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { edges, tasksIn } from "../core/rules.mjs";
+import { tasksIn } from "../core/rules.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 
@@ -224,7 +224,7 @@ function periodGuideText(session, briefName, scratch) {
     "",
     "1. 目的那句在账本上成立吗：这一期真的做成了它写的那件事，还是只把条目勾完了？",
     "2. 各段之间一致吗：同一件事在两段里是不是两种做法、留下两套说法；后面段的取舍推翻了前面段的结论？",
-    "3. 欠下的东西说清了吗：放弃有理由、延后有原因、待裁不悬着；有没有一段的结论本身就建立在一个已经不成立的前提上。",
+    "3. 欠下的东西说清了吗：放弃有理由、延后有原因；有没有一段的结论本身就建立在一个已经不成立的前提上。",
     "",
     "## 你怎么动手",
     "",
@@ -244,7 +244,7 @@ function periodGuideText(session, briefName, scratch) {
   ].join("\n");
 }
 
-// 期审清单：列的是这一期的目的、各段结局、当期定下的边界与弃、还挂着的东西。
+// 期审清单：列的是这一期的目的、各段结局、还挂着的东西。
 export function planWhole(root, session, at) {
   const p = ensureDirs(root);
   const scratch = path.join(p.tmp, "period-" + session.id + "-" + fileStamp(at));
@@ -274,8 +274,6 @@ export function planWhole(root, session, at) {
     .filter((task) => task.status === "deferred" || task.status === "dropped")
     .map((task) => "- " + task.id + " · " + (task.status === "deferred" ? "延后" : "放弃") + " · " + task.title + "：" +
       (task.deferredWhy ?? task.droppedWhy ?? "没有写理由"));
-  const waiting = session.asks.filter((one) => one.resolvedAt === null && one.state === "pending");
-  const lines = edges(session).map((one) => "- " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
   const nth = session.briefs.filter((one) => one.scope === "session").length + 1;
   const text = [
     "# 期审清单 · " + session.id + " · 第 " + nth + " 份",
@@ -289,15 +287,9 @@ export function planWhole(root, session, at) {
     "## 各段的结局",
     "",
     ...session.segments.map(segLine),
-    ...findings,
-    "",
-    "## 这一期定下的边界与弃",
-    "",
-    ...(lines.length > 0 ? lines : ["- 还没有定过"]),
     "",
     "## 还挂着的",
     "",
-    ...(waiting.length > 0 ? waiting.map((one) => "- 待裁 " + one.id + " · " + one.text + "（我理解成：" + one.reading + "）") : ["- 没有待裁"]),
     ...(carried.length > 0 ? carried : ["- 没有放弃或延后的条目"]),
     "",
     "## 怎么审",

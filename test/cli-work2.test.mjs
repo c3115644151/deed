@@ -154,26 +154,6 @@ test("removing a file in a submit is not a small change either", () => {
 });
 
 
-test("a settled decision keeps its border and what it gave up, and they are not tasks", () => {
-  const cwd = workspace("decision-edges");
-  deed(cwd, "init", "--said", "起点");
-  deed(cwd, "say", "先谈谈怎么收尾");
-  deed(cwd, "ask", "收尾要不要连文档一起改", "--reading", "只改代码", "--why", "两种都说得通");
-  const refused = deed(cwd, "ask", "answer", "A1", "--decision", "边界：", "--by", "user");
-  assert.equal(refused.status, 1, "空边界要挡：写了个词根没写内容");
-  assert.match(refused.stderr, /没写内容/);
-  const settled = deed(cwd, "ask", "answer", "A1", "--by", "user", "--decision", "只改代码\n边界：文档里的旧词不再新增\n弃：导出功能不做了");
-  assert.equal(settled.status, 0, settled.stderr);
-  assert.match(settled.stdout, /记下 · 2 条/);
-  const state = deed(cwd, "state");
-  assert.match(state.stdout, /边界 · 文档里的旧词不再新增（A1 · user）/);
-  assert.match(state.stdout, /弃 · 导出功能不做了（A1 · user）/);
-  // 它们不是任务：清单里没有多出条目，签收那一行的未结项也没变。
-  const plan = deed(cwd, "plan", "--print");
-  assert.doesNotMatch(plan.stdout, /文档里的旧词不再新增/);
-});
-
-
 test("an entry still to be done is carried to the next segment from the plan", () => {
   const cwd = workspace("carry-plan");
   deed(cwd, "init", "--said", "开始");

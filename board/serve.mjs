@@ -7,7 +7,7 @@ import http from "node:http";
 import path from "node:path";
 import { UnknownKindError } from "../core/events.mjs";
 import { fold } from "../core/fold.mjs";
-import { pressure, reading, countIn, currentSession, openSegment, nextAction, pendingAsks, signBlockers } from "../core/rules.mjs";
+import { pressure, reading, countIn, currentSession, openSegment, nextAction, signBlockers } from "../core/rules.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { wordsNotice } from "../lib/words.mjs";
@@ -145,7 +145,6 @@ export function handler(root, onRequest = () => {}) {
               opened: session.openedAt,
               turns: session.turns.length,
               segment: segment ? { id: segment.id, ...countIn(session, segment) } : null,
-              asks: pendingAsks(session).map((ask) => ask.id),
               sign: signBlockers(doc, session, config),
               pressure: pressure(session),
             }

@@ -12,7 +12,6 @@ import say from "./verbs/say.mjs";
 import point from "./verbs/point.mjs";
 import topic from "./verbs/topic.mjs";
 import task from "./verbs/task.mjs";
-import ask from "./verbs/ask.mjs";
 import project from "./verbs/project.mjs";
 import plan from "./verbs/plan.mjs";
 import submit from "./verbs/submit.mjs";
@@ -33,7 +32,7 @@ const HELP = [
   "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
 
-const commands = { init, say, point, topic, task, ask, project, check, plan, submit, review, sign, state, serve, panel };
+const commands = { init, say, point, topic, task, project, check, plan, submit, review, sign, state, serve, panel };
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。
@@ -80,6 +79,7 @@ const MOVED = {
   shelve: 'deed sign --shelve --why "…"',
   doctor: 'deed check --ledger',
   gate: 'deed check --gates',
+  ask: '待裁这个概念不用了：讨论里的要点用 deed point "…"，要人确认的用议题两次按钮（deed topic + 面板）',
 };
 const command = commands[verb];
 if (!command && MOVED[verb]) {

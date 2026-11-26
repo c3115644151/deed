@@ -78,30 +78,6 @@ export function countIn(session, segment) {
   return count;
 }
 
-export const pendingAsks = (session) => session.asks.filter((one) => one.state === "pending");
-
-// 结论块：一句裁定里能带两种行——边界（以后不许这么干）与弃（这件事不做了）。
-// 它们是从那句话算出来的，不另立事件、不加字段：账本里那句原话就是唯一的记录。
-const EDGE_LINE = /^(边界|弃)\s*[:：]\s*(.*)$/u;
-export const edges = (session) => {
-  const out = [];
-  for (const ask of session.asks ?? []) {
-    if (ask.state !== "resolved") continue;
-    for (const raw of (ask.decision ?? "").split("\n")) {
-      const hit = raw.trim().match(EDGE_LINE);
-      if (!hit) continue;
-      out.push({
-        kind: hit[1] === "边界" ? "border" : "abandon",
-        text: hit[2].trim(),
-        id: ask.id,
-        at: ask.closedAt,
-        by: ask.by,
-      });
-    }
-  }
-  return out;
-};
-
 // The newest conclusion about a segment that still stands. A reworked delivery
 // voids the old verdict, so reviews are filtered rather than overwritten.
 export const reviewOf = (session, segment) => {
@@ -373,8 +349,6 @@ export function signBlockers(doc, session, config = null) {
   if (todo.length > 0) blockers.push(`还有 ${todo.length} 条没做完（${todo.map((one) => one.id).join("、")}）`);
   if (undelivered.length > 0)
     blockers.push(`还有 ${undelivered.length} 条已交付但没判（${undelivered.map((one) => one.id).join("、")}）`);
-  const asks = pendingAsks(session);
-  if (asks.length > 0) blockers.push(`还有 ${asks.length} 条待裁（${asks.map((one) => one.id).join("、")}）`);
   const liveTopics = (session.topics ?? []).filter((one) => one.state !== "released");
   if (liveTopics.length > 0)
     blockers.push(`还有 ${liveTopics.length} 个议题等你确认（${liveTopics.map((one) => one.id + (one.state === "draft" ? "成立" : "出口")).join("、")}）`);
@@ -479,8 +453,7 @@ export function nextAction(doc, config) {
       text: `议题 ${released.id} · ${released.title} 已锁定出口：把它拆成清单里的任务（deed plan），拆完在正文里记下出口的任务号`,
       command: "deed plan",
     };
-  // 段里正在等结论时，这一步排在待裁前面：清单不发出去这一段的活就走不动，
-  // 而待裁是一句话的事——它一直在，不会因为没人裁而消失。
+  // 段里正在等结论时，清单不发出去这一段的活就走不动。
   const frozenStep = (() => {
     const open = openSegment(session);
     if (!open || open.closedAt !== null) return null;
@@ -494,18 +467,7 @@ export function nextAction(doc, config) {
       command: `deed review --segment ${open.id} --by "${handOf(session, open.id) ?? "你是谁"}" --verdict pass --result T1=met`,
     };
   })();
-  const asks = pendingAsks(session);
   if (session.segments.length === 0) {
-    if (asks.length > 0) {
-      const ask = asks[0];
-      return {
-        who: "user",
-        what: "裁定",
-        text: `${ask.id} · ${ask.text}（我理解成：${ask.reading}）`,
-        command: `deed ask resolve ${ask.id} --decision "…"`,
-      };
-    }
-
     return {
       who: "agent",
       what: "开段",
@@ -683,16 +645,6 @@ export function nextAction(doc, config) {
   }
   // 走到这里只剩一种：审查设置说这一段不用审，而它还没封。免审就是不用审，所以不再
   // 叫一个人去签发假结论——由交付的人写清凭什么不审，签收时这一段会被列出来。
-  // 段里能动的都轮完了，才轮到待裁：一句话的事不该挡住今天该交的那一步。
-  if (asks.length > 0) {
-    const ask = asks[0];
-    return {
-      who: "user",
-      what: "裁定",
-      text: `${ask.id} · ${ask.text}（我理解成：${ask.reading}）`,
-      command: `deed ask resolve ${ask.id} --decision "…"`,
-    };
-  }
   return {
     who: "agent",
     what: "封存",

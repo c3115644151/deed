@@ -8,13 +8,11 @@ import {
   byOrder,
   groupsOf,
   countIn,
-  edges,
   currentSession,
   goalOf,
   needsReview,
   nextAction,
   openSegment,
-  pendingAsks,
   periodReviewOf,
   reading,
   reviewOf,
@@ -181,75 +179,29 @@ function discussScreen(session, zone, on) {
       "</li>"
     );
   }).join("");
-  const asks = session ? (session.asks ?? []) : [];
-  const open = asks.filter((one) => one.state === "pending");
-  const settled = asks.filter((one) => one.state !== "pending");
   const row = (turn) =>
     '<li class="turn ' + turn.who + '">' +
     '<span class="tclock">' + when(turn.at, zone) + "</span>" +
     '<span class="twho">' + (turn.who === "user" ? "你" : "agent") + "</span>" +
     '<p class="tsaid">' + esc(turn.said) + "</p>" +
     "</li>";
-  // 这一屏的主轴是轮次：谁在什么时候说了什么。题在右边，是还没发出去的档案——
-  // 它不占主轴，只在窗口里自己攒你说的线索，攒到你说清为止。
-  const clues = (ask) => {
-    const from = Date.parse(ask.at);
-    const to = ask.closedAt ? Date.parse(ask.closedAt) : Infinity;
-    return turns.filter((turn) => {
-      const at = Date.parse(turn.at);
-      return turn.who === "user" && at >= from && at <= to;
-    });
-  };
-  const WORD = { pending: "等你定", resolved: "已裁", withdrawn: "已撤" };
-  const card = (ask) => {
-    const got = clues(ask);
-    return (
-      '<li class="qa" data-state="' + esc(ask.state) + '">' +
-      '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
-      '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span>" +
-      '<span class="qmeta">' + when(ask.at, zone) + (got.length ? " · 攒到 " + got.length + " 句" : "") + "</span></div>" +
-      '<p class="atext">' + esc(ask.text) + "</p>" +
-      (got.length
-        ? '<ol class="clues">' + [...got].reverse().map((turn) =>
-            '<li class="clue"><span class="cclock">' + when(turn.at, zone) + "</span>" + esc(turn.said) + "</li>",
-          ).join("") + "</ol>"
-        : "") +
-      (ask.state === "resolved"
-        ? '<p class="qdone">' + esc((ask.decision ?? "").split("\n").filter((one) => one.trim() && !/^(边界|弃)\s*[:：]/u.test(one))[0] ?? "") + "</p>"
-        : ask.state === "withdrawn"
-          ? '<p class="qdone quiet">撤 · ' + esc(ask.why2 ?? "") + "</p>"
-          : '<p class="areading"><span class="k">当成</span>' + esc(ask.reading) + "</p>" + cmd('deed ask resolve ' + ask.id + ' --decision "…"')) +
-      '<p class="qfoot">' + esc(ask.by ?? "") + (ask.closedAt ? " · " + when(ask.closedAt, zone) : "") + "</p>" +
-      "</li>"
-    );
-  };
+  const live = topics.filter((one) => one.state !== "released").length;
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="discuss" id="screen-discuss">' +
-    screenHead("01", "讨论", "你说的每一句，和还没定下的那些", turns.filter((one) => one.who === "user").length + " 轮 · " + open.length + " 条等你定") +
+    screenHead("01", "讨论", "你说的每一句、留下的要点、长出来的议题", turns.filter((one) => one.who === "user").length + " 轮 · " + livePoints.length + " 条要点 · " + live + " 个议题") +
     '<div class="cols">' +
     '<div class="col logs">' +
-    // 最新的在最上面：往下翻只会离现在更远。轮次、题、段、卡片都按这一条印。
     (turns.length ? '<ol class="turns">' + [...turns].reverse().map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
     "</div>" +
     '<aside class="side">' +
     '<h3 class="colh">灵感清单 · 要点</h3>' +
     (livePoints.length
       ? '<ul class="qlist">' + [...livePoints].reverse().map((p) =>
-          '<li class="clue"><span class="aid">' + esc(p.id) + "</span> " + esc(p.text) + (p.topic ? " · " + esc(p.topic) : "") + "</li>",
+          '<li class="clue"><span class="aid">' + esc(p.id) + "</span> " + esc(p.text) + "</li>",
         ).join("") + "</ul>"
-      : '<p class="quiet">没有还没收编的要点</p>') +
+      : '<p class="quiet">没有还散着的要点</p>') +
     '<h3 class="colh">核心议题</h3>' +
     (topicRows ? '<ol class="qlist">' + topicRows + "</ol>" : '<p class="quiet">还没有议题</p>') +
-    '<h3 class="colh">等你定</h3>' +
-    (open.length ? '<ol class="qlist">' + [...open].reverse().map(card).join("") + "</ol>" : '<p class="quiet">没有等你的题</p>') +
-    (settled.length
-      ? '<h3 class="colh">已经定下的</h3><ul class="qlist">' + [...settled].reverse().map((ask) =>
-          '<li class="qa quiet" data-state="' + esc(ask.state) + '">' +
-          '<div class="qhead"><span class="aid">' + esc(ask.id) + "</span>" +
-          '<span class="qstate">' + (WORD[ask.state] ?? ask.state) + "</span></div>" +
-          '<p class="qdone">' + esc((ask.decision ?? ask.text ?? "").split("\n")[0]) + "</p></li>",
-        ).join("") + "</ul>"
-      : "") +
     "</aside>" +
     "</div></section>"
   );
@@ -413,7 +365,6 @@ function check(ok, label, why) {
 function acceptScreen(doc, session, config, zone, on) {
   const segments = session ? session.segments : [];
   const tasks = session ? session.tasks : [];
-  const asks = session ? pendingAsks(session) : [];
   const blocks = signBlockers(doc, session, config);
   const taking = segments.find((one) => one.closedAt === null) ?? null;
   const unreviewed = segments.filter((segment) => segment.verdict === "exempt");
@@ -473,7 +424,6 @@ function acceptScreen(doc, session, config, zone, on) {
     : "";
   const signed = session && session.sign;
   const goal = session ? goalOf(session) : null;
-  const settled = session ? edges(session) : [];
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="accept" id="screen-accept">' +
     screenHead("03", "验收", "判过什么、谁判的、还差谁一句话", sealed.length + " 段判过") +
@@ -481,19 +431,12 @@ function acceptScreen(doc, session, config, zone, on) {
     '<div class="cols">' +
     '<div class="col">' +
     '<h3 class="colh">结论</h3>' + (periodCard || "") + (cards || '<p class="quiet">还没有审查结论</p>') +
-    (settled.length
-      ? '<h3 class="colh">定过的边界与不做</h3><ul class="edges">' +
-        settled.map((one) => '<li class="edge"><span class="ekind">' + (one.kind === "border" ? "边界" : "弃") + "</span>" + esc(one.text) +
-          '<span class="ewho">' + esc(one.id) + (one.by ? " · " + esc(one.by) : "") + "</span></li>").join("") +
-        "</ul>"
-      : "") +
     "</div>" +
     '<aside class="col side">' +
     '<h3 class="colh">签收</h3>' +
     '<ul class="checks">' +
     check(sealed.length === segments.length, "每一段都有结局", segments.length - sealed.length ? "还有 " + (segments.length - sealed.length) + " 段没有结局（等判决或免审封存）" : "") +
     check(todo === 0, "没有未做的条目", todo ? "还有 " + todo + " 条" : "") +
-    check(asks.length === 0, "没有等裁定的问题", asks.length ? "还有 " + asks.length + " 条待裁（" + asks.map((one) => one.id).join("、") + "）" : "") +
     check(blocks.length === 0, "没有挡住的项", blocks.length ? blocks.length + " 条，见下" : "") +
     "</ul>" +
     (signed
@@ -746,7 +689,7 @@ html[data-theme="light"] body {
 .tsaid { margin: 0; font-size: 14.5px; line-height: 1.55; overflow-wrap: anywhere; }
 .turn.first .tsaid { font-size: 15.5px; }
 
-/* ------------------------------------------------------------------ asks */
+/* ------------------------------------------------------------------ qa cards */
 .ask { border: 1px solid color-mix(in srgb, var(--warn) 32%, var(--line2)); background: color-mix(in srgb, var(--warn) 5%, var(--panel)); padding: 11px 13px; margin-bottom: 12px; }
 .ahead { display: flex; align-items: baseline; gap: 10px; }
 .aid { font-family: var(--mono); font-size: 11px; color: var(--warn); letter-spacing: .16em; }

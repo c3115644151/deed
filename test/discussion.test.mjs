@@ -12,7 +12,7 @@ import { workspace } from "../support/lib.mjs";
 const T = (n) => new Date(Date.UTC(2026, 10, 27, 10, n)).toISOString();
 const V = EVENT_VERSION;
 const turn = (n, said) => ({ v: 1, at: T(n), k: "turn", s: null, who: "user", said });
-const point = (n, id, text, topic = null) => ({ v: V, at: T(n), k: "point.add", s: null, id, text, topic, by: "agent:claude" });
+const point = (n, id, text, topic = null, replaces = null) => ({ v: V, at: T(n), k: "point.add", s: null, id, text, topic, ...(replaces ? { replaces } : {}) });
 const create = (n, id, title, points, body, replaces) => ({ v: V, at: T(n), k: "topic.create", s: null, id, title, points, body, by: "agent:claude", ...(replaces ? { replaces } : {}) });
 const establish = (n, id) => ({ v: V, at: T(n), k: "topic.establish", s: null, id, body: "成文", points: [], by: "user", via: "panel" });
 const release = (n, id) => ({ v: V, at: T(n), k: "topic.release", s: null, id, by: "user", via: "panel" });
@@ -40,14 +40,36 @@ test("a topic needs both confirmations, in order, and cannot take the same point
   assert.equal(fold([...head, establish(4, "I1")]).sessions[0].topics[0].state, "established");
 });
 
-test("a draft can be revised before establishment, but not after", () => {
+test("正文在出口前都能改，锁定之后冻住", () => {
   const events = [turn(1, "聊"), point(2, "P1", "一句"),
     create(3, "I1", "题", ["P1"], "第一版"),
     create(4, "I1", "题", ["P1"], "第二版", "I1")];
   const s = fold(events).sessions[0];
   assert.equal(s.topics.length, 1, "同一议题只留最新那份草稿");
   assert.equal(s.topics[0].body, "第二版");
-  assert.throws(() => fold([...events, establish(5, "I1"), create(6, "I1", "题", ["P1"], "第三版", "I1")]), /正文不往回改/);
+  // 成立到出口之间仍是讨论期：改正文保留 established 状态。
+  const mid = fold([...events, establish(5, "I1"), create(6, "I1", "题", ["P1"], "第三版", "I1")]);
+  assert.equal(mid.sessions[0].topics[0].state, "established");
+  assert.equal(mid.sessions[0].topics[0].body, "第三版");
+  assert.equal(mid.sessions[0].topics[0].establishedAt, T(5), "成立时刻不被改写");
+  // 锁定出口之后正文冻住。
+  assert.throws(
+    () => fold([...events, establish(5, "I1"), release(6, "I1"), create(7, "I1", "题", ["P1"], "第四版", "I1")]),
+    /锁定出口：正文不往回改/,
+  );
+});
+
+test("要点同 id 再记一条是更新；已收编的不能改", () => {
+  const head = [turn(1, "聊"), point(2, "P1", "旧内容")];
+  const updated = fold([...head, point(3, "P1", "新内容", null, "P1")]);
+  assert.equal(updated.sessions[0].points.length, 1, "界面只留最新那条");
+  assert.equal(updated.sessions[0].points[0].text, "新内容");
+  const withTopic = fold([...head, create(3, "I1", "题", ["P1"], "正文"), establish(4, "I1")]);
+  assert.equal(withTopic.sessions[0].points[0].absorbedBy, "I1");
+  assert.throws(
+    () => fold([...withTopic.sessions[0] && [...head, create(3, "I1", "题", ["P1"], "正文"), establish(4, "I1"), point(5, "P1", "改", null, "P1")]]),
+    /已经被 I1 收编/,
+  );
 });
 
 test("an unconfirmed topic blocks signing and drives the next step; a released one can be exported", () => {

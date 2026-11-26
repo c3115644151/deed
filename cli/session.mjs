@@ -15,7 +15,7 @@ import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.m
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { projectState } from "../core/checks.mjs";
 import { treeOf } from "../lib/tree.mjs";
-import { edges, countIn, currentSession, debt, goalOf, nextAction, openSegment, pendingAsks, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
+import { countIn, currentSession, debt, goalOf, nextAction, openSegment, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
 import { stamp0 } from "../lib/format.mjs";
@@ -374,13 +374,9 @@ export function printState() {
         for (const one of review.findings) console.log("      发现 · " + one);
       }
     }
-    for (const ask of pendingAsks(open)) console.log("  待裁 " + ask.id + " · " + ask.text);
     const owed = debt(open);
     if (owed.deferred.length + owed.dropped.length > 0)
       console.log("  还没结 · 延后 " + show(owed.deferred) + " · 放弃 " + show(owed.dropped));
-    const settled = edges(open);
-    for (const one of settled)
-      console.log("  " + (one.kind === "border" ? "边界" : "弃") + " · " + one.text + "（" + one.id + (one.by ? " · " + one.by : "") + "）");
     const blockers = signBlockers(doc, open, config);
     console.log("  签收 " + (blockers.length === 0 ? "可行" : "差：" + blockers.join("；")));
     const watch = pressure(open);

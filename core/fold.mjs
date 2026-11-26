@@ -475,21 +475,26 @@ export function fold(events) {
       case "point.add": {
         const session = sessionOf(doc, ev);
         if (!/^P\d+$/u.test(String(ev.id))) noway(`要点号要写成 P1：${ev.id}`);
-        const source = ev.replaces ? session.topics.find((one) => one.id === ev.replaces) : null;
-        if (ev.replaces && !source) noway(`账本里没有议题 ${ev.replaces}：补正文要点名那份草稿`);
-        if (source) session.points = session.points.filter((one) => one !== source);
-        else if (taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了`);
+        // 更新同一个要点：同一个 id 再落一行，旧行留在账本里，重放只留最新那句。
+        const source = ev.replaces ? session.points.find((one) => one.id === ev.replaces) : null;
+        if (ev.replaces && !source) noway(`账本里没有要点 ${ev.replaces}：改要点要点名已有的那一条`);
+        if (source) {
+          if (source.absorbedBy) noway(`要点 ${source.id} 已经被 ${source.absorbedBy} 收编：它是议题的历史来源，改要开新议题`);
+          session.points = session.points.filter((one) => one !== source);
+          for (const t of session.topics) t.points = t.points.filter((one) => one !== source.id);
+        } else if (taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了：改内容用同一个 id 再记一条（deed point ${ev.id} "…"）`);
         session.ids.add(ev.id);
+        const wanted = ev.topic ?? source?.topic ?? null;
         let topic = null;
-        if (ev.topic) {
-          topic = session.topics.find((one) => one.id === ev.topic);
-          if (!topic) noway(`账本里没有议题 ${ev.topic}：要点挂不上`);
-          if (topic.state !== "draft") noway(`议题 ${topic.id} 已经成立：新要点挂在它上面要开新议题`);
-          if (topic.points.includes(ev.id)) noway(`要点 ${ev.id} 已经在议题 ${topic.id} 里了`);
+        if (wanted) {
+          topic = session.topics.find((one) => one.id === wanted);
+          if (!topic) noway(`账本里没有议题 ${wanted}：要点挂不上`);
+          if (topic.state === "released") noway(`议题 ${topic.id} 已经锁定出口：新要点挂在它上面要开新议题`);
         }
+        const absorbedBy = topic && topic.state === "established" ? topic.id : null;
         session.points.push({
-          id: ev.id, text: ev.text, at: ev.at, by: ev.by ?? null,
-          topic: topic ? topic.id : null, absorbedBy: null,
+          id: ev.id, text: ev.text, at: ev.at,
+          topic: topic ? topic.id : null, absorbedBy,
         });
         if (topic) topic.points.push(ev.id);
         break;
@@ -498,8 +503,8 @@ export function fold(events) {
       case "topic.create": {
         const session = sessionOf(doc, ev);
         const source = ev.replaces ? session.topics.find((one) => one.id === ev.replaces) : null;
-        if (ev.replaces && !source) noway(`账本里没有议题 ${ev.replaces}：补正文要点名那份草稿`);
-        if (source && source.state !== "draft") noway(`议题 ${source.id} 已经${source.state === "established" ? "成立" : "锁定"}：正文不往回改`);
+        if (ev.replaces && !source) noway(`账本里没有议题 ${ev.replaces}：改正文要点名已有的议题`);
+        if (source && source.state === "released") noway(`议题 ${source.id} 已经锁定出口：正文不往回改`);
         if (!source && taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了`);
         if (!/^I\d+$/u.test(String(ev.id))) noway(`议题号要写成 I1：${ev.id}`);
         session.ids.add(ev.id);
@@ -508,13 +513,21 @@ export function fold(events) {
         for (const id of listed) {
           const point = session.points.find((one) => one.id === id);
           if (!point) noway(`账本里没有要点 ${id}：议题不能统合不存在的句子`);
-          if (point.absorbedBy) noway(`要点 ${id} 已经被 ${point.absorbedBy} 收编：同一句不能统合两次`);
+          if (point.absorbedBy && point.absorbedBy !== ev.id) noway(`要点 ${id} 已经被 ${point.absorbedBy} 收编：同一句不能统合两次`);
         }
+        // 成立到出口之间仍在讨论：改正文保留已成立的状态，不把它打回草稿。
         session.topics.push({
           id: ev.id, title: ev.title, body: ev.body ?? "", at: ev.at, by: ev.by ?? null,
-          state: "draft", points: [...listed], establishedAt: null, establishedBy: null,
+          state: source?.state ?? "draft", points: [...listed],
+          establishedAt: source?.establishedAt ?? null, establishedBy: source?.establishedBy ?? null,
           releasedAt: null, releasedBy: null,
         });
+        // 已成立的议题：新收编进来的要点直接算它的历史来源，不再散在活跃清单。
+        if (source?.state === "established")
+          for (const id of listed) {
+            const point = session.points.find((one) => one.id === id);
+            if (point) point.absorbedBy = ev.id;
+          }
         break;
       }
       case "topic.establish": {
@@ -961,7 +974,6 @@ export function fold(events) {
         if (ev.k === "sign") {
           const left = session.tasks.filter((one) => one.status === "todo" || one.status === "done");
           if (left.length > 0) noway(`还有没结清的：${left.map((one) => `${one.id} ${one.status}`).join("、")}`);
-          if (session.asks.some((one) => one.state === "pending")) noway("还有没处置的待裁项");
           session.title = ev.title;
           session.words = ev.words;
           session.closeKind = "signed";

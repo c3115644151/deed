@@ -20,7 +20,6 @@ const events = [
   { v: 1, at: T(4), k: "judge.pass", s: null, segment: "S01.1", by: "user" },
   { v: 1, at: T(5), k: "task.add", s: null, id: "T2", title: "服务", criteria: "SSE", files: ["core/serve.mjs"] },
   { v: 1, at: T(6), k: "task.done", s: null, id: "T2", evidence: "curl 200", by: "agent" },
-  { v: 1, at: T(7), k: "ask.raise", s: null, id: "A1", text: "要不要兼容旧账", reading: "不兼容", why: "没定" },
 ];
 
 // The threshold is folded out of the ledger, so a serving fixture states it
@@ -52,7 +51,6 @@ test("the sheet shows the period, both segments and both verdicts", () => {
   assert.match(html, /判过/);
   assert.match(html, /要审/);
   assert.match(html, /S01\.2[\s\S]{0,4000}这一段碰了要审的路径：core\/serve\.mjs/, "第二段碰了要审的路径，页面上要明说哪一条");
-  assert.match(html, /A1/);
 });
 
 test("the same ledger renders the same bytes, and no clock leaks in", () => {
@@ -60,8 +58,8 @@ test("the same ledger renders the same bytes, and no clock leaks in", () => {
   const second = render(fold(events));
   assert.equal(first, second);
   assert.doesNotMatch(first, /分钟前|小时前|刚刚/);
-  assert.match(first, /账本 <b>7<\/b> 条/, "报的是账本条数，不是轮次");
-  assert.notEqual(first, renderBoard(doc, config, { zone: "UTC", events: 7 }), "时区是显式参数，不是机器状态");
+  assert.match(first, /账本 <b>6<\/b> 条/, "报的是账本条数，不是轮次");
+  assert.notEqual(first, renderBoard(doc, config, { zone: "UTC", events: 6 }), "时区是显式参数，不是机器状态");
 });
 
 test("a conclusion older than the last delivery says so on the page", () => {
@@ -79,12 +77,11 @@ test("a conclusion older than the last delivery says so on the page", () => {
   assert.doesNotMatch(html, /undefined/);
 });
 
-// 待裁不劫持「下一步」：段里还有该做的事时，页面说的是那一步；待裁照旧列出来。
+// 段里还有该做的事时，页面说的是那一步，不是别的。
 test("the page names the next actor instead of listing everything", () => {
   const html = render();
   assert.match(html, /下一步 · agent/);
-  assert.match(html, /记下文件/, "T2 的交付没记下文件：那是该先做的一步，不是待裁");
-  assert.match(html, /A1/, "待裁不因为轮不上就消失");
+  assert.match(html, /记下文件/, "T2 的交付没记下文件：那是该先做的一步");
 });
 
 test("serving is read-only and says so", async () => {
@@ -108,10 +105,9 @@ test("serving is read-only and says so", async () => {
     const state = JSON.parse((await get(port, "/state")).body);
     assert.equal(state.reading, "execute");
     assert.equal(state.events, ledger + configEvents.length, "报的是账本条数，不是轮次");
-    assert.deepEqual(state.next.who, "agent", "段里还有该做的事：下一步是段内那一步，不是待裁");
+    assert.deepEqual(state.next.who, "agent", "段里还有该做的事：下一步是段内那一步");
     assert.equal(state.turns, 1);
     assert.equal(state.session.segment.id, "S01.2");
-    assert.deepEqual(state.session.asks, ["A1"]);
     assert.equal((await get(port, "/nope")).status, 404);
     const posted = await new Promise((resolve) => {
       const req = http.request({ host: "127.0.0.1", port, method: "POST", path: "/" }, (res) => resolve(res.statusCode));
@@ -260,33 +256,6 @@ test("a port somebody else already holds does not take the panel down with it", 
   }
 });
 
-test("the turns are the axis, and a question collects the words that came in while it was open", () => {
-  // 讨论屏的主轴是轮次：谁在什么时候说了什么。题在右边，是还没发出去的档案——
-  // 它只在自己的窗口里攒用户说的话，不复制主轴上的轮次。
-  const events = [
-    ...configEvents,
-    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先说两句" },
-    { v: 1, at: T(2), k: "ask.raise", s: null, id: "A1", text: "第一个问题", reading: "当成这样", why: "得你定" },
-    { v: 1, at: T(3), k: "turn", s: null, who: "user", said: "第一个问题接着问" },
-    { v: 1, at: T(4), k: "ask.raise", s: null, id: "A2", text: "第二个问题", reading: "当成那样", why: "也得你定" },
-    { v: 1, at: T(5), k: "turn", s: null, who: "user", said: "两个都谈谈" },
-    { v: 1, at: T(6), k: "ask.resolve", s: null, id: "A1", decision: "按第一个办\n边界：不许再问一遍", by: "user", why: "就这么定" },
-    { v: 1, at: T(7), k: "turn", s: null, who: "agent", said: "记下了" },
-  ];
-  const html = renderBoard(fold(events), config, { zone, events: 7 });
-  const main = html.slice(html.indexOf('<div class="col logs">'), html.indexOf('<aside class="side">'));
-  assert.equal((main.match(/class="turn /gu) ?? []).length, 4, "四条轮次都摊在主轴上，一条不折");
-  assert.match(main, /先说两句/, "没成题的轮次也在主轴上，不用先成题才能出现");
-  assert.match(html, /data-state="pending"[\s\S]{0,400}A2/, "还开着的题标成等你定");
-  assert.match(html, /deed ask resolve A2/, "等它定的时候给出那条命令");
-  assert.match(html, /class="clues"[\s\S]{0,400}两个都谈谈/, "开着的题把窗口里你说的话攒在自己名下");
-  assert.match(html, /攒到 1 句/, "题头说清它攒到了几句");
-  assert.match(html, /class="qdone">按第一个办</, "卡里的结论只留当场那句话，边界行另算");
-  assert.match(html, /已经定下的[\s\S]{0,400}A1/, "裁过的题收进右边那组，不占主轴");
-  assert.ok(html.indexOf("两个都谈谈") < html.indexOf('<aside class="side">'), "主轴在前，题在后");
-});
-
-// 三块屏都从新往旧排：往下翻只会离现在更远。
 test("every list on the page runs newest first", () => {
   const html = render();
   const turns = [...html.matchAll(/<p class="tsaid">([^<]*)<\/p>/g)].map((m) => m[1]);
@@ -306,24 +275,6 @@ test("every list on the page runs newest first", () => {
   assert.deepEqual(said, ["后说的话", "先说的话"], "最新的那轮在最上面");
 });
 
-test("the accept screen lists the borders a decision drew", () => {
-  // 签收前要看得见这一期定过哪些不许做的事；它不是任务，所以不在执行屏上。
-  const events = [
-    ...configEvents,
-    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先做重放" },
-    { v: 1, at: T(2), k: "ask.raise", s: null, id: "A1", text: "文档要不要一起改", reading: "只改代码", why: "两种都说得通" },
-    { v: 1, at: T(3), k: "ask.resolve", s: null, id: "A1", by: "user", why: "先这样", decision: "只改代码\n边界：文档里不再新增旧词\n弃：导出不做了" },
-  ];
-  const html = renderBoard(fold(events), config, { zone, events: 3 });
-  assert.match(html, /定过的边界与不做/);
-  assert.match(html, /文档里不再新增旧词/);
-  assert.match(html, /导出不做了/);
-  assert.match(html, /<span class="ekind">边界</);
-  assert.match(html, /<span class="ekind">弃</);
-});
-
-// 面板只多收一个写入口：/gate。签收就是从这里落的——命令行那条路已经关了，
-// 账本上要读得出是谁在页面上按的那一下。
 test("the one write the panel accepts is a gate, and signing happens there", async () => {
   const root = workspace("gate-panel");
   const run = (...args) =>

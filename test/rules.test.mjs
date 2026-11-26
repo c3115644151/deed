@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
   byOrder,
-  edges,
   needsReview,
   nextAction,
   reading,
@@ -30,7 +29,6 @@ const add = (n, id, files = []) => ({ v: 1, at: T(n), k: "task.add", s: null, id
 const done = (n, id, path = "core/fold.mjs") => ({ v: 1, at: T(n), k: "task.done", s: null, id, evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: path, changed: [], bytes: { [path]: 100 } });
 const pass = (n, segment = "S01.1") => ({ v: 1, at: T(n), k: "judge.pass", s: null, segment, by: "user" });
 const verdict = (n, v, segment = "S01.1") => ({ v: 1, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: v, brief: "b.md" });
-const ask = (n) => ({ v: 1, at: T(n), k: "ask.raise", s: null, id: "A1", text: "要兼容旧账吗", reading: "不兼容", why: "不确定" });
 const goal = (n, text = "把这一期收干净") => ({ v: 1, at: T(n), k: "goal.set", s: null, text, by: "user" });
 // 现在的结论自己关闭这一段（事件含义第 3 版起）；老账本里的结论只算一句判断。
 const sealed = (n, segment = "S01.1") => ({ v: 5, at: T(n), k: "review.log", s: null, segment, by: "qa", verdict: "pass", brief: "b.md", findings: [] });
@@ -130,13 +128,11 @@ test("the step it names is a command that carries its own name", () => {
   assert.match(step.command, /--by /u);
 });
 
-test("signing waits for the judgement and for every open question", () => {
+test("signing waits for the judgement and the period review", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
   assert.deepEqual(signBlockers(delivered, delivered.sessions[0], config), [
     "S01.1 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
   ]);
-  const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4), ask(5)]);
-  assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）", PERIOD_OWED]);
   const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4)]);
   assert.deepEqual(signBlockers(clean, clean.sessions[0], config), [PERIOD_OWED], "段判过了也还差期审");
   const judged = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4), ...periodPass(6)]);
@@ -215,9 +211,6 @@ test("the period judgement asks a different question, not a second pass over the
 test("the next step names one actor and one action", () => {
   assert.equal(nextAction(fold([]), config).who, "agent");
   assert.equal(nextAction(fold([turn(1)]), config).what, "开段");
-  const asked = fold([turn(1), ask(2)]);
-  assert.equal(nextAction(asked, config).who, "user");
-  assert.match(nextAction(asked, config).command, /ask resolve A1/);
   const todo = fold([turn(1), add(2, "T1", ["docs/a.md"])]);
   assert.equal(nextAction(todo, config).who, "agent");
   assert.match(nextAction(todo, config).text, /T1/);
@@ -376,26 +369,6 @@ test("an old period verdict is history: the segment it named reopens, nothing el
 });
 
 
-
-test("a decision can carry a border and an abandoned thing, and both are read off the words", () => {
-  // 结论块不另立事件、不加字段：这两个行是从那句裁定里读出来的，
-  // 所以同一句话里的其它内容不会被误当边界。
-  const doc = fold([
-    turn(1),
-    ask(2),
-    { v: 1, at: T(3), k: "ask.raise", s: null, id: "A2", text: "还没定的一条", reading: "x", why: "y" },
-    {
-      v: 1, at: T(4), k: "ask.resolve", s: null, id: "A1", by: "user", why: "就这么定",
-      decision: "按第一种读法办\n边界：文档里不再写「黑话」这个词\n边界: 半角冒号也认\n弃：那套导出格式不做了\n补充一句不是边界的话",
-    },
-  ]);
-  const got = edges(doc.sessions[0]);
-  assert.deepEqual(got.map((one) => one.kind), ["border", "border", "abandon"], "两行边界、一件不做；开着的题不参与");
-  assert.deepEqual(got.map((one) => one.text), ["文档里不再写「黑话」这个词", "半角冒号也认", "那套导出格式不做了"]);
-  assert.equal(got[0].id, "A1");
-  assert.equal(fold([turn(1), ask(2)]).sessions[0].asks.length, 1);
-  assert.deepEqual(edges(fold([turn(1), ask(2)]).sessions[0]), [], "没裁过的题没有结论可读");
-});
 
 // 清单、state 与面板印的是同一个顺序：先按 先后，没写的排后面。
 test("tasks are read in the order they were given, and the ones without one come after", () => {

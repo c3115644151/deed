@@ -19,9 +19,10 @@ export const SPEC = {
     ],
   },
   point: {
-    flags: ["id", "topic", "session", "by"],
+    flags: ["id", "topic", "session"],
     usage: [
       'deed point "这一轮留下的一句话" [--topic I1]   记一条要点：没有状态，写下来就在；可挂议题，也可散着',
+      'deed point P1 "改过的话"               同一个 id 再记一条就是更新：旧行留账本，界面只显示最新那句',
       "                 原文由系统记（现在是 say，将来宿主 hook 注入）；这里只写值得留下的判断",
     ],
   },
@@ -43,14 +44,6 @@ export const SPEC = {
       '                 要让数由工具采、话被真跑一遍，用 deed submit --run "<命令>"',
       'deed task undo <T1> --why "…"         收回最后那条交付（说错了话用它，别改写成对的）',
       'deed task defer|drop <T1> --why "…"',
-    ],
-  },
-  ask: {
-    flags: ["reading", "decision", "why", "session", "by", "id"],
-    usage: [
-      'deed ask "<问题>" --reading "我理解成…"   记下一道待裁：说不确定的那句话就是 reading',
-      'deed ask answer <A1> --decision "…" --by "谁"   只有人裁：从管道里跑要写清谁按的',
-      'deed ask drop <A1> --why "…" --by "谁"         这道待裁不做了，说清为什么',
     ],
   },
   plan: {
@@ -119,7 +112,7 @@ export const SPEC = {
 // 命令按三种状态分组：讨论把不确定说清，执行把说清的做出来，验收判它过没过。
 // 管理面是与状态无关的手（装、看、声明、起面板）。帮助与 ORDER 都从这一处出。
 export const GROUPS = [
-  { title: "讨论 · 把不确定说清", verbs: ["say", "point", "topic", "ask"] },
+  { title: "讨论 · 把讨论说清", verbs: ["say", "point", "topic"] },
   { title: "执行 · 把说清的做出来", verbs: ["plan", "submit", "task"] },
   { title: "验收 · 判它过没过", verbs: ["review", "sign", "check"] },
   { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "serve", "panel"] },

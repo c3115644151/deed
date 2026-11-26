@@ -33,8 +33,8 @@ test("AGENTS.md carries the same block, so the paste does not drift on one side"
 // The lexicon is one table in DESIGN 1.1. A word that stops being used there but
 // stays in prose teaches the next reader two vocabularies; this test is what
 // keeps "we renamed it" true after the grep that found it is forgotten.
-// 往里加一个词要同时做两件事：把它在仓里的每一处换成正式说法，以及在 HANDOFF.md 的
-// 「用词对照表」那一块写一行「旧词 → 换成什么」。只做前一件，下一个读的人只学到一个新词。
+// 往里加一个词要同时做两件事：把它在仓里的每一处换成正式说法，并在这里的
+// 「用词对照表」保留区写一行「旧词 → 换成什么」。只做前一件，下一个人只学到一个新词。
 const RETIRED = ["承诺", "判据", "折叠", "任务书", "白纸", "物料", "三态", "读数", "钉住", "证据", "事实账本", "出纸", "门槛", "收口", "欠账", "落账", "钉子", "封段", "搬"];
 const SKIP_DIRS = new Set(["node_modules", ".git", ".deed", ".deed-test", ".tmp", ".shots", ".archify", ".idea", ".vscode", "examples"]);
 
@@ -49,9 +49,8 @@ function prose(root, found = []) {
   return found;
 }
 
-// HANDOFF keeps the comparison table on purpose: it lists the words that were
-// replaced, so the words appear there. The markers make that region the only
-// place a retired word is allowed to stand.
+// 用词对照表故意保留被换掉的词，所以那里是 retired 词唯一允许出现的地方。
+// 标记圈出那一段，别处出现就是两份词表并存。
 const dropTable = (text) => text.replace(/<!-- 用词对照表[\s\S]*?<!-- \/用词对照表 -->/g, "");
 
 // 「材料」是一句日常话（过程材料），也是一个被换掉的绰号。数它出现几次靠人眼，
