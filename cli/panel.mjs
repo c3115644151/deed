@@ -3,18 +3,20 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { answers, buildNow, clearPanel, readPanel } from "../lib/panel.mjs";
+import { answers, buildNow, clearPanel, readPanel, recordPanel } from "../lib/panel.mjs";
 
 // 面板跟着命令走，不跟着开机走：这条系统不是开机就要用的，但你要用它的那一下
-// 页面应该在。所以每条命令先问一句"还活着吗"，不在就把它拉起来——后台起、
-// 不接管道、不占终端，命令该多快还是多快。
+// 页面应该在。所以每条命令先问一句"那一条页面是谁"，不在就把它拉起来。
+//
+// 一个工作区只有一个面板，一个面板只占一格端口。这条规矩以前不成立：号被占着就
+// 挨着往后试（+1、+2…），于是同一份账本同时开着两条页面，你看的是哪一条全靠记忆——
+// 屏幕上写着旧渲染，命令算的却是新的。现在只剩一条路：号被占着就问清是谁，
+// 是自己（旧代码/旧进程）就把它换掉，是别人就明说，绝不另开第二条。
 const here = path.dirname(fileURLToPath(import.meta.url));
 const entry = path.join(here, "deed.mjs");
 
 export const panelOff = () => process.env.DEED_NO_PANEL === "1";
 
-// 端口固定：给人一个能收藏的地址。工作区各自的审查设置里写着它（config.board.port，
-// 默认 7317）；被别的程序占了，serve 会退回系统给的号并在输出里说清。
 const portOf = (root) => {
   try {
     const one = JSON.parse(fs.readFileSync(path.join(root, ".deed", "config.json"), "utf8"));
@@ -25,27 +27,63 @@ const portOf = (root) => {
   }
 };
 
+// 问那一条页面：它是谁、手里是哪一版代码。问不到就是没人应答（不是"有面板"）。
+export async function askPanel(port, timeout = 600) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch("http://127.0.0.1:" + port + "/__deed", { signal: controller.signal });
+    if (res.ok) {
+      const one = await res.json();
+      return one && one.deed === true ? one : null;
+    }
+    // 更早一版的面板没有 /__deed 这个路口，只有一句固定的 404。这句话本身就是它的记号：
+    // 认出它是自己的旧面板，才谈得上"把它换掉"，而不是含糊地报一句"端口占用中"。
+    const why = await res.text();
+    if (/只收 \/gate|只有 \/ 、\/state、\/events/u.test(why))
+      return { deed: true, legacy: true, root: null, pid: null, port, build: null };
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function panelNow(root) {
-  const one = readPanel(root);
-  if (!one) return { running: false };
-  if (!(await answers(one.port))) return { running: false, stale: one };
-  // 代码换过之后，还活着的那个卖的还是旧渲染：报成"不在"，让上层的 ensure 换掉它。
-  if (one.build !== buildNow()) return { running: false, stale: one, outdated: true };
-  return { running: true, port: one.port, pid: one.pid };
+  const asked = portOf(root);
+  const who = await askPanel(asked);
+  if (!who) return { running: false, port: asked };
+  if (who.legacy === true) return { running: false, port: asked, stale: { pid: who.pid ?? null, port: asked }, legacy: true };
+  if (path.resolve(who.root) !== path.resolve(root))
+    return { running: false, port: asked, blocked: { port: asked, why: "端口上坐着另一个工作区的面板（" + who.root + "）" } };
+  if (who.build !== buildNow())
+    return { running: false, port: asked, stale: { pid: who.pid, port: asked }, outdated: true };
+  recordPanel(root, { pid: who.pid, port: asked, build: who.build });
+  return { running: true, port: asked, pid: who.pid };
 }
 
 const waitFor = async (root, ms) => {
   const until = Date.now() + ms;
   while (Date.now() < until) {
-    const one = readPanel(root);
-    if (one && (await answers(one.port))) return one;
-    await new Promise((step) => setTimeout(step, 60));
+    const now = await panelNow(root);
+    if (now.running) return now;
+    await new Promise((step) => setTimeout(step, 80));
   }
   return null;
 };
 
 // 「这个号现在能不能占」跟「这个号上有没有人应答」不是一回事：刚停掉的进程会把号
 // 留在 TIME_WAIT 里，connect 不上去，listen 还是 EADDRINUSE。判的是能不能占。
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const canBind = (port) =>
   new Promise((ok) => {
     const probe = net.createServer(() => {});
@@ -64,15 +102,9 @@ const holdFor = async (port, ms) => {
 
 export async function startPanel(root) {
   const asked = portOf(root);
-  // 声明的号空着就用它。空不出来（别人占着、或者刚落下的号还在 TIME_WAIT 里），
-  // 就守住这个工作区上一次实际在听的那一格：地址是给书签用的，重启不该换一条。
-  // 那一格也守不住时，serve 自己挨着往后试（+1、+2…），落点仍然是算得出来的。
-  let want = asked;
-  if (!(await holdFor(asked, 600))) {
-    const last = readPanel(root);
-    if (last?.port && (await canBind(last.port))) want = last.port;
-  }
-  const child = spawn(process.execPath, [entry, "serve", "--port", String(want)], {
+  // 只等这一格：等的是 TIME_WAIT，不是"换一格"。等不住就交给 serve 说清楚谁占着。
+  await holdFor(asked, 800);
+  const child = spawn(process.execPath, [entry, "serve", "--port", String(asked)], {
     cwd: root,
     detached: true,
     stdio: "ignore",
@@ -80,38 +112,72 @@ export async function startPanel(root) {
   });
   child.unref();
   const one = await waitFor(root, 3000);
-  if (!one) return { running: false };
-  // 面板是在一个不接管道的子进程里起的，它自己那句"端口被占着"只会掉进虚空：
-  // 端口退到哪儿这件事必须由拉它起来的这一头说，否则用户只看到一条无声换掉的地址。
-  return { running: true, port: one.port, pid: one.pid, started: true, asked, fellBack: one.port !== asked };
+  if (one) return { ...one, started: true };
+  // 起不来只有两种：号被别人占着，或者进程自己没站稳。两种都不许另开一条。
+  const who = await askPanel(asked);
+  const why = who?.legacy
+    ? "端口 " + asked + " 上是更早一版的面板（没有 /__deed），关不掉它"
+    : who
+      ? "端口上已经有面板（pid " + (who.pid ?? "?") + "），它不是这一份代码或不属于这个工作区，而且没能换掉"
+      : "端口 " + asked + " 占用中，拉不起新的面板";
+  return { running: false, port: asked, blocked: { port: asked, why } };
 }
 
-// 每条命令都过的这一句：在就不动（一次 socket 探测），不在就起，起不来就算了。
+// 每条命令都过的这一句：在就不动，不在就起，起不来就一句话说清谁占着。
 export async function ensurePanel(root) {
   if (panelOff()) return null;
   if (!fs.existsSync(path.join(root, ".deed", "config.json"))) return null;
   const now = await panelNow(root);
-  if (now.running) {
-    // 审查设置里写的那个号空出来了，而活着的这一个还停在当初退回的号上：换回去。
-    // 地址是用来收藏的，"退回的号"只是一次意外的落点，不该变成新的地址。
-    const asked = portOf(root);
-    if (now.port === asked || !(await canBind(asked))) return { ...now, started: false };
+  if (now.running) return { ...now, started: false };
+  if (now.blocked) return now;
+  // 自己那一格上坐着旧代码：先让位，再在原格上起来。让不开就不另开。
+  if (now.stale) {
     stopPanel(root);
-    return startPanel(root);
+    await holdFor(now.port, 800);
+    const after = await panelNow(root);
+    if (after.running) return { ...after, started: false };
+    if (after.blocked) return after;
+    if (after.stale)
+      return {
+        running: false,
+        port: now.port,
+        blocked: {
+          port: now.port,
+          why: "端口 " + now.port + " 上是更早一版的面板（没有 /__deed），它不在这个进程树里，关不掉——重启应用或手动结束它",
+        },
+      };
   }
-  // 旧的那个还占着端口：先让它把号让出来，否则新进程只能退到别的号去。
-  if (now.stale) stopPanel(root);
+  // 号上没人应答，但记号里还写着一个活着的 pid：那是这个工作区更早一版的面板
+  // （它没有 /__deed，问不出自己是谁）。先让它让位；让不动就说清楚是哪一个。
+  const old = readPanel(root);
+  if (old?.pid && alive(old.pid) && !(await canBind(now.port))) {
+    stopPanel(root);
+    await holdFor(now.port, 800);
+    if (!(await canBind(now.port)))
+      return {
+        running: false,
+        port: now.port,
+        blocked: {
+          port: now.port,
+          why: "端口上是旧面板（pid " + old.pid + "），它属于别的进程树，关不掉",
+        },
+      };
+  }
   return startPanel(root);
 }
 
 export function stopPanel(root) {
   const one = readPanel(root);
-  if (!one) return { stopped: false };
+  const port = one?.port ?? portOf(root);
+  if (!one) {
+    clearPanel(root, null);
+    return { stopped: false, port };
+  }
   try {
     process.kill(one.pid);
   } catch {
     // 已经退了：清掉记号就算停住。
   }
   clearPanel(root, one.pid);
-  return { stopped: true, pid: one.pid, port: one.port };
+  return { stopped: true, pid: one.pid, port };
 }

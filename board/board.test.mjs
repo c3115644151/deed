@@ -7,6 +7,7 @@ import { fold } from "../core/fold.mjs";
 import { append } from "../lib/store.mjs";
 import { renderBoard, when } from "../board/render.mjs";
 import { start } from "../board/serve.mjs";
+import { buildNow } from "../lib/panel.mjs";
 import { workspace } from "../support/lib.mjs";
 import { spawnSync } from "node:child_process";
 import { readEvents } from "../lib/store.mjs";
@@ -235,26 +236,53 @@ test("a broken ledger makes the panel say so instead of vanishing", async () => 
 
 
 
-test("a port somebody else already holds does not take the panel down with it", async () => {
-  // 面板的意义是"随时能看"：号被占了就换一个号继续开，并在页面上说清它开在哪。
+test("a port somebody else already holds is named, not routed around", async () => {
+  // 一个工作区只有一个面板：号被占着的时候不再换号（换号=同时两条页面）。
+  // serve 该做的是把这件事说出来，然后退出——路由到别的号就是把"看哪一条"变成记忆问题。
   const other = http.createServer((req, res) => res.end("not deed"));
   await new Promise((resolve) => other.listen(0, "127.0.0.1", resolve));
   const taken = other.address().port;
   const root = workspace("port-taken");
   fs.mkdirSync(path.join(root, ".deed"), { recursive: true });
-  const server = start(root, taken);
-  const actual = await new Promise((resolve) => {
+  let said = "";
+  const errors = [];
+  const quiet = (err) => errors.push(err);
+  process.on("uncaughtException", quiet);
+  const server = start(root, taken, (body) => {
+    said = body;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  process.off("uncaughtException", quiet);
+  try {
+    assert.match(said, /端口 \d+ 被占着，面板不再换号/, "占着就明说，不换号：" + said);
+    assert.match(said, /\/__deed/, "顺手给出确认它是谁的办法");
+    server.close();
+  } finally {
+    await new Promise((resolve) => other.close(resolve));
+  }
+});
+
+
+test("a panel answers who it is, so nothing has to guess", async () => {
+  const root = workspace("identity");
+  fs.mkdirSync(path.join(root, ".deed"), { recursive: true });
+  const server = start(root, 0);
+  const port = await new Promise((resolve) => {
     const see = () => (server.address()?.port ? resolve(server.address().port) : setTimeout(see, 10));
     see();
   });
   try {
-    assert.notEqual(actual, taken, "占了就换一个");
-    assert.ok(actual > 0);
+    const res = await fetch("http://127.0.0.1:" + port + "/__deed");
+    const who = await res.json();
+    assert.equal(who.deed, true, "这个号上是 deed 的面板");
+    assert.equal(path.resolve(who.root), path.resolve(root), "是这一份账本的面板，不是别的工作区的");
+    assert.equal(who.port, port, "它自己说得出自己在哪一格");
+    assert.equal(who.build, buildNow(), "它手里的代码是哪一版也说得出——这就是旧渲染能被发现的原因");
   } finally {
     await new Promise((resolve) => server.close(resolve));
-    await new Promise((resolve) => other.close(resolve));
   }
 });
+
 
 test("every list on the page runs newest first", () => {
   const html = render();

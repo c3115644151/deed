@@ -2,6 +2,7 @@
 // The page is rendered per request from the ledger, so a browser refresh can
 // never show something the shell command would not.
 
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -56,10 +57,29 @@ function zoneOfMachine() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
+// 这个进程是谁：路径、pid、端口、代码指纹。一个问题就能回答"这条页面是不是这个工作区的、
+// 手里的代码是不是最新的"——没有这个答案，端口上坐着谁只能靠猜，猜错就会同时开着两个面板。
+let seenBuild = null;
+const buildCached = () => {
+  const now = Date.now();
+  if (seenBuild !== null && now - seenBuild.at < 1000) return seenBuild.build;
+  seenBuild = { at: now, build: buildNow() };
+  return seenBuild.build;
+};
+
+export function identity(root, port) {
+  return { deed: true, root: path.resolve(root), pid: process.pid, port, build: buildCached() };
+}
+
 export function handler(root, onRequest = () => {}) {
   return (req, res) => {
     onRequest();
     const url = new URL(req.url, "http://localhost");
+    if (url.pathname === "/__deed") {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify(identity(root, req.socket.localPort), null, 1) + "\n");
+      return;
+    }
     // 面板只多收一个写入口：/gate（那三个闸）。别的路径照旧只读。
     if (req.method === "POST") {
       if (url.pathname !== "/gate") {
@@ -213,31 +233,49 @@ export function handler(root, onRequest = () => {}) {
   };
 }
 
-export function start(root, port) {
+export function start(root, port, onFatal = null) {
   let lastRequest = Date.now();
   const server = http.createServer(handler(root, () => { lastRequest = Date.now(); }));
-  // 地址是用来收藏的：声明号被别的程序占着时，挨着它往后一格一格试（+1、+2…），
-  // 不是抽一个系统给的号——抽出来的号每次重启都不一样，书签就废了。
-  // 挨着的九格都被占才落到系统给的号；落到那个号之后每撞一次都算别的问题，该炸就炸。
-  let asked = port;
-  let spare = false;
+  // 一个工作区只有一个面板，一个面板只占一格端口：这条页面是你收藏的那一条地址。
+  // 号被占着就不再换号——换号意味着同时开着两个面板，而"看哪一条"从此变成一个要靠记忆的
+  // 问题。占着的时候只有一句该说：这个号在谁手里、要不要把它关掉。
   server.on("error", (error) => {
     if (error.code !== "EADDRINUSE") throw error;
-    asked += 1;
-    if (asked <= port + 9) {
-      server.listen(asked, "127.0.0.1", ready);
+    const body = `deed: 端口 ${port} 被占着，面板不再换号（一个工作区只留一个面板）\n` +
+      `  先看清它是谁：curl http://127.0.0.1:${port}/__deed\n` +
+      `  是旧面板：deed panel --stop   不是：把它关掉，或改审查设置里的 board.port\n`;
+    // 有人在等这条消息（serve 动词、测试）：交给他，由他决定怎么收场；
+    // 没人等（后台拉起来的进程）就自己退，别占着不走。
+    if (onFatal) {
+      onFatal(body);
       return;
     }
-    if (!spare) {
-      spare = true;
-      console.error(`deed: 端口 ${port} 到 ${port + 9} 都被占着；面板改开在系统给的空闲端口（下面一行是新的 URL）`);
-      server.listen(0, "127.0.0.1", ready);
-      return;
-    }
-    throw error;
+    console.error(body);
+    process.exit(1);
   });
   // 面板闲着自己退：它跟着命令被拉起来，就没有理由在没人看的时候一直占着一格端口。
   // 有人连着（SSE）不算闲，所以按"最后一次请求"算，不按"最后一个页面"算。
+  // 代码换过之后，这个进程手里的渲染是旧的：它自己换掉自己，端口不动。
+  // 以前靠"下一条命令发现指纹不符再重启"，可那条命令如果拿不到这个号（比如旧进程还活着），
+  // 就只能再开一个——于是两个面板并存。让在位的那一个自己换代，这事就没有第二种结局。
+  const buildAtStart = buildNow();
+  const auto = setInterval(() => {
+    if (buildCached() === buildAtStart) return;
+    clearInterval(auto);
+    clearInterval(clock);
+    server.close(() => {
+      clearPanel(root, process.pid);
+      const child = spawn(process.execPath, [process.argv[1] ?? "", "serve", "--port", String(port)], {
+        cwd: root,
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      child.unref();
+      process.exit(0);
+    });
+  }, 2000);
+
   const idle = Number(process.env.DEED_PANEL_IDLE_MIN ?? 30) * 60 * 1000;
   const clock = setInterval(() => {
     if (Date.now() - lastRequest < idle) return;
@@ -246,6 +284,7 @@ export function start(root, port) {
   }, 60 * 1000);
   server.on("close", () => {
     clearInterval(clock);
+    clearInterval(auto);
     clearPanel(root, process.pid);
   });
   const ready = () => {

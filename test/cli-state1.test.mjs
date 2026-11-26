@@ -9,7 +9,7 @@ import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
-import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
+import { panelRecord, buildNow, watchedFiles, readPanel } from "../lib/panel.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
@@ -67,14 +67,28 @@ test("a config.json saved with a BOM reads the same as one without", () => {
 
 
 
+// 现挑一格能占的空号：并发的另一次跑、或机器上真在跑的面板，都不该让这一条红。
+const emptyPort = () =>
+  new Promise((ok) => {
+    const probe = net.createServer(() => {});
+    probe.once("error", () => ok(0));
+    probe.listen(0, "127.0.0.1", () => {
+      const port = probe.address().port;
+      probe.close(() => ok(port));
+    });
+  });
+
+
 // 面板跟着命令走：你不必记得先跑 serve，也不必在 dsh 重启之后手动把它拉回来。
-test("a panel comes up with the first command, and the next one leaves it alone", () => {
+test("a panel comes up with the first command, and the next one leaves it alone", async () => {
   const cwd = workspace("panel");
   const env = { ...process.env };
   delete env.DEED_NO_PANEL;
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
+  // 声明号现挑一格空号：一个工作区只有一个面板，撞上机器上真在跑的那一条就不是在测这段代码了。
+  const free = await emptyPort();
   try {
-    run("init", "--said", "起点");
+    run("init", "--said", "起点", "--port", String(free));
     const first = run("say", "看看面板");
     assert.equal(first.status, 0, first.stderr);
     assert.match(first.stdout, /面板 · http:\/\/127\.0\.0\.1:\d+/, "第一条命令就把面板拉起来了");
@@ -98,85 +112,39 @@ test("a panel comes up with the first command, and the next one leaves it alone"
 });
 
 
-// 地址要能收藏：面板守在工作区审查设置里写的那个端口；那个号被别人占着时，
-// 它挨着往后找一格（+1、+2…），并且"哪个被占、改开在哪"这句话必须由拉它起来的那一头说出来——
-// 子进程不接管道，它自己那句只会掉进虚空。
-// 起点号每跑一次现挑一格：写死 7433 会让并发的另一次跑抢走同一格，红了也说明不了代码有问题。
-test("a panel says when the declared port was taken, and goes back to it when the port is free", async () => {
+// 一个工作区只有一个面板：声明的号被占着时不再换号（换号=同时两条页面），
+// 只说清是谁占着，命令照跑；号让出来之后，下一条命令在原格上把面板拉起来。
+test("a taken port is named, and the panel appears there once it is free", async () => {
   const cwd = workspace("panel-port");
   const env = { ...process.env };
   delete env.DEED_NO_PANEL;
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
-  // 子进程在 listen 之后才写记号，探活成功与记号落盘之间有几毫秒：读到就等它写完，
-  // 不让这条用例因为「差几毫秒」红（跑全量时机器更慢，这个窗口会放大）。
-  const nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  const record = () => {
-    for (let step = 0; step < 40; step += 1) {
-      try {
-        return JSON.parse(fs.readFileSync(panelRecord(cwd), "utf8"));
-      } catch {
-        nap(100);
-      }
-    }
-    throw new Error("面板的记号一直没写出来：" + panelRecord(cwd));
-  };
   const url = (out) => Number(out.match(/127\.0\.0\.1:(\d+)/)[1]);
-  const canBind = (port) =>
-    new Promise((ok) => {
-      const probe = net.createServer(() => {});
-      probe.once("error", () => ok(false));
-      probe.listen(port, "127.0.0.1", () => probe.close(() => ok(true)));
-    });
-  const pick = async () => {
-    for (let step = 0; step < 40; step += 1) {
-      const want = 5200 + Math.floor(Math.random() * 600);
-      if (await canBind(want)) return want;
-    }
-    return 0;
-  };
+  const base = await emptyPort();
   const held = net.createServer(() => {});
-  const base = await pick();
-  assert.notEqual(base, 0, "找不到一格空号，这一条跑不了");
   const listen = () => new Promise((ok) => held.listen(base, "127.0.0.1", ok));
-  const free = () => new Promise((ok) => held.close(() => ok()));
+  const give = () => new Promise((ok) => held.close(() => ok()));
   try {
     assert.equal(run("init", "--said", "起点", "--port", String(base)).status, 0);
     await listen();
     const taken = run("say", "看看面板");
-    assert.equal(taken.status, 0, taken.stderr);
-    const fell = url(taken.stdout);
-    assert.ok(fell > base && fell <= base + 9, "被占着就挨着往后找，落点离声明号不超过九格：" + fell + " 对 " + base);
-    for (let step = 1; step < fell - base; step += 1)
-      assert.equal(await canBind(base + step), true, base + step + " 当时是空的，却跳了过去");
-    assert.match(taken.stdout, new RegExp("端口 " + base + " 被占着；面板改开在 " + fell), "退到哪儿要说出来，不是无声换掉一条地址");
-    assert.equal(record().port, fell, "记号里记的就是它实际在听的那个号");
-    assert.match(String(record().build), /^[0-9a-f]{16}$/, "记号里带着面板代码的指纹");
-    // 停了再起：声明号还被占着，退回的地址也得是同一格，否则每次重启都要人重收一次书签。
-    run("panel", "--stop");
-    const restarted = run("state");
-    assert.equal(restarted.status, 0, restarted.stderr);
-    assert.equal(url(restarted.stdout), fell, "重新起来还是那一格");
-    // 号让出来了：下一条命令要把它挪回审查设置里写的那个地址——地址是用来收藏的。
-    // 这里不先停下旧面板：活着的那个停在退回的号上，得由"号空出来了"这件事把它挪回去，
-    // 否则它一辈子守着那个意外落点，声明过的地址就再也没人用过。
-    await free();
+    assert.equal(taken.status, 0, "面板起不来不该让命令失败：" + taken.stderr);
+    assert.match(taken.stdout, new RegExp("面板没起来 —— .*（端口 " + base + "）"), "占着就说清，不换号：" + taken.stdout);
+    assert.doesNotMatch(taken.stdout, /面板 · http:/, "不许另开第二条页面");
+    // 号让出来：下一条命令把它起在声明的这一格上，地址就是收藏的那一条
+    await give();
     const again = run("state");
     assert.equal(again.status, 0, again.stderr);
-    assert.equal(url(again.stdout), base, "号空出来之后回到声明的那个地址");
-    assert.equal(record().port, base, "记号里也跟着挪回去了");
-    assert.notEqual(record().pid, fell, "挪回去的是另一个进程，不是一个改过口的进程");
-    // 面板代码换过（记号里的指纹对不上）：下一条命令自己把旧的换掉，
-    // 不必有人记得"改完要重启"——换过之后地址不变。
-    const heard = record();
-    fs.writeFileSync(panelRecord(cwd), JSON.stringify({ pid: heard.pid, port: heard.port, build: "0000000000000000" }));
-    const swapped = run("state");
-    assert.equal(swapped.status, 0, swapped.stderr);
-    const now = record();
-    assert.notEqual(now.pid, heard.pid, "旧进程被换掉了");
-    assert.equal(now.port, base, "换掉的进程守的还是同一个号");
+    assert.equal(url(again.stdout), base, "就在声明的那一格上起来");
+    // 记号里写的是它自己：pid、端口，以及它手里那版代码的指纹（= 当前这份代码）。
+    // 换了代码之后由面板自己换代（每 2 秒对一次指纹、端口不动），所以这里只验不变量。
+    const now = readPanel(cwd);
+    assert.ok(now && now.pid > 0, "记号里记着它自己的 pid");
+    assert.equal(now.port, base, "记号里的端口就是声明的那一格");
+    assert.equal(now.build, buildNow(), "记号里的指纹就是当前这份代码——旧渲染因此能被发现");
   } finally {
     run("panel", "--stop");
-    if (held.listening) await free();
+    if (held.listening) await give();
   }
 });
 

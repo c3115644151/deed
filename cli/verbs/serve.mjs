@@ -11,6 +11,10 @@ export default function serve(argv) {
       const port = Number(flags.port ?? doc.config.board.port);
       if (!Number.isInteger(port) || port < 0 || port > 65535)
         fail("端口要写成 0–65535 的整数：" + String(flags.port) + "；例如 deed serve --port 7317");
-      start(ROOT, port);
+      start(ROOT, port, (body) => {
+        // 起不来的原因要落在调用者眼前：serve 经常跑在别的窗口或后台里。
+        process.exitCode = 1;
+        return body;
+      });
     });
 };
