@@ -289,8 +289,8 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
   fs.writeFileSync(path.join(root, "core", "a.mjs"), "a\n");
   run("task", "done", "T1", "--evidence", "写完了");
   // 审查通过只把这一段交回来：判决那一按才是它的结局。
-  assert.equal(run("review", "--segment", "S01.1", "--by", "qa").status, 0);
-  assert.equal(run("review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
+  assert.equal(run("review", "--segment", "S01.1").status, 0);
+  assert.equal(run("review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
 
   const server = start(root, 0);
   await new Promise((resolve) => server.once("listening", resolve));
@@ -331,8 +331,8 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
     assert.equal(closed.judgedBy, "user");
     const again2 = await post({ action: "judgement", segment: "S01.1" });
     assert.equal(again2.status, 400, "判过的段不再判");
-    assert.equal(run("review", "--all", "--by", "period-1").status, 0);
-    assert.equal(run("review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+    assert.equal(run("review", "--all").status, 0);
+    assert.equal(run("review", "--all", "--verdict", "pass").status, 0);
 
     const open = await get(port, "/");
     assert.match(open.body, /data-gate="sign"/, "段都判过、期审也过了：签收的闸开在这里");

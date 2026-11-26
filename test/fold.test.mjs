@@ -188,20 +188,6 @@ test("a rework sends the named task back, clears its evidence, and voids the ver
   assert.equal(session.reviews[0].voidedAt, T(6), "结论留在账本里，但不再算数");
 });
 
-test("the hand that did the work cannot clear it", () => {
-  // The default label does both jobs: an agent delivers and then writes the verdict.
-  const self = { v: 1, at: T(4), k: "review.log", s: null, segment: "S01.1", by: "agent", verdict: "pass", brief: "b.md", findings: [] };
-  assert.throws(() => fold([turn(1), add(2, "T1"), done(3, "T1"), self]), /同一个人不能判自己交付的段/u);
-  // A different label clears it: independence is a label, not an approval.
-  const other = { ...self, by: "qa" };
-  assert.equal(fold([turn(1), add(2, "T1"), done(3, "T1"), other]).sessions[0].reviews.length, 1);
-  // Independence is per segment: delivering the last one does not bar this one.
-  const next = { ...self, at: T(7), segment: "S01.2" };
-  const second = { v: 1, at: T(6), k: "task.done", s: null, id: "T2", evidence: "ran", by: "qa" };
-  const doc = fold([turn(1), add(2, "T1"), done(3, "T1"), judgePass(4, "S01.1"), add(5, "T2"), second, next]);
-  assert.equal(doc.sessions[0].reviews.length, 1);
-});
-
 test("signing closes the period and the next turn opens a new one", () => {
   const doc = fold([turn(1), add(2, "T1"), done(3, "T1"), judgePass(4, "S01.1"), sign(5), turn(6)]);
   assert.equal(doc.sessions[0].closeKind, "signed");

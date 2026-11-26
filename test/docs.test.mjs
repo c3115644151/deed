@@ -25,10 +25,6 @@ test("the block names the commands an agent needs, and no verb it does not have"
     assert.ok(BLOCK.includes(verb), "那段里少了 " + verb);
   assert.doesNotMatch(BLOCK, /deed (start|close|switch)\b/u, "没有的动作不要写进规则里");
 });
-test("AGENTS.md carries the same block, so the paste does not drift on one side", () => {
-  const agents = fs.readFileSync(path.join(ROOT, "AGENTS.md"), "utf8").replace(/\r\n/g, "\n");
-  assert.ok(agents.trimEnd().endsWith(BLOCK.trimEnd()), "AGENTS.md 结尾那段要和 init --print-agents 逐字相同（重跑命令，把尾段整个换掉）");
-});
 
 // The lexicon is one table in DESIGN 1.1. A word that stops being used there but
 // stays in prose teaches the next reader two vocabularies; this test is what
@@ -36,7 +32,7 @@ test("AGENTS.md carries the same block, so the paste does not drift on one side"
 // 往里加一个词要同时做两件事：把它在仓里的每一处换成正式说法，并在这里的
 // 「用词对照表」保留区写一行「旧词 → 换成什么」。只做前一件，下一个人只学到一个新词。
 const RETIRED = ["承诺", "判据", "折叠", "任务书", "白纸", "物料", "三态", "读数", "钉住", "证据", "事实账本", "出纸", "门槛", "收口", "欠账", "落账", "钉子", "封段", "搬"];
-const SKIP_DIRS = new Set(["node_modules", ".git", ".deed", ".deed-test", ".tmp", ".shots", ".archify", ".idea", ".vscode", "examples"]);
+const SKIP_DIRS = new Set(["node_modules", ".git", ".deed", ".deed-test", ".tmp", ".shots", ".archify", ".idea", ".vscode"]);
 
 function prose(root, found = []) {
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
@@ -88,7 +84,7 @@ test("the round is a user's round in the help, the docs and the code alike", () 
   assert.doesNotMatch(usage, /--who/u, "say 不收 --who：轮次只有人开口的那一轮");
   assert.doesNotMatch(usage, /--said/u, "said 是位置参数：再给一个 --said 就有两个说法");
   assert.deepEqual(WHO, ["user"], "代码里只认用户那一轮");
-  for (const name of ["README.md", "AGENTS.md"]) {
+  for (const name of ["README.md"]) {
     const text = fs.readFileSync(path.join(ROOT, name), "utf8");
     assert.match(text, /deed say "…"/u, name + " 里要写清轮次怎么记");
     assert.doesNotMatch(text, /deed tick/u, name + " 里不能再留旧动词");

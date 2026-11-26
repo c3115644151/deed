@@ -79,8 +79,8 @@ export const MEANING = {
   // 撤回一份还没被回答的清单：它作废、段回到执行态，账本上留着谁、为什么。
   withdraw: 19,
   // 期审回来：段全关之后还要有人判「这一期做成的样子对不对、各段之间说不说得通」，
-  // 签收压在它后面。它记的不是"各段结论的汇总"，是另一层问题，所以要一双手去判。
-  // 同时这一段起，清单要写明交给谁：段审一直用同一双手，期审每次都换一双新的。
+  // 签收压在它后面。它记的不是"各段结论的汇总"，是另一层问题。
+  // 从这一版起清单不再写明交给谁：名字由通道决定，命令行不收 --by。
   periodReview: 20,
   // 三个闸放到面板上：签收与推翻结论不再从命令行发生，落下的行要写明是谁在哪按的
   // （by + via:"panel"）。命令行那两条路当场拒。旧行照读（那时 by 是自述）。
@@ -146,7 +146,7 @@ export function validateEvent(ev, at) {
       // 第 12 版起轮次只记人开口的那一轮。旧行里的 agent 轮照读：
       // 拿新规矩去核旧行，会把当时合法的历史全判成坏账（doctor 会逐行核）。
       if (meaning >= MEANING.userOnlyRounds && !WHO.includes(ev.who))
-        throw new Error(`轮次只记你和用户之间的一轮：你自己的进展写进交付记录或结论，不记成轮次（--who 写 user）`);
+        throw new Error(`轮次只记你和用户之间的一轮：你自己的进展写进交付记录或结论，不记成轮次（deed say 只写人开口的那一轮）`);
       need(ev, "said");
       // 空参数会被有些 shell 吞掉（PowerShell 5.1 会把 --did "" 变成裸开关），
       // 于是 did 落成 true，账本读起来像"这轮做过事"。类型也要查：这不是记轮的人
@@ -311,7 +311,8 @@ export function validateEvent(ev, at) {
         throw new Error("审查清单落在段上：那一版里整期上不出清单（签收只看各段的结论与条件）");
       if (ev.scope === "session") need(ev, "goal");
       else need(ev, "segment");
-      // 清单是交给某一双手的：没写交给谁，事后没人说得清这一份是谁在读。
+      // 第 20 版起清单写明谁在看（那时是自述的名字）；从写者 0.25 起这一项恒为 agent：
+      // 名字由通道决定，命令行不收 --by。
       if (meaningOf(ev) >= MEANING.periodReview) need(ev, "by");
       need(ev, "brief");
       // 角色包和清单成对交出去：两份一起给审查者，结论回答的是这两份。

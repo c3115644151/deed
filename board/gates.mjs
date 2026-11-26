@@ -84,7 +84,7 @@ export function applyGate(root, action = {}) {
           s: session.id,
           words: String(action.words).trim(),
           title: action.title ?? periodOf(doc, session),
-          by: action.by ?? "user",
+          by: "user",
           via: "panel",
         };
       },
@@ -105,7 +105,7 @@ export function applyGate(root, action = {}) {
         if (!home) demand("账本里没有段 " + id);
         if (home.closedAt !== null) demand(home.id + " 已经判过了");
         if (home.verdict !== "pass") demand(home.id + " 还没有审查通过：判决在审查通过之后才按得下去");
-        return { k: "verdict.pass", s: session.id, segment: id, by: action.by ?? "user", via: "panel" };
+        return { k: "verdict.pass", s: session.id, segment: id, by: "user", via: "panel" };
       },
       { at: action.at ?? null },
     );
@@ -127,7 +127,7 @@ export function applyGate(root, action = {}) {
         return {
           k: "topic.establish", s: session.id, id: topic.id,
           body: topic.body, points: [...topic.points],
-          by: action.by ?? "user", via: "panel",
+          by: "user", via: "panel",
         };
       },
       { at: action.at ?? null },
@@ -146,7 +146,7 @@ export function applyGate(root, action = {}) {
         const topic = (session.topics ?? []).find((one) => one.id === id);
         if (!topic) demand("账本里没有议题 " + id);
         if (topic.state !== "established") demand(topic.id + " 还没成立：先按成立那一下");
-        return { k: "topic.release", s: session.id, id: topic.id, by: action.by ?? "user", via: "panel" };
+        return { k: "topic.release", s: session.id, id: topic.id, by: "user", via: "panel" };
       },
       { at: action.at ?? null },
     );

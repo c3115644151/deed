@@ -117,7 +117,7 @@ export const CHECKS = [
     id: "background",
     title: "项目背景已写",
     capability: "项目级验收",
-    fix: 'deed project --background "这个项目是什么、为谁、不做什么" --by 谁',
+    fix: 'deed project --background "这个项目是什么、为谁、不做什么"',
     judge: ({ project }) => {
       if (!project) return { verdict: "na", detail: "没有声明成项目" };
       const text = String(project.background ?? "").trim();

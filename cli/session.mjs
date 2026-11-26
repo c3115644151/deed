@@ -294,12 +294,6 @@ const REVIEW_LABEL = {
 // 签收一条龙之后，记录上写着是用户按的。名字现在必须由写者给；只有真的在终端
 // 里敲（stdin 与 stdout 都是 tty）才允许默认 "user"——那是"有个人在键盘前"这个
 // 事实，不是"这个人是用户"这个推断。
-export function signer(flags, act) {
-  if (flags.by) return flags.by;
-  if (process.stdin.isTTY && process.stdout.isTTY) return "user";
-  fail("「" + act + "」没有写名字：deed 不替任何动作填名字。写 --by「谁」（比如 agent:claude）");
-}
-
 export function printState() {
   const { doc, events } = load();
   const config = doc.config;

@@ -131,10 +131,10 @@ test("a flag one letter off is refused, and the nearest name is guessed", () => 
 test("a sealed segment with no reason written says what it is, without empty brackets", () => {
   const cwd = workspace("seal-why-blank");
   deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
-  setGoal(cwd, "把文档写完", "--by", "user");
+  setGoal(cwd, "把文档写完");
   addTask(cwd, "写文档", "读完能上手");
   assert.equal(deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" }).status, 0);
-  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档").status, 0);
   const logDir = path.join(cwd, ".deed", "log");
   const name = fs.readdirSync(logDir).find((one) => one.endsWith(".jsonl"));
   const file = path.join(logDir, name);
@@ -145,8 +145,8 @@ test("a sealed segment with no reason written says what it is, without empty bra
   delete ev.why;
   lines[at] = JSON.stringify(ev);
   fs.writeFileSync(file, lines.join("\n") + "\n");
-  assert.equal(judged(cwd, "review", "--all", "--by", "period-1").status, 0, "期审清单出得来");
-  assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+  assert.equal(judged(cwd, "review", "--all").status, 0, "期审清单出得来");
+  assert.equal(judged(cwd, "review", "--all", "--verdict", "pass").status, 0);
   const signed = signHere(cwd, "可以");
   assert.equal(signed.status, 0, signed.stderr);
   assert.match(signed.stdout, /没经过审查 · S01\.1/, "这一行照旧要露面");

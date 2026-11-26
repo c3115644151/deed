@@ -1,7 +1,7 @@
 import { projectState } from "../../core/checks.mjs";
 import { nextAction } from "../../core/rules.mjs";
 import { treeOf } from "../../lib/tree.mjs";
-import { ROOT, parse, load, transact, fail, guard, signer } from "../session.mjs";
+import { ROOT, parse, load, transact, fail, guard } from "../session.mjs";
 
 // "core=core:,app=cli:core+lib" → [{role:"core",dir:"core",mayImport:[]},{role:"app",dir:"cli",mayImport:["core","lib"]}]
 // 左边的"格"可以省：省了就等于目录名——但目录名和范式不一样时（cli 是 app），必须写清它认领哪一格。
@@ -28,14 +28,14 @@ export default function declare(argv) {
     const { doc } = load();
     const before = doc.project ?? null;
     const shape = flags.shape ?? before?.shape;
-    if (!shape) fail('声明成项目要说清是哪一类：deed project --shape software|document|data|work|free --by "谁"');
+    if (!shape) fail('声明成项目要说清是哪一类：deed project --shape software|document|data|work|free');
     const background = flags.background ?? before?.background ?? "";
     const layers = flags.layers === undefined ? before?.layers ?? [] : layersOf(flags.layers);
     const extras =
       flags.extras === undefined
         ? before?.extras ?? []
         : String(flags.extras).split(",").map((one) => one.trim()).filter(Boolean);
-    const ev = { k: "project.declare", shape, background, layers, extras, by: signer(flags, "声明项目") };
+    const ev = { k: "project.declare", shape, background, layers, extras, by: "agent" };
     transact(flags, () => ev);
     const after = projectState({ ...doc, project: { shape, background, layers, extras } }, treeOf(ROOT));
     console.log("项目 · " + shape + " · " + after.passed + "/" + after.total + " 条通过");

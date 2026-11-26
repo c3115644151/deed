@@ -153,5 +153,5 @@ export const setGoal = (cwd, text) => {
     else lines.push(text);
     writePlan(cwd, lines.join("\n"));
   }
-  return deed(cwd, "submit", "--by", "user");
+  return deed(cwd, "submit");
 };

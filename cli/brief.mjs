@@ -10,7 +10,7 @@ import { fileStamp, stamp0 } from "../lib/format.mjs";
 
 // 角色包：清单说"审什么"，这一份说"怎么审"。它和清单一起交出去，也一起
 // 记下 sha256——换掉其中任何一份，结论就落不下来。
-function guideText(subject, target, briefName, scratch, hand = null, nth = 1) {
+function guideText(subject, target, briefName, scratch, nth = 1) {
   const verdict = "deed review --segment " + target;
   return [
     "# 审查者 · " + subject,
@@ -18,12 +18,12 @@ function guideText(subject, target, briefName, scratch, hand = null, nth = 1) {
     "你要回答一件事：这一段交付的活，够不够得上它自己写的标准。",
     "清单在同目录（" + briefName + "）。你判的是清单上那几条，不是整个项目。",
     "",
-    "## 这一段一直由同一个人判",
+    "## 这一段到这一步",
     "",
     (nth > 1
-      ? "这是这一段的第 " + nth + " 份清单，前几份也是同一个人在看：先找出上一份点过哪几条，"
-      : "这是这一段的第一份清单：这一段的清单此后都会交给你，不换人。") +
-      "同一段的判断不该每轮换个人从头摸一遍——换手会把「这一段到底行不行」变成「今天谁在看」。",
+      ? "这是这一段的第 " + nth + " 份清单：前几份判过了，先找出上一份点过哪几条。"
+      : "这是这一段的第一份清单。") +
+      "你要判的是这一次的变动，不是把这一段的活从头摸一遍。",
     "",
     "## 先读标准，再读代码",
     "",
@@ -53,13 +53,13 @@ function guideText(subject, target, briefName, scratch, hand = null, nth = 1) {
     "",
     "全部达成：",
     "",
-    "    " + verdict + " --by \"你是谁\" --verdict pass",
+    "    " + verdict + " --verdict pass",
     "",
     "pass 把这一段交回给用户：判决那一下才是这一段关闭的时刻。",
     "",
     "有没达成的：",
     "",
-    "    " + verdict + " --by \"你是谁\" --verdict fail --rework T1,T2 \\",
+    "    " + verdict + " --verdict fail --rework T1,T2 \\",
     "      --why \"一句话总结\" --finding \"…\" --finding \"…\"",
     "",
     "被点名的条目回到未做（交付记录退回），其余保持交付；这一段不关闭，补完再交再审。",
@@ -185,7 +185,7 @@ export function planBrief(root, open, segment, at) {
     "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
     "2. 只看这一段的任务，不替它补未来的事。",
     "3. 每条标准给一个判定，落结论时逐条写：--result T1=met --result T2=unmet；pass 要求这一段每条都有判定。",
-    "4. 结论落盘：deed review --segment " + segment.id + " --by \"<你是谁>\" --verdict pass|fail --finding \"<不合格的那几条>\"",
+    "4. 结论落盘：deed review --segment " + segment.id + " --verdict pass|fail --finding \"<不合格的那几条>\"",
     "",
     "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
     "",
@@ -199,8 +199,7 @@ export function planBrief(root, open, segment, at) {
     file = base(n) + ".md";
   }
   const nth = open.briefs.filter((one) => one.scope === "segment" && one.segment === segment.id).length + 1;
-  const hand = open.briefs.filter((one) => one.scope === "segment" && one.segment === segment.id).at(-1)?.by ?? null;
-  const guide = guideText("段 " + segment.id, segment.id, path.basename(file), scratch, hand, nth);
+  const guide = guideText("段 " + segment.id, segment.id, path.basename(file), scratch, nth);
   return {
     file,
     text,
@@ -234,12 +233,11 @@ function periodGuideText(session, briefName, scratch) {
     "",
     "## 你怎么落结论",
     "",
-    "- 通过：deed review --all --by \"<你是谁>\" --verdict pass",
-    "- 不合格：deed review --all --by \"<你是谁>\" --verdict fail --rework S02.7,S02.9 --why \"一句话总结\"",
+    "- 通过：deed review --all --verdict pass",
+    "- 不合格：deed review --all --verdict fail --rework S02.7,S02.9 --why \"一句话总结\"",
     "  点名的是段号：哪一段的前提不成立了，就退回那一段——段里的条目由那一段的审查者点名。",
     "- 具体问题写成 --finding，逐条带位置。",
     "",
-    "期审每次换一双手：同一期里判过段的人不能判这一期（段审一直用同一双手，期审每次都新开）。",
     "",
   ].join("\n");
 }
@@ -296,8 +294,7 @@ export function planWhole(root, session, at) {
     "",
     "1. 判的是这一期做成的样子，不是段里每条标准（那些已经判过，见上）。",
     "2. 看各段之间说不说得通：同一件事两种做法、两套说法、后一段推翻前一段的前提。",
-    "3. 结论：deed review --all --by \"<你是谁>\" --verdict pass|fail；不合格点名段号 --rework S02.7。",
-    "4. 期审每次换一双手：判过段的人不判这一期。",
+    "3. 结论：deed review --all --verdict pass|fail；不合格点名段号 --rework S02.7。",
     "",
     "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
     "",

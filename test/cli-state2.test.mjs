@@ -22,7 +22,7 @@ test("naming a segment the ledger does not have lists the ones it does", () => {
   const cwd = workspace("segment-typo");
   deed(cwd, "init", "--said", "开始");
   addTask(cwd, "甲", "c");
-  const run = deed(cwd, "review", "--segment", "S01.7", "--by", "qa");
+  const run = deed(cwd, "review", "--segment", "S01.7");
   assert.equal(run.status, 1);
   assert.match(run.stderr, /里没有段 S01\.7/);
   assert.match(run.stderr, /S01\.1/);
@@ -53,7 +53,7 @@ test("--session that names no period is refused by every verb that takes one", (
   for (const args of [
     ["task", "done", "T1", "--evidence", "写完了", "--session", "S99"],
     ["review", "--segment", "S01.1", "--session", "S99"],
-    ["review", "--skip", "--why", "免审", "--by", "user", "--session", "S99"],
+    ["review", "--skip", "--why", "免审", "--session", "S99"],
   ]) {
     const refused = deed(cwd, ...args);
     assert.equal(refused.status, 1, args.join(" ") + " 要点名真存在的会话");
@@ -116,7 +116,7 @@ test("asking what a verb takes does not run it", () => {
   const before = briefs(cwd).length;
   const asked = deed(cwd, "review", "--help");
   assert.equal(asked.status, 0);
-  assert.match(asked.stdout, /deed review --segment S01\.1 --by/);
+  assert.match(asked.stdout, /deed review --segment S01\.1/);
   assert.equal(briefs(cwd).length, before, "问一句用法不该发一份清单");
   assert.equal(kinds(cwd).includes("review.brief"), false);
 
@@ -187,8 +187,8 @@ test("the draft keeps judged entries ticked", () => {
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   writePlan(cwd, readPlan(cwd).replace("- [ ] T1 写一句话", "- [x] T1 写一句话").replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写下 docs/a.md"));
   assert.equal(deed(cwd, "submit").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   const draft = deed(cwd, "plan", "--force");
   assert.equal(draft.status, 0, draft.stderr);
   assert.match(readPlan(cwd), /- \[x\] T1 写一句话/, "判过的条目在草稿里还是勾上的");
@@ -274,7 +274,7 @@ test("a workspace is not a project until it says so, and the standing is compute
   fs.mkdirSync(path.join(cwd, "tests"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "tests", "t.test.mjs"), "export const t = 1;\n");
   deed(cwd, "plan");
-  const said = deed(cwd, "project", "--shape", "software", "--layers", "core=core:,app=app:core,tests=tests:core+app", "--extras", "scripts", "--background", "一个本地工具；不碰网络。", "--by", "user");
+  const said = deed(cwd, "project", "--shape", "software", "--layers", "core=core:,app=app:core,tests=tests:core+app", "--extras", "scripts", "--background", "一个本地工具；不碰网络。");
   assert.equal(said.status, 0, said.stdout + said.stderr);
   assert.equal(kinds(cwd).filter((one) => one === "project.declare").length, 1, "声明是账本上的一行");
 

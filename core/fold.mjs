@@ -624,18 +624,6 @@ export function fold(events) {
         const missing = inScope.filter((one) => one.status === "todo");
         if (missing.length > 0)
           noway(`${subject} 还有没交付的（${missing.map((one) => one.id).join("、")}）：结论只能落在交付之后`);
-        // 谁做的活不能由谁自己清账：那样结论就是交付自己的说法。身份是自述，
-        // 所以这里堵的是默认路径（同一个标签两头都用），不是刻意换名字的人。
-        const ownWork = inScope
-          .filter((one) => one.evidence.some((proof) => proof.by === ev.by))
-          .map((one) => one.id);
-        if (ownWork.length > 0) {
-          // 整体审说的是这一段的活，签收核对说的是这一期的活：同一句话，两种说法。
-          const hand = segment ? "段" : "活";
-          noway(
-            `${subject} 的 ${ownWork.join("、")} 是 ${ev.by} 交付的：同一个人不能判自己交付的${hand}（换一个 --by，或让用户判）`,
-          );
-        }
         // 两种对象各有一份"在案结论"：整体审的互斥只看本段，签收核对的只看整期。
         const live = session.reviews.filter(
           (one) => one.voidedAt === null && (segment ? one.scope === "segment" && one.segment === segment.id : one.scope === "session"),

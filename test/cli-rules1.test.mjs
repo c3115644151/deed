@@ -60,21 +60,21 @@ test("a period with one segment still owes the period judgement, and that judgem
   assert.equal(alone.status, 1, "整期上没有审查这件事");
   assert.match(alone.stderr, /--all/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.brief").length, 0, "被拒的一个字都不写");
-  deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
+  deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
   assert.match(state.stdout, /下一步 · user · 判决/, "审查通过之后轮到你判这一段");
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
   assert.match(deed(cwd, "state").stdout, /下一步 · reviewer · 期审/, "判过之后轮到这一期做成的样子");
   assert.match(deed(cwd, "state").stdout, /deed review --all/u, "期审有它自己的命令");
-  assert.equal(judged(cwd, "review", "--all", "--by", "period-1").status, 0);
+  assert.equal(judged(cwd, "review", "--all").status, 0);
   const sheet = briefs(cwd)
     .filter((one) => one.startsWith("S01-period-") && !one.endsWith("-reviewer.md"))
     .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8")).at(-1);
   assert.match(sheet, /各段的结局/u, "期审清单列的是各段结局");
   assert.doesNotMatch(sheet, /## 要审的任务/u, "期审不重判段里的条目");
-  assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+  assert.equal(judged(cwd, "review", "--all", "--verdict", "pass").status, 0);
   assert.match(deed(cwd, "state").stdout, /下一步 · user · 签收/, "期审过了才剩一句话");
   assert.equal(signHere(cwd, "可以").status, 0);
 });
@@ -94,9 +94,9 @@ test("a closed period cannot be written into, and no verb invents a new one", ()
   addTask(cwd, "写文档", "读完能上手");
   // 交付落在免审路径上，这一段才封得掉（审查设置只 exempt docs/**）。
   assert.equal(deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" }).status, 0);
-  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent").status, 0);
-  judged(cwd, "review", "--all", "--by", "period-1");
-  assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档").status, 0);
+  judged(cwd, "review", "--all");
+  assert.equal(judged(cwd, "review", "--all", "--verdict", "pass").status, 0);
   signHere(cwd, "可以");
   const after = readEvents(cwd).length;
   const stray = addTask(cwd, "又一件", "x");
@@ -127,7 +127,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   addTask(cwd, "改重放", "同账本同文档", "--files", "core/fold.mjs");
   deliverTask(cwd, "T1", "node --test");
-  const blocked = deed(cwd, "review", "--skip", "--why", "全部免审", "--by", "user");
+  const blocked = deed(cwd, "review", "--skip", "--why", "全部免审");
   assert.equal(blocked.status, 1, "改文件不改变规则");
   assert.match(blocked.stderr, /要审|审查/);
   assert.match(deed(cwd, "state").stdout, /审查设置 文件与账本不一致/, "文件与账本不一致由 state 说出来");
@@ -138,7 +138,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   assert.equal(last.why, "全部免审，只留文档");
   assert.deepEqual(last.to.required, [], "账本记的是改成什么样");
   assert.deepEqual(last.to.exempt, ["**"]);
-  assert.equal(deed(cwd, "review", "--skip", "--why", "全部免审", "--by", "user").status, 0, "账本放开了才算放开");
+  assert.equal(deed(cwd, "review", "--skip", "--why", "全部免审").status, 0, "账本放开了才算放开");
 });
 
 

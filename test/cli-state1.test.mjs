@@ -297,7 +297,7 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.equal(unknown.status, 1, "点名不存在的条目要被拒");
   assert.match(unknown.stderr, /没有这条|账本里没有|T9/u);
   assert.equal(readEvents(cwd).length, before, "被拒的动作一个字节也没写进去");
-  deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent");
+  deed(cwd, "review", "--skip", "--why", "只改了文档");
   const sealed = deliverTask(cwd, "T1", "封过之后又改", { keep: true });
   assert.equal(sealed.status, 1, "判过的段不能再往任务上写");
   assert.match(sealed.stderr, /已封存|没有要落的改动/u);

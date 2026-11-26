@@ -4,7 +4,7 @@
 // usage 是给人看的那几行，按 HELP 原来的样子抄下来——帮助不再另写一份，从这里出。
 export const SPEC = {
   init: {
-    flags: ["print-agents", "force", "said", "who", "review", "exempt", "port", "why", "by"],
+    flags: ["print-agents", "force", "said", "who", "review", "exempt", "port", "why"],
     booleans: ["print-agents", "force"],
     usage: [
       'deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区',
@@ -27,7 +27,7 @@ export const SPEC = {
     ],
   },
   topic: {
-    flags: ["id", "title", "body", "points", "by"],
+    flags: ["id", "title", "body", "points"],
     usage: [
       'deed topic "标题" --points P1,P2 --body "统合后的正文"   开一个议题草稿：要点由它统合',
       'deed topic I1 --body "统合后的正文" --points P1,P2   给草稿补正文（成立就收编这些要点）',
@@ -36,7 +36,7 @@ export const SPEC = {
     ],
   },
   task: {
-    flags: ["id", "title", "criteria", "session", "files", "evidence", "by", "why"],
+    flags: ["id", "title", "criteria", "session", "files", "evidence", "why"],
     usage: [
       'deed task add "<要做的事>" --criteria "<做完的标准>" [--files "src/a.mjs,docs/b.md"]',
       'deed task done <T1> --evidence "<命令与结果>" [--session S01]',
@@ -52,32 +52,31 @@ export const SPEC = {
     usage: ["deed plan [--format|--print] [--force]   把这一期的清单写成草稿（--format 打印格式，--force 覆盖磁盘上那份）"],
   },
   submit: {
-    flags: ["by", "session", "run"],
+    flags: ["session", "run"],
     usage: [
-      'deed submit [--by "谁"] [--run "<命令>"]   把清单上的改动一次记账（勾上=交付，取消勾=撤回，~~=不做）',
+      'deed submit  [--run "<命令>"]   把清单上的改动一次记账（勾上=交付，取消勾=撤回，~~=不做）',
       '                                            --run 先真跑一遍，把条数记进账本；记录里对不上就整批拒',
     ],
   },
   review: {
-    flags: ["segment", "verdict", "by", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip"],
+    flags: ["segment", "verdict", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip"],
     repeat: ["finding", "result"],
     booleans: ["withdraw", "all", "skip"],
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
-      'deed review --segment S01.1 --skip --why "…" --by "谁"   封一个免审段（没人审过，落款留着）',
-      'deed review --segment S01.1 --by "谁" --verdict pass --result T1=met [--result T2=met]   审查通过：把这一段交回给用户判决',
-      'deed review --segment S01.1 --by "谁" --verdict fail --rework T1,T2 --why "…" [--finding "…"]',
+      'deed review --segment S01.1 --skip --why "…"   封一个免审段（没人审过，落款留着）',
+      'deed review --segment S01.1 --verdict pass --result T1=met [--result T2=met]   审查通过：把这一段交回给用户判决',
+      'deed review --segment S01.1 --verdict fail --rework T1,T2 --why "…" [--finding "…"]',
       "                 --result 逐条写判定（met／unmet／unknown:说明）；--result-all met 是这一句话的省写",
       "                 pass 要求这一段每条都判过：逐条写，或用 --result-all 统一说一句",
-      'deed review --by "这一段的审查者"         段审一直用同一双手：清单交给谁，之后的结论由谁落',
-      'deed review --all --by "谁"              期审：各段都关了之后判这一期做成的样子（期审每次换一双手）',
-      'deed review --all --by "谁" --verdict pass|fail [--rework S01.7] [--why "…"]   期审的结论；不合格点名的是段号',
-      'deed review --segment S01.1 --withdraw --why "…" --by "谁"   撤回这份还没被回答的清单，这一段回到执行态',
+      "deed review --all              期审：各段都关了之后判这一期做成的样子",
+      'deed review --all --verdict pass|fail [--rework S01.7] [--why "…"]   期审的结论；不合格点名的是段号',
+      'deed review --segment S01.1 --withdraw --why "…"   撤回这份还没被回答的清单，这一段回到执行态',
       "                 审查只在段里做：签收看的是每一段的结论都放行、条件都满足，没有另一道整期审查",
     ],
   },
   sign: {
-    flags: ["words", "title", "by", "session", "shelve", "why"],
+    flags: ["words", "title", "session", "shelve", "why"],
     booleans: ["shelve"],
     usage: [
       "deed sign     只说一句：签收在面板上按（命令行不再提供）",
@@ -97,12 +96,12 @@ export const SPEC = {
     ],
   },
   project: {
-    flags: ["shape", "background", "layers", "extras", "by", "why"],
+    flags: ["shape", "background", "layers", "extras", "why"],
     usage: [
-      'deed project --shape software --by "谁"      声明这个工作区是一个项目（形态决定启用哪些约束）',
-      'deed project --background "是什么、为谁、不做什么" --by "谁"',
-      'deed project --layers "core=core:,app=cli:core+lib" --by "谁"   每条写 格=目录：它可以依赖的格',
-      'deed project --extras "scripts,examples" --by "谁"           不在结构里的顶层目录，说清它们不参与',
+      'deed project --shape software      声明这个工作区是一个项目（形态决定启用哪些约束）',
+      'deed project --background "是什么、为谁、不做什么"',
+      'deed project --layers "core=core:,app=cli:core+lib"   每条写 格=目录：它可以依赖的格',
+      'deed project --extras "scripts,examples"           不在结构里的顶层目录，说清它们不参与',
     ],
   },
   serve: { flags: ["port"], usage: ["deed serve [--port 7317]"] },

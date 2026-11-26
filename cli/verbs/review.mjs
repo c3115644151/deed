@@ -8,26 +8,15 @@ import {
   needsReview,
   nextAction,
   openSegment,
-  periodFresh,
-  periodReviewers,
-  periodState,
   sealBlockers,
-  segmentReviewers,
   stalePeriod,
   takingSegment,
   tasksIn,
 } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, writeBrief } from "../brief.mjs";
-import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, signer, split, list } from "../session.mjs";
+import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
 
-
-// 段审一直用同一双手——除非人推翻过这一段的结论：那一套判断已经被否掉了，
-// 接着判的可以是另一双手。这里只认"人推翻"这一条路，不认"我想换个名字"。
-const maySwitch = (one, segmentId) =>
-  one.reviews.some(
-    (rv) => rv.segment === segmentId && rv.voidedAt !== null && rv.voidedBy && !rv.supersededBy,
-  );
 
 export default function review(argv) {
 
@@ -61,7 +50,7 @@ export default function review(argv) {
         s: one.id,
         segment: seg.id,
         why: flags.why,
-        by: signer(flags, "封存"),
+        by: "agent",
       })).doc;
       console.log("封存 · " + seg.id + " · " + flags.why);
       const step = nextAction(after, after.config);
@@ -71,11 +60,10 @@ export default function review(argv) {
     }
     // ---- 期审：deed review --all -------------------------------------------------------
     // 段审判「这一段对不对」；期审判「这一期做成的样子对不对、各段之间说不说得通」。
-    // 期审每次换一双手：判过段的人不判这一期。段审反过来，一直用同一双手。
+    // 期审视的是各段之间说不说得通，不重判段里那些条目。
     if (flags.all) {
       if (flags.segment) fail("--all 判的是整期：--all 与 --segment 一次只用一个");
       const session = one;
-      const taken = new Set([...segmentReviewers(session), ...periodReviewers(session)]);
       if (!flags.verdict) {
         if (!needsPeriodReview(session))
           fail(
@@ -83,16 +71,13 @@ export default function review(argv) {
               (openSegment(session) ? "（" + openSegment(session).id + " 还开着）" : "（还有条目没交付或没判）") +
               "；到那时候用 deed review --all 出期审清单",
           );
-        if (!flags.by) fail('期审要写清这一期交给谁：--by "你是谁"（期审每次换一双手，判过段的人不判这一期）');
-        if (taken.has(flags.by))
-          fail(flags.by + " 已经判过这一期的段（或期审过）：期审换一双手——" + (flags.by === undefined ? "" : "另找一个没判过这一段的人"));
         const handed = lastPeriodBrief(session);
         if (handed && handed.withdrawnAt === undefined && handed.answeredBy === null) {
           const file = path.resolve(ROOT, handed.brief);
           const intact = fs.existsSync(file);
           if (intact) {
             console.log("期审清单 · " + handed.brief + "（已经出过，等结论落盘）");
-            console.log('  结论用 deed review --all --by "' + handed.by + '" --verdict pass|fail');
+            console.log("  结论用 deed review --all --verdict pass|fail");
             return;
           }
         }
@@ -106,24 +91,21 @@ export default function review(argv) {
             s: session.id,
             scope: "session",
             goal: session.goal?.text ?? "这一期没有写下目的",
-            by: flags.by,
+            by: "agent",
             brief,
             guide,
           }),
           () => writeBrief(plan, brief),
         );
         const nth = session.briefs.filter((b) => b.scope === "session").length + 1;
-        console.log("期审清单 · " + brief + "（审什么）· " + session.id + " 的第 " + nth + " 份 · 交给 " + flags.by);
+        console.log("期审清单 · " + brief + "（审什么）· " + session.id + " 的第 " + nth + " 份");
         console.log("  角色包 · " + guide + "（怎么审）· 两份一起交给期审的人");
-        console.log('  结论用 deed review --all --by "' + flags.by + '" --verdict pass|fail');
+        console.log("  结论用 deed review --all --verdict pass|fail");
         return;
       }
-      if (!flags.by) fail('期审要给结论就写清谁判的：--by "…"');
       const handed = lastPeriodBrief(session);
-      if (!handed) fail("这一期还没有期审清单：先 deed review --all --by \"你是谁\" 出一份");
+      if (!handed) fail("这一期还没有期审清单：先 deed review --all 出一份");
       if (handed.withdrawnAt !== undefined) fail("那份期审清单已经撤回（" + handed.brief + "）：另出一份再落结论");
-      if (handed.by && handed.by !== flags.by)
-        fail("这份期审清单是交给 " + handed.by + " 判的：结论要由这一双手落（期审每次换手，但不在一份清单里换）");
       const file = path.resolve(ROOT, handed.brief);
       if (!fs.existsSync(file)) fail("期审清单不在了（" + handed.brief + "）：先 deed review --all 另出一份");
       if (stalePeriod(session))
@@ -144,7 +126,7 @@ export default function review(argv) {
         s: session.id,
         scope: "session",
         goal: session.goal?.text ?? null,
-        by: flags.by,
+        by: "agent",
         verdict: flags.verdict,
         brief: handed.brief,
         briefDigest: handed.briefDigest,
@@ -156,14 +138,14 @@ export default function review(argv) {
         force: true,
       });
       if (flags.verdict === "pass") {
-        console.log("期审通过 · " + session.id + " · " + flags.by + " · 这一期做成的样子成立，下一步是签收");
+        console.log("期审通过 · " + session.id + " · 这一期做成的样子成立，下一步是签收");
         for (const one2 of findings) console.log("  发现 · " + one2);
         const step = nextAction(after, after.config);
         console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
         console.log("  " + step.command);
         return;
       }
-      console.log("期审不合格 · " + session.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
+      console.log("期审不合格 · " + session.id + " · 退回 " + rework.join("、") + " · " + flags.why);
       for (const one2 of findings) console.log("  发现 · " + one2);
       console.log("  被点名的段重新打开：那一段的条目保持交付，重判的是那一段");
       return;
@@ -191,7 +173,6 @@ export default function review(argv) {
       // 那种自动判断——是一个人在账本上写下"这一份不作数"，谁写的、为什么都留着。
       if (flags.withdraw) {
         if (flags.verdict) fail("--withdraw 与 --verdict 是两件事：撤回这份清单，或者回答它，一次只做一件");
-        if (!flags.by) fail('撤回也要写清谁撤的：--by "…"');
         if (!flags.why) fail('撤回要说清为什么：--why "…"（这条会留在账本上，读的人靠它知道当时怎么回事）');
         const handed = lastBrief(one, seg.id);
         if (!handed) fail("段 " + seg.id + " 还没有发过清单：没有可撤回的那一份");
@@ -205,27 +186,19 @@ export default function review(argv) {
           brief: handed.brief,
           briefDigest: handed.briefDigest,
           why: flags.why,
-          by: flags.by,
+          by: "agent",
         }));
-        console.log("撤回清单 · " + seg.id + " · " + handed.brief + " · " + flags.by);
+        console.log("撤回清单 · " + seg.id + " · " + handed.brief);
         console.log("  " + flags.why);
         console.log("  这一段回到执行态：可以继续交付；改完再 deed review --segment " + seg.id + " 出下一份清单");
         return;
       }
       if (!flags.verdict) {
-        // 段审一直用同一双手：这一段的清单第一次交给谁，之后还是他。换手只发生在人推翻结论时。
-        // 这一句要放在「已经出过、等结论」之前：那份清单是谁的，先看它，再看手上这一份。
-        const before = lastBrief(one, seg.id);
-        const hand = flags.by ?? before?.by ?? null;
-        if (!hand)
-          fail('这一段要交给谁判：--by "这一段的审查者"（之后这一段的清单都写他——同一段的判断不该每次换个人从头摸一遍）');
-        if (before?.by && before.by !== hand && !maySwitch(one, seg.id))
-          fail("这一段已经交给 " + before.by + " 判了：段审一直用同一双手（封过的段不换手：要改就开新一期）");
         // 审查设置说这一段不用审（改动全落在免审路径）：不出清单。出了一份没人需要的卷子，
         // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
         if (!needsReview(doc.config, one, seg)) {
           console.log("审查设置说这一段不用审（改动都落在免审路径）：不出清单与角色包，账本也不记一条等人回答的清单");
-          console.log('  关闭这一段：deed review --segment ' + seg.id + ' --skip --why "凭什么不审" --by "…"');
+          console.log("  关闭这一段：deed review --segment " + seg.id + ' --skip --why "凭什么不审"');
           return;
         }
         // 清单写的是"这些条目、这些交付记录"。还有条目没交，清单就是一份没人能答的卷子：
@@ -249,7 +222,7 @@ export default function review(argv) {
           if (intact && stale) console.log("上一份清单(" + handed.brief + ")出在这一段最近一次改动之前：另出一份");
           else if (intact) {
             console.log("审查清单 · " + handed.brief + "（这一段已经出过，等结论落盘）");
-            console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
+            console.log("  结论用 deed review --segment " + seg.id + " --verdict pass|fail");
             return;
           } else console.log("上一份清单(" + handed.brief + " 与角色包)改过或丢了：另出一份，旧的那条账本记录留着（它回答不了这一段现在的事）");
         }
@@ -258,20 +231,19 @@ export default function review(argv) {
         const guide = rel(ROOT, plan.guideFile);
         transact(
           flags,
-          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, guide, by: hand }),
+          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, guide, by: "agent" }),
           () => writeBrief(plan, brief),
         );
         // 账本里已有几份，加上手上这份：一次审只回答一份清单。
         const nth = one.briefs.filter((b) => (b.segment ?? null) === seg.id).length + 1;
-        console.log("审查清单 · " + brief + "（审什么）· " + seg.id + " 的第 " + nth + " 份 · 交给 " + hand);
+        console.log("审查清单 · " + brief + "（审什么）· " + seg.id + " 的第 " + nth + " 份");
         // 第三份起提一句：同一段反复出清单，通常是上一份没看清哪里不够，而不是这一段真的又变了。
         // 只提示不拦——拦下来会让人去编理由，而不是去读上一份。
         if (nth >= 3) console.log("  提示 · 这一段已经出过 " + (nth - 1) + " 份清单：先看上一份的审查者点了哪几条，别从头再写一份");
         console.log("  角色包 · " + guide + "（怎么审）· 两份一起交给审查者");
-        console.log("  结论用 deed review --segment " + seg.id + " --by \"…\" --verdict pass|fail");
+        console.log("  结论用 deed review --segment " + seg.id + " --verdict pass|fail");
         return;
       }
-      if (!flags.by) fail("review 要给结论就要写清谁审的：--by \"…\"");
       const waiting = tasksIn(one, seg).filter((task) => task.status === "todo");
       if (waiting.length > 0)
         fail("段 " + seg.id + " 还有没交付的（" + waiting.map((task) => task.id).join("、") + "）：结论只能落在交付之后");
@@ -279,17 +251,6 @@ export default function review(argv) {
       // here would pin bytes produced after the reading -- a brief nobody read.
       const handed = lastBrief(one, seg.id);
       if (!handed) fail("这一段还没有清单：先 deed review --segment " + seg.id + " 出清单，再把结论落回来");
-      // 清单是交给某一双手的：结论要由那一双手落。段审一直用同一个人，换手等于换了一套判断标准。
-      if (handed.by && handed.by !== flags.by && !maySwitch(one, seg.id)) {
-        // 两种"换手"各说各的：自己交付过的段判不了（规则 10）；不是自己交付的，也换不得手——
-        // 这一段的判断归原来那双手。
-        const delivered = tasksIn(one, seg).some((task) => task.evidence.some((proof) => proof.by === flags.by));
-        fail(
-          delivered
-            ? "段 " + seg.id + " 的活是 " + flags.by + " 交付的：同一个人不能判自己交付的段（换一个 --by）"
-            : "这一段是交给 " + handed.by + " 判的（同一段一直用同一双手）：结论要由他落；封过的段不换手，要改就开新一期",
-        );
-      }
       if (handed.withdrawnAt !== undefined)
         fail("这一段的那份清单已经撤回（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份，再落结论");
       const file = path.resolve(ROOT, handed.brief);
@@ -358,7 +319,7 @@ export default function review(argv) {
         k: "review.log",
         s: one.id,
         segment: seg.id,
-        by: flags.by,
+        by: "agent",
         verdict: flags.verdict,
         brief: handed.brief,
         briefDigest: handed.briefDigest,
@@ -375,7 +336,7 @@ export default function review(argv) {
         force: true,
       });
       if (flags.verdict === "pass") {
-        console.log("审查通过 · " + seg.id + " · " + flags.by + " · 交回给你判（段还开着，判决之后才关闭）");
+        console.log("审查通过 · " + seg.id + " · 交回给你判（段还开着，判决之后才关闭）");
         console.log("  清单 " + handed.brief);
         for (const one2 of gaveUp)
           console.log("  被点名但已放弃 · " + one2.id + " · " + (one2.deferredWhy ?? "没写理由") + "（这条不合格没有交付可结清，结论落在它被放弃这件事上）");
@@ -385,7 +346,7 @@ export default function review(argv) {
         console.log("  " + step.command);
         return;
       }
-      console.log("审查不合格 · " + seg.id + " · " + flags.by + " · 退回 " + rework.join("、") + " · " + flags.why);
+      console.log("审查不合格 · " + seg.id + " · 退回 " + rework.join("、") + " · " + flags.why);
       console.log("  清单 " + handed.brief);
       for (const one2 of findings) console.log("  发现 · " + one2);
       console.log("  被点名的条目回到未做；补完再交，deed review --segment " + seg.id + " 另出清单再审");

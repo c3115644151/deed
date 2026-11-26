@@ -1,4 +1,4 @@
-import { parse, transact, nextId, fail, guard, signer, load } from "../session.mjs";
+import { parse, transact, nextId, fail, guard, load } from "../session.mjs";
 
 const one = (id) => {
   const { doc } = load();
@@ -30,7 +30,7 @@ export default function topic(argv) {
           k: "topic.create", s: session.id, id: topic.id,
           title: flags.title ?? topic.title, body: String(flags.body),
           points: [...new Set([...topic.points, ...named])],
-          by: signer(flags, "补正文"),
+          by: "agent",
           replaces: topic.id,
         };
       });
@@ -65,7 +65,7 @@ export default function topic(argv) {
       return {
         k: "topic.create", s: session.id, id: flags.id ?? nextId(doc0, "I"),
         title, body: String(flags.body), points,
-        by: signer(flags, "开议题"),
+        by: "agent",
       };
     });
     console.log("议题草稿 · " + ev.id + " · " + ev.title + " · 统合 " + points.length + " 条要点");

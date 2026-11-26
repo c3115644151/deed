@@ -14,7 +14,6 @@
 - [`research.md`](research.md)：对照与出处，「站在哪一格」那一节的底稿。
 - [`deed-architecture.html`](deed-architecture.html)：架构图（单文件、可交互）；同目录的 `deed-architecture.candidate.json` 是它的图源，`architecture.png` 是它的一张截图，给 README 用。
 
-演示数据在 [`../examples/`](../examples/)，不算文档：`examples/contract/NOTES.md` 是那份示例账本的说明。
 
 ## 一条规矩：新增文档先问
 

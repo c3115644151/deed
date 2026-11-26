@@ -308,20 +308,6 @@ export const periodFresh = (session) => {
   return Boolean(brief) && brief.answeredBy === null && brief.withdrawnAt === undefined;
 };
 
-// 这一期的段审用过哪些手：期审要换一双新的。段审自己则一直用同一双手——
-// 前一次判过这一段的人，下一次还是他：同一段的判断不该每次换个人从头摸一遍。
-// 一段交给谁判：这一段的清单第一次写了谁，之后就是他。下一步的命令照它印。
-export const handOf = (session, segmentId) =>
-  session.briefs.filter((one) => one.scope === "segment" && one.segment === segmentId && one.by).at(-1)?.by ?? null;
-
-export const segmentReviewers = (session) =>
-  [...new Set(session.briefs.filter((one) => one.scope === "segment" && one.by).map((one) => one.by))];
-
-export const periodReviewers = (session) =>
-  [...new Set(session.briefs.filter((one) => one.scope === "session" && one.by).map((one) => one.by))];
-
-// Signing is a session-level judgement, so it looks at the whole session, not
-// just the segment that happens to be open.
 export function signBlockers(doc, session, config = null) {
   if (!session) return ["现在没有在推进的会话"];
   const blockers = [];
@@ -422,7 +408,7 @@ export function nextAction(doc, config) {
     return {
       who: "agent",
       what: "记一轮",
-      text: "这个工作区还没有在推进的会话；把这一轮谁说了什么写进账本（--who 写开口的人），会话自己开出来",
+      text: "这个工作区还没有在推进的会话；把这一轮谁说了什么写进账本（deed say 一句，会话自己开出来）",
       command: `deed say "…"`,
     };
   }
@@ -464,7 +450,7 @@ export function nextAction(doc, config) {
       who: "reviewer",
       what: "落结论",
       text: `${open.id} 的清单交出去了、还没人回答（${countIn(session, open).total} 条）：判完落结论，这一段才动得了；要改这一段就先撤回这份清单`,
-      command: `deed review --segment ${open.id} --by "${handOf(session, open.id) ?? "你是谁"}" --verdict pass --result T1=met`,
+      command: `deed review --segment ${open.id} --verdict pass --result T1=met`,
     };
   })();
   if (session.segments.length === 0) {
@@ -486,15 +472,15 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落期审结论",
         text: session.id + " 的期审清单交出去了、还没人回答：" + handed.brief + "（这一期 " + session.segments.length + " 段都关了）",
-        command: `deed review --all --by "你是谁" --verdict pass`,
+        command: `deed review --all --verdict pass`,
       };
     }
     if (state === "stale") {
       return {
         who: "reviewer",
         what: "重判这一期",
-        text: session.id + " 的期审结论早于之后的段变动：那一次判的不是这一期现在的样子；期审要换一双手",
-        command: `deed review --all --by "你是谁"`,
+        text: session.id + " 的期审结论早于之后的段变动：那一次判的不是这一期现在的样子；另出一份重判",
+        command: `deed review --all`,
       };
     }
     if (state === "fail") {
@@ -508,8 +494,8 @@ export function nextAction(doc, config) {
     return {
       who: "reviewer",
       what: "期审",
-      text: session.id + " 的各段都关了（" + session.segments.length + " 段）：这一期做成的样子还没有人判；期审换一双手，别用判过段的人",
-      command: `deed review --all --by "你是谁"`,
+      text: session.id + " 的各段都关了（" + session.segments.length + " 段）：这一期做成的样子还没有人判",
+      command: `deed review --all`,
     };
   }
   // 审查通过只把这一段交回来：此刻轮到人判，它不是签收，也不是再审。
@@ -547,13 +533,13 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的结论早于最后一次交付，新的一份清单已经交出去了：${fresh.brief}`,
-        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
+        command: `deed review --segment ${segment.id} --verdict pass`,
       };
     return {
       who: "reviewer",
       what: "重审",
       text: `${segment.id} 的结论早于最后一次交付：它回答的是旧内容`,
-      command: `deed review --segment ${segment.id}${handOf(session, segment.id) ? ' --by "' + handOf(session, segment.id) + '"' : ''}`,
+      command: `deed review --segment ${segment.id}`,
     };
   }
   if (state !== "fail" && needsReview(config, session, segment)) {
@@ -576,14 +562,14 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的清单与角色包已经交出去了：${handed.brief}（${count.total} 条都交付了）`,
-        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
+        command: `deed review --segment ${segment.id} --verdict pass`,
       };
     }
     return {
       who: "reviewer",
       what: voidedReview(session, segment) ? "重审" : "审这一段",
       text: `${segment.id} 的 ${count.total} 条都交付了，要一份独立结论`,
-      command: `deed review --segment ${segment.id}${handOf(session, segment.id) ? ' --by "' + handOf(session, segment.id) + '"' : ''}`,
+      command: `deed review --segment ${segment.id}`,
     };
   }
   if (state === "fail") {
@@ -617,7 +603,7 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的不合格（${review.by}）还在案；新的一份清单已经交出去了：${handed.brief}`,
-        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
+        command: `deed review --segment ${segment.id} --verdict pass`,
       };
     // 旧账本里有点名之前写下的不合格：没有可结清的条目，这一段停在这里，账本不往回改。
     if (named.length === 0)
@@ -634,13 +620,13 @@ export function nextAction(doc, config) {
         who: "reviewer",
         what: "落结论",
         text: `${segment.id} 的不合格（${review.by}）点名了 ${gave.map((one) => one.id).join("、")}，它们改主意不做了：没有活可以重交，放行会把放弃与理由记进账本`,
-        command: `deed review --segment ${segment.id} --by "${handOf(session, segment.id) ?? "你是谁"}" --verdict pass`,
+        command: `deed review --segment ${segment.id} --verdict pass`,
       };
     return {
       who: "reviewer",
       what: "重审",
       text: `${segment.id} 的不合格（${review.by}）还在案，被点名的已经重新交付：另出一份清单再审`,
-      command: `deed review --segment ${segment.id}${handOf(session, segment.id) ? ' --by "' + handOf(session, segment.id) + '"' : ''}`,
+      command: `deed review --segment ${segment.id}`,
     };
   }
   // 走到这里只剩一种：审查设置说这一段不用审，而它还没封。免审就是不用审，所以不再
@@ -649,7 +635,7 @@ export function nextAction(doc, config) {
     who: "agent",
     what: "封存",
     text: `${segment.id} · ${count.total} 条都交付了，审查设置说这一段不用审（改动只落在免审路径，没人需要审）`,
-    command: `deed review --segment ${segment.id} --skip --why "凭什么不用审" --by "…"`,
+    command: `deed review --segment ${segment.id} --skip --why "凭什么不用审" `,
   };
 }
 

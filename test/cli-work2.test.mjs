@@ -276,7 +276,7 @@ test("a delivery that says what it will show has to show it when the ledger is w
   // 成立的那条留下了凭据：账本记下命令与它必须印出的那段话，清单上也看得到
   const first = readEvents(cwd).find((one) => one.k === "task.done");
   assert.deepEqual(first.expects, [{ command: "node say.mjs", want: "hi" }]);
-  deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
+  deed(cwd, "review", "--segment", "S01.1");
   const brief = fs
     .readdirSync(path.join(cwd, ".deed", "review"))
     .filter((one) => !one.endsWith("-reviewer.md"))
@@ -422,7 +422,7 @@ test("the plan can line up several segments, and only the first takes work", () 
       "",
     ].join("\n"),
   );
-  const first = deed(cwd, "submit", "--by", "agent");
+  const first = deed(cwd, "submit");
   assert.equal(first.status, 0, first.stdout + first.stderr);
   const doc = fold(readEvents(cwd));
   const one = doc.sessions[0];
@@ -437,14 +437,14 @@ test("the plan can line up several segments, and only the first takes work", () 
   const queued = deliverTask(cwd, "T2", "试试看");
   assert.equal(queued.status, 1, "还没轮到的那一段不能交付");
   assert.match(queued.stderr, /轮到它的那一段还没开/u);
-  const early = deed(cwd, "review", "--segment", "S01.2", "--by", "qa");
+  const early = deed(cwd, "review", "--segment", "S01.2");
   assert.equal(early.status, 1);
   assert.match(early.stderr, /轮到它的那一段还没开|还没轮到/u);
 
   // 第一段交付、审过、判过之后，第二段才接过活。
   assert.equal(deliverTask(cwd, "T1", "做完了").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
   assert.match(deed(cwd, "state").stdout, /S01\.2/);
   assert.equal(deliverTask(cwd, "T2", "轮到它了").status, 0);
