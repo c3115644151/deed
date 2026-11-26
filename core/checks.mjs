@@ -27,8 +27,15 @@ export const CHECKS = [
     id: "workspace",
     title: "账本可读、审查设置已声明",
     capability: "三种状态与账本",
-    fix: 'deed init --said "这一轮说了什么"',
-    judge: ({ doc }) => {
+    fix: "deed check --ledger 看坏在哪一行；deed init 补审查设置",
+    // 表里唯一一条在重放之前就成立的检查：别的检查都要先有 doc，而 doc 是重放出来的。
+    // 账本读不动的时候，下面每条都没有输入——这一条先说清楚，别让状态报出一个通过率。
+    judge: ({ doc, ledger }) => {
+      if (ledger && ledger.ok === false)
+        return {
+          verdict: "fail",
+          detail: "账本读不动：" + (ledger.why ?? "某一行的形状不成立") + "（deed check --ledger 看那一行与修法）",
+        };
       if (!doc || !Array.isArray(doc.sessions))
         return { verdict: "fail", detail: "账本读不出会话：这个目录还没接过 deed" };
       if (doc.config === null || doc.config === undefined)
@@ -123,15 +130,15 @@ export const CHECKS = [
 export const projectOf = (doc) => doc?.project ?? null;
 
 // 状态是算出来的，不是记下来的：没声明就没有状态可言；声明了才谈通过率。
-export function checkAll(doc, tree = null) {
+export function checkAll(doc, tree = null, ledger = { ok: true }) {
   const project = projectOf(doc);
-  const facts = { doc, project, tree };
+  const facts = { doc, project, tree, ledger };
   return CHECKS.map((check) => ({ id: check.id, title: check.title, capability: check.capability, fix: check.fix, ...check.judge(facts) }));
 }
 
-export function projectState(doc, tree = null) {
+export function projectState(doc, tree = null, ledger = { ok: true }) {
   const project = projectOf(doc);
-  const list = checkAll(doc, tree);
+  const list = checkAll(doc, tree, ledger);
   if (!project) return { declared: false, shape: null, passed: 0, total: list.length, missing: [], checks: list };
   const ok = list.filter((one) => one.verdict === "pass" || one.verdict === "na");
   return {

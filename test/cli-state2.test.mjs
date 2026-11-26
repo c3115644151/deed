@@ -354,3 +354,15 @@ test("the merged verbs point at their new home instead of doing nothing", () => 
   assert.equal(goal.status, 1);
   assert.match(goal.stderr, /清单第一行/u);
 });
+
+// 账本坏一行时，体检的第一条先红：别的检查都没有输入，也不该报一个通过率。
+test("a broken ledger turns the first check red and says where to look", () => {
+  const cwd = workspace("broken-ledger");
+  deed(cwd, "init", "--said", "开始");
+  writeLines(cwd, [{ k: "no-such-kind", at: "2026-11-01T00:00:00.000Z", v: EVENT_VERSION }]);
+  const run = deed(cwd, "check");
+  assert.equal(run.status, 1, "账本读不动时退出码是 1，不是 0");
+  assert.match(run.stdout, /✗ 账本可读、审查设置已声明 · 账本读不动/u);
+  assert.match(run.stdout, /deed check --ledger/u);
+  assert.match(run.stdout, /先处理那一行/u);
+});

@@ -104,6 +104,16 @@ const software = (extra = {}) => declared({
   ...extra,
 });
 
+test("a ledger that cannot be read turns the first check red, before anything else", () => {
+  const list = checkAll(null, null, { ok: false, why: "第 3 行不是合法 JSON" });
+  assert.equal(list[0].verdict, "fail");
+  assert.match(list[0].detail, /第 3 行/u);
+  // 账本读不动时连"这个工作区是不是项目"都无从谈起：状态只说这一条红，不报通过率。
+  const state = projectState(null, null, { ok: false, why: "第 3 行不是合法 JSON" });
+  assert.equal(state.declared, false);
+  assert.equal(state.checks[0].verdict, "fail");
+});
+
 test("the standing falls back when the tree moves: it is a value, not a badge", () => {
   const before = projectState(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"]));
   assert.equal(before.passed, 3);
