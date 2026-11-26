@@ -63,7 +63,8 @@ if (!panelOff() && verb !== "serve" && verb !== "panel") {
     const one = await ensurePanel(ROOT);
     if (one && one.started) console.log("面板 · http://127.0.0.1:" + one.port);
     // 一个工作区只有一个面板：这一格被谁占着就说谁，绝不另开第二条页面。
-    if (one && one.blocked) console.log("deed: 面板没起来 —— " + one.blocked.why + "（端口 " + one.blocked.port + "）");
+    if (one && one.blocked && one.blocked.quiet !== true)
+      console.log("deed: 面板没起来 —— " + one.blocked.why + "（端口 " + one.blocked.port + "）");
   } catch {
     // 面板起不来不该让命令失败：账本的事比页面重要。
   }

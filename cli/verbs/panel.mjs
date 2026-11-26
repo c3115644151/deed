@@ -19,7 +19,7 @@ export default function panel(argv) {
           return null;
         }
         if (now.blocked) {
-          reject(now.blocked.why + "（端口 " + now.blocked.port + "）：把它关掉，或者改审查设置里的 board.port");
+          reject(now.blocked.why + "（端口 " + now.blocked.port + "）");
           return null;
         }
         return startPanel(ROOT).then((one) => {
@@ -27,7 +27,7 @@ export default function panel(argv) {
             console.log("面板 · http://127.0.0.1:" + one.port + (one.pid ? " · pid " + one.pid : ""));
             return null;
           }
-          reject(one.blocked.why + "（端口 " + one.blocked.port + "）：把它关掉，或者改审查设置里的 board.port");
+          reject(one.blocked.why + "（端口 " + one.blocked.port + "）");
           return null;
         });
       })

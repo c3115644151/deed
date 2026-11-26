@@ -71,10 +71,29 @@ export function identity(root, port) {
   return { deed: true, root: path.resolve(root), pid: process.pid, port, build: buildCached() };
 }
 
-export function handler(root, onRequest = () => {}) {
+export function handler(root, onRequest = () => {}, onRetire = null) {
   return (req, res) => {
     onRequest();
     const url = new URL(req.url, "http://localhost");
+    // 让位：这个号要给新代码用了。谁都不是杀手——面板自己收摊，端口随之放开。
+    if (req.method === "POST" && url.pathname === "/__deed/retire") {
+      const peer = req.socket.remoteAddress ?? "";
+      const local = peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
+      if (!local) {
+        res.writeHead(403, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, why: "只在这台机器上让位" }) + "\n");
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ ok: true, pid: process.pid }) + "\n");
+      // 先把话说完再收摊：对方要拿到 200 才会把这一格当成空的。
+      setTimeout(() => {
+        clearPanel(root, process.pid);
+        if (onRetire) onRetire();
+        else process.exit(0);
+      }, 60);
+      return;
+    }
     if (url.pathname === "/__deed") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
       res.end(JSON.stringify(identity(root, req.socket.localPort), null, 1) + "\n");
@@ -233,9 +252,24 @@ export function handler(root, onRequest = () => {}) {
   };
 }
 
-export function start(root, port, onFatal = null) {
+export function start(root, port, onFatal = null, options = {}) {
   let lastRequest = Date.now();
-  const server = http.createServer(handler(root, () => { lastRequest = Date.now(); }));
+  const server = http.createServer(
+    handler(
+      root,
+      () => {
+        lastRequest = Date.now();
+      },
+      // 让位：由起它的人决定怎么收场。后台拉起来的那个进程直接退；跑在测试里时只关服务，
+      // 不把整个测试进程带走。
+      () => {
+        server.close(() => {
+          if (options.exit === false) return;
+          process.exit(0);
+        });
+      },
+    ),
+  );
   // 一个工作区只有一个面板，一个面板只占一格端口：这条页面是你收藏的那一条地址。
   // 号被占着就不再换号——换号意味着同时开着两个面板，而"看哪一条"从此变成一个要靠记忆的
   // 问题。占着的时候只有一句该说：这个号在谁手里、要不要把它关掉。

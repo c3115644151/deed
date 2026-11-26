@@ -263,6 +263,25 @@ test("a port somebody else already holds is named, not routed around", async () 
 });
 
 
+test("a panel stands down when it is asked to, so nobody has to kill it", async () => {
+  const root = workspace("retire");
+  fs.mkdirSync(path.join(root, ".deed"), { recursive: true });
+  const server = start(root, 0, null, { exit: false });
+  const port = await new Promise((resolve) => {
+    const see = () => (server.address()?.port ? resolve(server.address().port) : setTimeout(see, 10));
+    see();
+  });
+  const res = await fetch("http://127.0.0.1:" + port + "/__deed/retire", { method: "POST" });
+  assert.equal(res.status, 200, "让位的话说得出");
+  const who = await res.json();
+  assert.equal(who.ok, true);
+  assert.equal(who.pid, process.pid, "退的是它自己");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const gone = await fetch("http://127.0.0.1:" + port + "/__deed").then(() => false).catch(() => true);
+  assert.equal(gone, true, "说完就收摊：那一格空出来了");
+});
+
+
 test("a panel answers who it is, so nothing has to guess", async () => {
   const root = workspace("identity");
   fs.mkdirSync(path.join(root, ".deed"), { recursive: true });

@@ -50,11 +50,50 @@ export async function askPanel(port, timeout = 600) {
   }
 }
 
+// 请那一格让位：面板自己收摊，端口随即空出来。这不是 kill——谁也不该去杀别人的进程，
+// 一个工作区里该发生的是"新的请旧的退场"，而不是"我把它按死"。
+const LEGACY_WHY = (port) =>
+  "端口 " + port + " 上还坐着更早一版的面板（它没有 /__deed/retire 这个路口）：" +
+  "它自己静下来 30 分钟后会退场，那时下一条命令就会把它换成新的；要现在就看，重启一次应用";
+
+export async function retirePanel(port, timeout = 800) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch("http://127.0.0.1:" + port + "/__deed/retire", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "content-type": "application/json" },
+    });
+    if (!res.ok) return false;
+    const one = await res.json();
+    return one?.ok === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function panelNow(root) {
   const asked = portOf(root);
+  // 上一次已经认出那一格是更早一版：不再发 HTTP（每发一次就等于替它续一次命），
+  // 只探一下它还在不在。它自己的空闲计时会把它收走，收走之后这里就空出来了。
+  const seen = readPanel(root);
+  if (seen?.legacy === true && seen.port === asked) {
+    if (!(await answers(asked))) {
+      clearPanel(root, seen.pid ?? null);
+      return { running: false, port: asked };
+    }
+    return { running: false, port: asked, blocked: { port: asked, legacy: true, quiet: seen.legacyAnnounced === true, why: LEGACY_WHY(asked) } };
+  }
   const who = await askPanel(asked);
   if (!who) return { running: false, port: asked };
-  if (who.legacy === true) return { running: false, port: asked, stale: { pid: who.pid ?? null, port: asked }, legacy: true };
+  if (who.legacy === true) {
+    const seen = readPanel(root);
+    recordPanel(root, { pid: who.pid ?? null, port: asked, legacy: true, legacyAnnounced: seen?.legacyAnnounced === true, build: null });
+    return { running: false, port: asked, blocked: { port: asked, legacy: true, quiet: seen?.legacyAnnounced === true, why: LEGACY_WHY(asked) } };
+  }
   if (path.resolve(who.root) !== path.resolve(root))
     return { running: false, port: asked, blocked: { port: asked, why: "端口上坐着另一个工作区的面板（" + who.root + "）" } };
   if (who.build !== buildNow())
@@ -129,23 +168,26 @@ export async function ensurePanel(root) {
   if (!fs.existsSync(path.join(root, ".deed", "config.json"))) return null;
   const now = await panelNow(root);
   if (now.running) return { ...now, started: false };
-  if (now.blocked) return now;
+  if (now.blocked) {
+    if (now.blocked.legacy && now.blocked.quiet !== true) {
+      recordPanel(root, { ...(readPanel(root) ?? {}), legacy: true, port: now.blocked.port, legacyAnnounced: true });
+    }
+    return now;
+  }
   // 自己那一格上坐着旧代码：先让位，再在原格上起来。让不开就不另开。
   if (now.stale) {
-    stopPanel(root);
-    await holdFor(now.port, 800);
+    // 先请它自己退场（新一版都听得懂这句话）；听不懂的那一版，就等它自己收摊：
+    // 面板在没人请求 30 分钟后会自己退，不需要任何人去替它按死。
+    await retirePanel(now.port);
+    await holdFor(now.port, 1200);
     const after = await panelNow(root);
     if (after.running) return { ...after, started: false };
     if (after.blocked) return after;
-    if (after.stale)
-      return {
-        running: false,
-        port: now.port,
-        blocked: {
-          port: now.port,
-          why: "端口 " + now.port + " 上是更早一版的面板（没有 /__deed），它不在这个进程树里，关不掉——重启应用或手动结束它",
-        },
-      };
+    if (after.stale) {
+      const seen = readPanel(root);
+      recordPanel(root, { pid: seen?.pid ?? null, port: now.port, legacy: true, legacyAnnounced: true, build: null });
+      return { running: false, port: now.port, blocked: { port: now.port, legacy: true, quiet: true, why: LEGACY_WHY(now.port) } };
+    }
   }
   // 号上没人应答，但记号里还写着一个活着的 pid：那是这个工作区更早一版的面板
   // （它没有 /__deed，问不出自己是谁）。先让它让位；让不动就说清楚是哪一个。
@@ -173,8 +215,12 @@ export function stopPanel(root) {
     clearPanel(root, null);
     return { stopped: false, port };
   }
+  // 先请它自己退；它不听（更早一版、或已经僵住）才由这里收尾。收尾也不该是日常动作：
+  // 正常路径是那句 POST /__deed/retire。
+  const retire = retirePanel(one.port);
+  retire.catch(() => false);
   try {
-    process.kill(one.pid);
+    if (Number.isInteger(one.pid)) process.kill(one.pid);
   } catch {
     // 已经退了：清掉记号就算停住。
   }
