@@ -256,11 +256,12 @@ export function apply(ctx, config = {}) {
 
   // 不同构建的子代理 API 名字不一样（本机装的是 startContinuable，另一些构建是
   // startActivation/start）。这里按能力挑，挑不到就说清，不猜。
-  const spawnChild = async (subagents, agent, prompt, signal) => {
+  const spawnChild = async (subagents, agent, prompt, signal, key) => {
     if (typeof subagents.startContinuable === "function") {
       const started = await subagents.startContinuable({
         provider: "spawn",
-        label: "deed review",
+        // 标签就是这个名字：热重载把内存清空之后，靠它从子代理目录里找回同一个审查者。
+        label: key,
         request: { parent: agent, prompt },
         signal,
       });
@@ -277,7 +278,7 @@ export function apply(ctx, config = {}) {
       });
       return { childId: started.childId, api: "startActivation", result: started.result };
     }
-    const run = await subagents.start("spawn", { label: "deed review", prompt, parent: agent, signal });
+    const run = await subagents.start("spawn", { label: key, prompt, parent: agent, signal });
     return { childId: run?.childId ?? run?.id, api: "start", result: run?.result };
   };
 
@@ -294,6 +295,22 @@ export function apply(ctx, config = {}) {
     }
     const key = handKey(due);
     if (inflight.has(key)) return; // 同一份材料只起一次：并发问两次会起两个审查者
+
+    // 重载或重启之后内存里的那张表没了：先去父会话的子代理目录里找同名的那一个。
+    // 找回来就接着给它发消息，而不是另起一个——同一份材料不该有两个读者。
+    if (!hands.has(key) && typeof subagents.listChildren === "function") {
+      try {
+        const rows = await subagents.listChildren(sid, AbortSignal.timeout(5000));
+        // 目录行在有的构建里 kind 是 null，但 label 与 id 稳定：按 label 认，不认 kind。
+        const hit = rows.find((row) => row?.label === key && row?.id);
+        if (hit?.id) {
+          hands.set(key, { childId: hit.id });
+          note(root, "找回了审查者 · " + String(hit.id).slice(0, 12) + " · " + key);
+        }
+      } catch (err) {
+        note(root, "找审查者失败（照常新起） · " + clip(err?.message ?? err, 160));
+      }
+    }
     inflight.add(key);
     try {
       await deliverOnce(root, due, key, { subagents, agent });
@@ -320,7 +337,7 @@ export function apply(ctx, config = {}) {
       }
     }
 
-    const started = await spawnChild(subagents, agent, prompt, signal);
+    const started = await spawnChild(subagents, agent, prompt, signal, key);
     hands.set(key, { childId: started.childId });
     note(root, "起了审查者 · " + started.api + " · " + String(started.childId).slice(0, 12) + " · " + (due.segment ?? "整期"));
     started.result?.then?.(

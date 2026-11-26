@@ -30,6 +30,21 @@ New-Item -ItemType Junction -Path "$env:USERPROFILE\.dsh\profiles\desktop\node_m
 
 拆掉：删掉那两行、删掉那个 Junction、重启。工作区里只会多出 `.deed/tmp/dsh.log`。
 
+## 热重载
+
+改完存盘就生效，不用重启——前提是 hmr 行监听了这个目录（默认 `root: []` 只监听配置，不监听源码）：
+
+```yaml
+- id: hmr
+  config:
+    root:
+      - C:/Users/NUC/Desktop/deed/adapters/dsh
+```
+
+这条配置是**启动时**读的：先加它、重启一次；此后改 `index.js` 存盘即重载。重载会清掉内存里的
+状态（`hands`、`askPoint`），所以审查者的映射写成子代理目录里的 `label`（就是 hand 名，
+例如 `r-s01-1`），重载后按 `subagents.listChildren` 找回来，不会为同一份清单再起一个读者。
+
 ## 已知边界
 
 - 适配器按顺序找 CLI：配置里的 `deed`（绝对路径）→ 工作区自带的 `cli/deed.mjs` → 适配器旁边那个（同一个仓库）→ PATH 上的 `deed`。用的是 `node`（PATH 或 `DEED_NODE`），不是 `process.execPath`——在宿主进程里那是宿主自己。
