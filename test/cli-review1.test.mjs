@@ -18,7 +18,7 @@ import {
 
 
 test("delivery needs evidence, and the reviewer decides what counts", () => {
-  const cwd = workspace("gate");
+  const cwd = workspace("gates");
   deed(cwd, "init", "--said", "改重放函数");
   proof(cwd, "fold.mjs");
   assert.equal(deed(cwd, "task", "add", "改重放函数", "--criteria", "同样的账本折出同样的文档", "--files", "fold.mjs").status, 0);
@@ -184,10 +184,10 @@ test("the declared gates run in order and a failing one stops the run", () => {
   };
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   assert.equal(deed(cwd, "init", "--force", "--why", "测试里加两道门").status, 0, "门要记账才生效");
-  const passed = deed(cwd, "gate", "commit");
+  const passed = deed(cwd, "check", "--gates", "commit");
   assert.equal(passed.status, 0, passed.stderr);
   assert.equal(fs.readFileSync(path.join(cwd, "mark.txt"), "utf8"), "ran");
-  const failed = deed(cwd, "gate");
+  const failed = deed(cwd, "check", "--gates");
   assert.equal(failed.status, 1, "第二条命令失败就要停");
   assert.match(failed.stderr, /门 check 没过/);
 });
@@ -196,7 +196,7 @@ test("the declared gates run in order and a failing one stops the run", () => {
 test("a workspace with no declared gates says so, instead of blaming a gate", () => {
   const cwd = workspace("gate-empty");
   deed(cwd, "init", "--said", "开始");
-  const run = deed(cwd, "gate");
+  const run = deed(cwd, "check", "--gates");
   assert.equal(run.status, 1);
   assert.match(run.stderr, /这个工作区没有门/);
 });
@@ -209,11 +209,11 @@ test("a gate is a ledger fact: writing it in the file and not recording it runs 
   const config = JSON.parse(fs.readFileSync(configFile, "utf8"));
   config.gates = { commit: [process.execPath + ' -e "require(\'fs\').writeFileSync(\'mark.txt\',\'ran\')"'] };
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-  const silent = deed(cwd, "gate");
+  const silent = deed(cwd, "check", "--gates");
   assert.equal(silent.status, 1, "文件里的门还没记账");
   assert.match(silent.stderr, /没有门/);
   assert.equal(deed(cwd, "init", "--force", "--why", "加一道提交门").status, 0);
-  assert.equal(deed(cwd, "gate").status, 0);
+  assert.equal(deed(cwd, "check", "--gates").status, 0);
   assert.equal(fs.readFileSync(path.join(cwd, "mark.txt"), "utf8"), "ran");
 });
 
@@ -350,7 +350,7 @@ test("a gate command is run in order, and the first failure stops it", () => {
   config.gates = { commit: [process.execPath + ' -e "process.exit(0)"', process.execPath + ' -e "process.exit(3)"'] };
   fs.writeFileSync(path.join(cwd, ".deed", "config.json"), JSON.stringify(config, null, 2));
   assert.equal(deed(cwd, "init", "--force", "--why", "两道门").status, 0, "门要记账才生效");
-  const gate = deed(cwd, "gate");
+  const gate = deed(cwd, "check", "--gates");
   assert.equal(gate.status, 1);
   assert.match(gate.stderr, /退出码 3/);
 });

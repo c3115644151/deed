@@ -99,7 +99,7 @@ test("an invented kind with no writer version is still a broken line", () => {
   const cwd = workspace("hand-written-kind");
   deed(cwd, "init", "--said", "开始");
   writeLines(cwd, [{ v: 1, at: new Date().toISOString(), k: "task.block", s: "S01", id: "T1", why: "手写的" }]);
-  const doctor = deed(cwd, "doctor");
+  const doctor = deed(cwd, "check", "--ledger");
   assert.equal(doctor.status, 1);
   assert.match(doctor.stdout, /账本坏了/);
   assert.match(doctor.stdout, /没有写者版本/);
@@ -129,11 +129,10 @@ test("--version answers with the version this program ships as", () => {
 // 2) --help for a verb with no arguments
 test("asking a verb that takes no arguments answers with its line, not the whole page", () => {
   const cwd = workspace("usage-noargs");
-  for (const verb of ["state", "doctor"]) {
-    const run = deed(cwd, verb, "--help");
-    assert.equal(run.status, 0);
-    assert.equal(run.stdout.trim(), "deed " + verb, verb + " --help 只该打这一行");
-  }
+  const run = deed(cwd, "state", "--help");
+  assert.equal(run.status, 0);
+  assert.equal(run.stdout.trim(), "deed state", "state --help 只该打这一行");
+  assert.match(deed(cwd, "check", "--help").stdout, /deed check --ledger/u, "check 收开关：它的帮助是那几行");
   const task = deed(cwd, "task", "--help");
   assert.match(task.stdout, /deed task undo/);
   assert.doesNotMatch(task.stdout, /deed judge --pass/, "问 task 的用法不该回 judge 的行");
@@ -265,12 +264,13 @@ test("a verb that takes no flags still says so instead of ignoring them", () => 
   // 只读动词以前不过开关表：拼错的开关被当成没写，命令照常 exit 0。
   const cwd = workspace("readonly-flags");
   deed(cwd, "init", "--said", "起点");
-  for (const verb of ["state", "doctor"]) {
-    const one = deed(cwd, verb, "--digset", "a.md");
-    assert.equal(one.status, 1, verb + " 带了不认的开关却说没事：" + one.stdout);
-    assert.match(one.stderr, /不认 --digset/);
-    assert.match(one.stderr, /不收开关/, verb + " 一个开关都不收，别去猜最接近的名字");
-  }
+  const one = deed(cwd, "state", "--digset", "a.md");
+  assert.equal(one.status, 1, "state 带了不认的开关却说没事：" + one.stdout);
+  assert.match(one.stderr, /不认 --digset/);
+  assert.match(one.stderr, /不收开关/, "state 一个开关都不收，别去猜最接近的名字");
+  const lost = deed(cwd, "check", "--digset", "a.md");
+  assert.equal(lost.status, 1);
+  assert.match(lost.stderr, /它认的是 --ledger、--gates/, "check 有开关，拒绝要把它认的列出来");
 });
 
 

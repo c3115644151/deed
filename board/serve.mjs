@@ -44,7 +44,7 @@ function brokenPage(error) {
     "<body style=\"font:15px/1.7 system-ui;margin:4vh auto;max-width:44rem;padding:0 1.5rem;background:#fbf9f5;color:#1c1a17\">" +
     "<h1 style=\"font-size:1.2rem\">" + title + "</h1>" +
     "<p>" + lead + "</p>" +
-    "<pre style=\"background:#f1ece3;padding:.8rem 1rem;overflow:auto\">deed doctor</pre>" +
+    "<pre style=\"background:#f1ece3;padding:.8rem 1rem;overflow:auto\">deed check --ledger</pre>" +
     "<p style=\"color:#6b6255\">" +
     escape(notice ? notice.headline : (error && error.message ? error.message : error)) +
     "</p>" + (notice ? "<p style=\"color:#6b6255\">" + escape(notice.advice) + "</p>" : "") +

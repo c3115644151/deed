@@ -33,7 +33,7 @@ test("init says what else can be done, so one round can finish it", () => {
   const cwd = workspace("init-optional");
   const out = deed(cwd, "init", "--said", "开始", "--port", "7420");
   assert.equal(out.status, 0);
-  for (const one of ["deed init --print-agents", "deed serve", "deed doctor", "deed gate", "deed init --force"])
+  for (const one of ["deed init --print-agents", "deed serve", "deed check --ledger", "deed check --gates", "deed init --force"])
     assert.ok(out.stdout.includes(one), one + " 应该出现在 init 的反馈里");
   assert.match(out.stdout, /127\.0\.0\.1:7420/, "面板地址用这个工作区的端口");
   assert.match(out.stdout, /都可选/, "说清楚不做也不会坏");
@@ -173,7 +173,7 @@ test("a ledger written by a newer deed says so instead of calling itself broken"
   const cwd = workspace("newer-ledger");
   deed(cwd, "init", "--said", "开始");
   writeLines(cwd, [{ v: 1, at: new Date().toISOString(), k: "task.block", s: "S01", id: "T1", why: "0.9 才有的事件", w: "9.9.9" }]);
-  const doctor = deed(cwd, "doctor");
+  const doctor = deed(cwd, "check", "--ledger");
   assert.equal(doctor.status, 1, "读不动就是读不动：不猜语义");
   assert.match(doctor.stdout, /账本比 deed 新/);
   assert.match(doctor.stdout, /升级 deed/);

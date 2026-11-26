@@ -29,7 +29,7 @@ test("a line this deed cannot read, written by the same version, is told apart b
     { v: 1, at, k: "turn", s: "S01", who: "user", said: "开始" },
     { v: EVENT_VERSION + 1, at, k: "task.block", s: "S01", id: "T1", why: "新版本才有的事件", w: shipped },
   ]);
-  const doctor = deed(cwd, "doctor");
+  const doctor = deed(cwd, "check", "--ledger");
   assert.equal(doctor.status, 1, "读不动还是读不动：不猜语义");
   assert.match(doctor.stdout, /账本比 deed 新/);
   assert.match(doctor.stdout, new RegExp(`事件含义第 ${EVENT_VERSION + 1} 版`));
@@ -63,7 +63,7 @@ test("a directory with no ledger cannot be written into, or read as if it were f
   assert.equal(state.stdout.includes("这个目录还没接 deed · 先 deed init"), true);
   assert.equal(/下一步/.test(state.stdout), false, "没有审查设置时不该给下一步");
 
-  const doctor = deed(cwd, "doctor");
+  const doctor = deed(cwd, "check", "--ledger");
   assert.equal(doctor.status, 0, "医生在没有账本时只说这一句，不报错");
   assert.match(doctor.stdout, /没有账本：deed init 之后才有/);
   assert.equal(fs.existsSync(path.join(cwd, ".deed")), false, "读也不行：看别人的目录不该建出 .deed/");

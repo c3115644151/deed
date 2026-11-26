@@ -78,7 +78,15 @@ export const SPEC = {
   state: { flags: [], usage: ["deed state"] },
   // 体检层：只读。它回答"这个工作区还是不是一个项目、差哪几条"，
   // 不产生行动，也不挡三种状态。
-  check: { flags: [], usage: ["deed check               体检：项目状态与逐条诊断（只读）"] },
+  check: {
+    flags: ["ledger", "gates"],
+    booleans: ["ledger", "gates"],
+    usage: [
+      "deed check               体检：项目状态与逐条诊断（只读，不挡任何动作）",
+      "deed check --ledger      账本能不能重放（逐行校验；坏了报哪一行哪一条，退出码 1）",
+      "deed check --gates [名字…]   按账本里的 gates 顺序跑门，没过就退出码 1",
+    ],
+  },
   project: {
     flags: ["shape", "background", "layers", "extras", "by", "why"],
     usage: [
@@ -88,8 +96,6 @@ export const SPEC = {
       'deed project --extras "scripts,examples" --by "谁"           不在结构里的顶层目录，说清它们不参与',
     ],
   },
-  doctor: { flags: [], usage: ["deed doctor"] },
-  gate: { flags: [], usage: ["deed gate [名字…]              按账本里的 gates 顺序跑门，失败即退出"] },
   serve: { flags: ["port"], usage: ["deed serve [--port 7317]"] },
   panel: { flags: ["stop"], booleans: ["stop"], usage: ["deed panel [--stop]              看面板在不在（没在跑就拉起来，打印 URL）"] },
 };
@@ -100,7 +106,7 @@ export const GROUPS = [
   { title: "讨论 · 把不确定说清", verbs: ["say", "ask"] },
   { title: "执行 · 把说清的做出来", verbs: ["plan", "submit", "task"] },
   { title: "验收 · 判它过没过", verbs: ["review", "sign", "check"] },
-  { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "doctor", "gate", "serve", "panel"] },
+  { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "serve", "panel"] },
 ];
 
 export const ORDER = GROUPS.flatMap((one) => one.verbs);

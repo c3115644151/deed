@@ -218,7 +218,7 @@ test("a broken ledger makes the panel say so instead of vanishing", async () => 
     assert.equal(page.status, 500, "读不动就说读不动，不要 200 一张空页");
     assert.match(page.headers["content-type"], /text\/html/);
     assert.match(page.body, /账本里有读不动的行/);
-    assert.match(page.body, /deed doctor/);
+    assert.match(page.body, /deed check --ledger/);
     const state = await get(port, "/state");
     assert.equal(state.status, 500);
     assert.ok(JSON.parse(state.body).broken, "机器也要看出这是坏账，不是空账");

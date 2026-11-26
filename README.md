@@ -51,7 +51,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 
 接完在宿主的规则文件里粘一段，让下一位 agent 知道规矩。`deed init --print-agents` 打印的就是下面这段，
 原样粘进 `AGENTS.md`（或 `CLAUDE.md`）：deed 不替你写那个文件，它属于管理这个仓库的人。
-没粘不报错，但 `deed doctor` 每次都会提一句「接入 · …」，面板顶上挂着同一句，直到有人写进去。
+没粘不报错，但 `deed check --ledger` 每次都会提一句「接入 · …」，面板顶上挂着同一句，直到有人写进去。
 
 ```md
 ## 治理
@@ -74,7 +74,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 在清单里勾上时不用挑文件：`submit` 按工作区快照前后差自己算碰了哪些文件（只记路径与字节数，不记内容）。没记下文件的交付仍在账本里，但会挡住要审段的放行。
 - 交付记录里的数字要在你要交的那份字节上跑出来：`deed submit --run <命令>` 真跑一遍，条数由工具采进账本，记录里那一对数字与它不一致整批拒。说得出现象的配一行 `期望：<命令> => 要看到的话`，记账前真跑；跑不出来就是假记录；两样都没配的，清单上标成「只是说法」，不算可核的事实。
 - 这个工作区是不是项目，说一句就算：`deed project --shape software --layers "core:,lib:core" --background "是什么、为谁、不做什么" --by "谁"`；没声明就是工作区模式，三种状态照常。`deed check` 看通过几条（只读，不挡任何动作）。
-- 查：`deed doctor`（账本能否重放）、面板（跟着命令自己起，`deed panel` 看它在不在）。
+- 查：`deed check --ledger`（账本能否重放）、`deed check --gates`（跑配置里的门）、面板（跟着命令自己起，`deed panel` 看它在不在）。
 
 没有落进账本的动作不算发生过；状态是推出来的，不用手写。
 ```
@@ -98,15 +98,15 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 在清单里勾上时不用挑文件：`submit` 按工作区快照前后差自己算碰了哪些文件（只记路径与字节数，不记内容）。没记下文件的交付仍在账本里，但会挡住要审段的放行。
 - 交付记录里的数字要在你要交的那份字节上跑出来：`deed submit --run <命令>` 真跑一遍，条数由工具采进账本，记录里那一对数字与它不一致整批拒。说得出现象的配一行 `期望：<命令> => 要看到的话`，记账前真跑；跑不出来就是假记录；两样都没配的，清单上标成「只是说法」，不算可核的事实。
 - 这个工作区是不是项目，说一句就算：`deed project --shape software --layers "core:,lib:core" --background "是什么、为谁、不做什么" --by "谁"`；没声明就是工作区模式，三种状态照常。`deed check` 看通过几条（只读，不挡任何动作）。
-- 查：`deed doctor`（账本能否重放）、面板（跟着命令自己起，`deed panel` 看它在不在）。
+- 查：`deed check --ledger`（账本能否重放）、面板（跟着命令自己起，`deed panel` 看它在不在）。
 
 没有落进账本的动作不算发生过；状态是推出来的，不用手写。
 ```bash
 deed project --shape software --layers "core=core:,app=cli:core+lib" --extras "docs,examples" --background "…"   # 声明这个工作区是一个项目（格=目录：它可以依赖的格）
 deed check       # 体检：项目状态 + 逐条诊断（只读，不挡任何动作）
-deed doctor      # 账本能不能重放：事件形状、编号撞车、时刻对不上；读不动就 exit 1
-deed doctor      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法。顺带两行：接入（规则文件里有没有 deed state）、心跳（认得的宿主配置里跑不跑 deed say，账本最后一条是几点的）
-deed gate        # 按账本里的审查设置顺序跑门命令，第一条不过就停，报名字与退出码
+deed check --ledger      # 账本能不能重放：事件形状、编号撞车、时刻对不上；读不动就 exit 1
+deed check --ledger      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法。顺带两行：接入（规则文件里有没有 deed state）、心跳（认得的宿主配置里跑不跑 deed say，账本最后一条是几点的）
+deed check --gates   # 按账本里的审查设置顺序跑门命令，第一条不过就停，报名字与退出码
 deed panel       # 面板在不在；不在就用后台进程拉起来，URL 打在这里（账本一变页面自己变）
 deed serve       # 前台版：固定端口 7317，Ctrl+C 就停
 ```

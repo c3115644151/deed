@@ -99,11 +99,11 @@ deed init --print-agents
 ```
 
 把输出原样粘进 `AGENTS.md`（或 `CLAUDE.md`）。deed 不替你写那个文件：它属于管理这个仓库的人。
-没粘不报错，但 `deed doctor` 每次提一句「接入 · …」，`deed serve` 的页面顶上挂着同一句，直到有人写进去。
+没粘不报错，但 `deed check --ledger` 每次提一句「接入 · …」，`deed serve` 的页面顶上挂着同一句，直到有人写进去。
 
 ### 门（可选）
 
-审查设置里的 `gates` 是一张「名字 → 命令数组」的表，`deed gate` 按顺序跑、第一条不过就停。
+审查设置里的 `gates` 是一张「名字 → 命令数组」的表，`deed check --gates` 按顺序跑、第一条不过就停。
 想用它结束提交，就在 `config.json` 里写，再用 `deed init --force --why "加门"` 记进账本：
 
 ```json
@@ -116,7 +116,7 @@ deed init --print-agents
 cd /path/to/deed && git pull && npm test
 ```
 
-`npm link` 装的会立刻生效；vendor 的要重新拷。升级前后都跑一次 `deed doctor`：
+`npm link` 装的会立刻生效；vendor 的要重新拷。升级前后都跑一次 `deed check --ledger`：
 
 - **账本比 deed 新**（每条事件都记着事件含义的版本 `v` 与写它的版本 `w`，先比 `v`）：`doctor`／`state`／`verify`／面板都说「升级 deed 就能读」。**别删也别挪**，那一行是有效事实，不是坏账。
 - **deed 比账本新**：安全，事件类型只做加法，老事件照样折。
@@ -137,7 +137,7 @@ deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来
 | 症状 | 原因与修法 |
 | --- | --- |
 | `deed: 未知事件：x`，且写着「账本比 deed 新」 | 账本是更新的 deed 写的。升级 deed，不要动那一行 |
-| `deed doctor` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
+| `deed check --ledger` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
 | `deed verify` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。在清单里重新勾一次再 `deed submit`，或在审查里点名退回 |
 | `deed verify` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |

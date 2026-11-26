@@ -20,9 +20,9 @@ import {
 test("doctor keeps saying it until the workspace tells its agents where to ask", () => {
   const cwd = workspace("doctor-words");
   deed(cwd, "init", "--said", "开始");
-  assert.match(deed(cwd, "doctor").stdout, /接入 · 这个工作区没有 AGENTS\.md/);
+  assert.match(deed(cwd, "check", "--ledger").stdout, /接入 · 这个工作区没有 AGENTS\.md/);
   fs.writeFileSync(path.join(cwd, "AGENTS.md"), "# 管理\n\n下一步看 `deed state`。\n");
-  const told = deed(cwd, "doctor");
+  const told = deed(cwd, "check", "--ledger");
   assert.equal(told.status, 0);
   assert.match(told.stdout, /账本干净/);
   assert.doesNotMatch(told.stdout, /接入 · /, "已经写清楚了就别再念，否则这句提示会变成噪音");
@@ -34,13 +34,13 @@ test("doctor keeps saying it until the workspace tells its agents where to ask",
 
 
 test("doctor names the line that broke the ledger and the only repair it allows", () => {
-  const cwd = workspace("doctor");
+  const cwd = workspace("ledger");
   deed(cwd, "init", "--said", "开始");
-  assert.match(deed(cwd, "doctor").stdout, /账本干净/);
+  assert.match(deed(cwd, "check", "--ledger").stdout, /账本干净/);
   const file = fs.readdirSync(path.join(cwd, ".deed", "log")).find((one) => one.endsWith(".jsonl"));
   const written = fs.readFileSync(path.join(cwd, ".deed", "log", file), "utf8").split("\n").filter(Boolean).length;
   fs.appendFileSync(path.join(cwd, ".deed", "log", file), "{ oh no\n");
-  const broken = deed(cwd, "doctor");
+  const broken = deed(cwd, "check", "--ledger");
   assert.equal(broken.status, 1);
   assert.match(broken.stdout, new RegExp("账本坏了 · .* 第 " + (written + 1) + " 行"));
   assert.match(broken.stdout, /移到 .deed\/log\/rejected/);
@@ -56,7 +56,7 @@ test("a config.json saved with a BOM reads the same as one without", () => {
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
   assert.doesNotMatch(state.stdout, /审查设置 文件与账本不一致/);
-  assert.equal(deed(cwd, "doctor").status, 0, "带 BOM 的那份照样读得动");
+  assert.equal(deed(cwd, "check", "--ledger").status, 0, "带 BOM 的那份照样读得动");
 });
 
 
@@ -299,5 +299,5 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.match(sealed.stderr, /已封存/);
   assert.equal(readEvents(cwd).length, before + 1, "只多了那一条封存");
   assert.equal(deed(cwd, "state").status, 0, "工作区没被写坏");
-  assert.equal(deed(cwd, "doctor").status, 0);
+  assert.equal(deed(cwd, "check", "--ledger").status, 0);
 });

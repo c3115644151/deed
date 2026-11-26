@@ -18,8 +18,6 @@ import review from "./verbs/review.mjs";
 import sign from "./verbs/sign.mjs";
 import state from "./verbs/state.mjs";
 import check from "./verbs/check.mjs";
-import doctor from "./verbs/doctor.mjs";
-import gate from "./verbs/gate.mjs";
 import serve from "./verbs/serve.mjs";
 import panel from "./verbs/panel.mjs";
 
@@ -33,7 +31,7 @@ const HELP = [
   "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
 
-const commands = { init, say, task, ask, project, check, plan, submit, review, sign, state, doctor, gate, serve, panel };
+const commands = { init, say, task, ask, project, check, plan, submit, review, sign, state, serve, panel };
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。
@@ -78,6 +76,8 @@ const MOVED = {
   goal: '把目的写在清单第一行（# 这一期要做成什么 下面那一句），deed submit 记账',
   seal: 'deed review --segment S01.1 --skip --why "…"',
   shelve: 'deed sign --shelve --why "…"',
+  doctor: 'deed check --ledger',
+  gate: 'deed check --gates',
 };
 const command = commands[verb];
 if (!command && MOVED[verb]) {
