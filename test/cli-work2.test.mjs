@@ -14,6 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
 
@@ -134,14 +135,14 @@ test("removing a file in a submit is not a small change either", () => {
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "big.md"), "x".repeat(15000));
-  deed(cwd, "task", "add", "写一份一万五的文档", "--criteria", "它在", "--files", "docs/big.md");
+  addTask(cwd, "写一份一万五的文档", "它在", "--files", "docs/big.md");
   const plan = path.join(cwd, ".deed", "plan.md");
   deed(cwd, "plan", "--force");
   fs.writeFileSync(plan, ["# 这一期要做成什么", "写一份，再删掉。", "", "- [x] T1 写一份一万五的文档", "  标准：它在", "  交付：写了 docs/big.md"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   assert.match(deed(cwd, "state").stdout, /免审（全部落在 exempt）/u, "一万五千字节落在免审路径上，本来不用审");
 
-  deed(cwd, "task", "add", "再把它删掉", "--criteria", "它不在了", "--files", "docs/big.md");
+  addTask(cwd, "再把它删掉", "它不在了", "--files", "docs/big.md");
   fs.rmSync(path.join(cwd, "docs", "big.md"));
   deed(cwd, "plan", "--force");
   fs.writeFileSync(plan, ["# 这一期要做成什么", "写一份，再删掉。", "", "- [x] T1 写一份一万五的文档", "  标准：它在", "  交付：写了 docs/big.md", "", "- [x] T2 再把它删掉", "  标准：它不在了", "  交付：docs/big.md 已删"].join("\n") + "\n");
@@ -176,9 +177,9 @@ test("a settled decision keeps its border and what it gave up, and they are not 
 test("an entry still to be done is carried to the next segment from the plan", () => {
   const cwd = workspace("carry-plan");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "先做这一件", "--criteria", "能跑", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "跑了 1/1");
-  deed(cwd, "task", "add", "下一段再做", "--criteria", "也做完");
+  addTask(cwd, "先做这一件", "能跑", "--files", "proof.txt");
+  deliverTask(cwd, "T1", "跑了 1/1");
+  addTask(cwd, "下一段再做", "也做完");
   const plan = path.join(cwd, ".deed", "plan.md");
   deed(cwd, "plan", "--force");
   // 改到下一段要有落脚的地方：清单里那一段先排出来，条目才挪得过去。
@@ -215,7 +216,7 @@ test("the counts in a delivery are taken by running the command, not copied", ()
     path.join(cwd, "x.test.mjs"),
     'import test from "node:test";\ntest("one", () => {});\ntest("two", () => {});\n',
   );
-  deed(cwd, "task", "add", "写两条测试", "--criteria", "node --test x.test.mjs 报 2/2");
+  addTask(cwd, "写两条测试", "node --test x.test.mjs 报 2/2");
   deed(cwd, "plan");
   const file = path.join(cwd, ".deed", "plan.md");
   const first = fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：写了 x.test.mjs，报 2/2 通过\n");
@@ -233,7 +234,7 @@ test("the counts in a delivery are taken by running the command, not copied", ()
   assert.equal(done.run.command, "node --test x.test.mjs");
 
   // 清单里早交过的那条还带着当时的数：再接一条新活，--run 只核这一次真交的那条
-  deed(cwd, "task", "add", "再写一条", "--criteria", "也是 2/2");
+  addTask(cwd, "再写一条", "也是 2/2");
   fs.writeFileSync(path.join(cwd, "note.txt"), "这次真动了一下\n");
   deed(cwd, "plan", "--force");
   fs.writeFileSync(
@@ -253,7 +254,7 @@ test("a delivery whose numbers disagree with the run is refused before anything 
     path.join(cwd, "x.test.mjs"),
     'import test from "node:test";\ntest("one", () => {});\ntest("two", () => {});\n',
   );
-  deed(cwd, "task", "add", "写两条测试", "--criteria", "node --test x.test.mjs 报 2/2");
+  addTask(cwd, "写两条测试", "node --test x.test.mjs 报 2/2");
   deed(cwd, "plan");
   const file = path.join(cwd, ".deed", "plan.md");
   const before = readEvents(cwd).length;
@@ -285,7 +286,7 @@ test("a delivery that says what it will show has to show it when the ledger is w
   const cwd = workspace("run-expect");
   deed(cwd, "init", "--said", "开始");
   fs.writeFileSync(path.join(cwd, "say.mjs"), 'console.log("hi");\n');
-  deed(cwd, "task", "add", "写一句话", "--criteria", "node say.mjs 印 hi");
+  addTask(cwd, "写一句话", "node say.mjs 印 hi");
   deed(cwd, "plan");
   const file = path.join(cwd, ".deed", "plan.md");
   const base = fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.*)\n/, "- [x] T1 $1\n  交付：说 hi 就印 hi；期望：node say.mjs => hi\n");
@@ -305,7 +306,7 @@ test("a delivery that says what it will show has to show it when the ledger is w
   assert.doesNotMatch(brief, /只是说法/);
 
   // 说得出现象却跑不出来：记账前就拒
-  deed(cwd, "task", "add", "再写一句", "--criteria", "印 bye");
+  addTask(cwd, "再写一句", "印 bye");
   deed(cwd, "plan", "--force");
   const next = fs
     .readFileSync(file, "utf8")
@@ -453,19 +454,19 @@ test("the plan can line up several segments, and only the first takes work", () 
 
   // 排好的那一段此刻不收活：交付与送审都被拒，理由指得出现在收活的是哪一段。
   fs.writeFileSync(path.join(cwd, "proof.txt"), "p\n");
-  const queued = deed(cwd, "task", "done", "T2", "--evidence", "试试看");
+  const queued = deliverTask(cwd, "T2", "试试看");
   assert.equal(queued.status, 1, "还没轮到的那一段不能交付");
-  assert.match(queued.stderr, /还没轮到/);
+  assert.match(queued.stderr, /轮到它的那一段还没开/u);
   const early = deed(cwd, "review", "--segment", "S01.2", "--by", "qa");
   assert.equal(early.status, 1);
-  assert.match(early.stderr, /还没轮到/);
+  assert.match(early.stderr, /轮到它的那一段还没开|还没轮到/u);
 
   // 第一段交付、审过、判过之后，第二段才接过活。
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "做完了").status, 0);
+  assert.equal(deliverTask(cwd, "T1", "做完了").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
   assert.match(deed(cwd, "state").stdout, /S01\.2/);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "轮到它了").status, 0);
+  assert.equal(deliverTask(cwd, "T2", "轮到它了").status, 0);
 });
 

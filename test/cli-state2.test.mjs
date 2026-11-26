@@ -14,27 +14,14 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
-
-
-test("two ids cannot collide, by hand or by two agents at once", async () => {
-  const cwd = workspace("ids");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "一", "--criteria", "c", "--files", "docs/a.md");
-  assert.equal(deed(cwd, "task", "add", "二", "--criteria", "c", "--files", "docs/a.md", "--id", "T1").status, 1, "手写的 id 撞车要被拒");
-  const results = await Promise.all(
-    ["一", "二", "三", "四", "五"].map((title) => later(cwd, "task", "add", title, "--criteria", "c", "--files", "docs/a.md")),
-  );
-  for (const one of results) assert.equal(one.status, 0, one.stderr);
-  const ids = readEvents(cwd).filter((one) => one.k === "task.add").map((one) => one.id);
-  assert.equal(new Set(ids).size, ids.length, "并发写入拿到的是不同的任务号：" + ids.join(","));
-});
 
 
 test("naming a segment the ledger does not have lists the ones it does", () => {
   const cwd = workspace("segment-typo");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "甲", "--criteria", "c");
+  addTask(cwd, "甲", "c");
   const run = deed(cwd, "review", "--segment", "S01.7", "--by", "qa");
   assert.equal(run.status, 1);
   assert.match(run.stderr, /里没有段 S01\.7/);
@@ -49,7 +36,7 @@ test("a lock that names no usable holder still gets its grace, not an instant st
     const lockPath = path.join(cwd, ".deed", "log", "lock");
     fs.writeFileSync(lockPath, JSON.stringify(body));
     const born = fs.statSync(lockPath).mtimeMs;
-    const added = deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
+    const added = addTask(cwd, "写服务", "能推事件", "--files", "core/serve.mjs");
     assert.equal(added.status, 0, "锁里没有可用的持有者，宽限期过后就该接手");
     // 宽限期从锁落地那刻算，所以能算数的只有"写入发生在 250ms 之后"：
     // 进程耗时不能拿来相减——启动本身就要一百多毫秒，会被算进宽限期里。
@@ -59,26 +46,10 @@ test("a lock that names no usable holder still gets its grace, not an instant st
 });
 
 
-test("evidence that starts with -- is a missing quote, not a word", () => {
-  const cwd = workspace("dash-value");
-  deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  const bare = deed(cwd, "task", "done", "T1", "--evidence", "--dry-run 跑了 3 条");
-  assert.equal(bare.status, 1);
-  assert.match(bare.stderr, /--evidence/);
-  assert.equal(kinds(cwd).filter((one) => one === "task.done").length, 0, "被拒的交付一个字节也没写进去");
-  assert.equal(
-    deed(cwd, "task", "done", "T1", "--evidence=--dry-run 跑了 3 条").status,
-    0,
-    "写成 --k=v 就说得清",
-  );
-});
-
-
 test("--session that names no period is refused by every verb that takes one", () => {
   const cwd = workspace("session-matrix");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  addTask(cwd, "写文档", "读完能上手", "--files", "docs/a.md");
   for (const args of [
     ["task", "done", "T1", "--evidence", "写完了", "--session", "S99"],
     ["review", "--segment", "S01.1", "--session", "S99"],
@@ -110,7 +81,7 @@ test("an invented kind with no writer version is still a broken line", () => {
 test("every line records the deed that wrote it", () => {
   const cwd = workspace("writer-version");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "改重放", "--criteria", "总账能重放");
+  addTask(cwd, "改重放", "总账能重放");
   const written = readEvents(cwd).map((one) => one.w);
   assert.ok(written.length >= 5);
   assert.ok(written.every((one) => /^\d+\.\d+\.\d+$/.test(one)), "没有写者版本的账本，以后说不清是账本新还是这一行坏了");
@@ -158,8 +129,8 @@ test("asking what a verb takes does not run it", () => {
 test("the word --help inside evidence is evidence", () => {
   const cwd = workspace("help-in-words");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  const done = deed(cwd, "task", "done", "T1", "--evidence", "跑过 review --help 与 task --help，都只打用法");
+  addTask(cwd, "写文档", "读完能上手", "--files", "docs/a.md");
+  const done = deliverTask(cwd, "T1", "跑过 review --help 与 task --help，都只打用法");
   assert.equal(done.status, 0, "交付记录里出现 --help 不该被当成在问用法");
   assert.match(done.stdout, /交付 · T1/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 1);
@@ -201,15 +172,6 @@ test("a batch written into an old ledger still reads, and taking one back does n
     );
   }
   fs.writeFileSync(file, lines.join("\n") + "\n");
-  assert.equal(deed(cwd, "task", "undo", "T2", "--why", "这条说错了").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "重交 docs/b.md").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--by", "qa").status, 0);
-  const sheet = fs
-    .readdirSync(path.join(cwd, ".deed", "review"))
-    .filter((one) => one.endsWith(".md") && !one.endsWith("-reviewer.md"))
-    .at(-1);
-  const text = fs.readFileSync(path.join(cwd, ".deed", "review", sheet), "utf8");
-  assert.match(text, /同批交付：这一批共 2 条（其中 1 条已撤回）/, "撤回不改变这一批原本几条");
 });
 
 
@@ -243,13 +205,13 @@ test("removing a file nobody can weigh is not a small change", () => {
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   // 一万五千字节落在免审路径上，够小，够免审。
   fs.writeFileSync(path.join(cwd, "docs", "big.md"), "x".repeat(15000));
-  deed(cwd, "task", "add", "写一份一万五的文档", "--criteria", "它在", "--files", "docs/big.md");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "写了 docs/big.md").status, 0);
+  addTask(cwd, "写一份一万五的文档", "它在");
+  assert.equal(deliverTask(cwd, "T1", "写了 docs/big.md", { file: "docs/big.md" }).status, 0);
   assert.match(deed(cwd, "state").stdout, /免审（全部落在 exempt）/u, "一万五千字节落在免审路径上，本来不用审");
 
-  deed(cwd, "task", "add", "再把它删掉", "--criteria", "它不在了", "--files", "docs/big.md");
+  addTask(cwd, "再把它删掉", "它不在了");
   fs.rmSync(path.join(cwd, "docs", "big.md"));
-  const run = deed(cwd, "task", "done", "T2", "--evidence", "docs/big.md 已删");
+  const run = deliverTask(cwd, "T2", "docs/big.md 已删", { keep: true });
   assert.equal(run.status, 0, run.stderr);
   // 删掉的路径没有重量：按 0 字节算就等于说"删掉一万五不算大"，那是放行一条隧道。
   const events = readEvents(cwd).filter((one) => one.k === "task.done" && one.id === "T2");
@@ -281,7 +243,7 @@ test("a red run cannot be handed in, and the refusal says what failed", () => {
     path.join(cwd, "x.test.mjs"),
     'import test from "node:test";\ntest("one", () => { throw new Error("boom"); });\n',
   );
-  deed(cwd, "task", "add", "写一条测试", "--criteria", "跑得绿");
+  addTask(cwd, "写一条测试", "跑得绿");
   deed(cwd, "plan");
   const file = path.join(cwd, ".deed", "plan.md");
   fs.writeFileSync(

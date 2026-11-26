@@ -14,7 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
-  setGoal,
+  setGoal, addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
 
@@ -85,11 +85,10 @@ test("a take-back's shape is checked where it is written", () => {
 test("a flag given twice is refused instead of quietly keeping the last one", () => {
   const cwd = workspace("repeat-flag");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  const twice = deed(cwd, "task", "done", "T1", "--evidence", "第一条", "--evidence", "第二条");
+  const twice = deed(cwd, "say", "第一句", "--session", "S01", "--session", "S01");
   assert.equal(twice.status, 1, "同一个参数写两遍要问清楚，不能只留最后一条");
-  assert.match(twice.stderr, /--evidence 只收一个值/);
-  assert.equal(readEvents(cwd).filter((one) => one.k === "task.done").length, 0, "被拒的命令一条都不写");
+  assert.match(twice.stderr, /--session 只收一个值/u);
+  assert.equal(kinds(cwd).filter((one) => one === "turn").length, 1, "被拒的命令一条都不写");
 });
 
 
@@ -116,15 +115,14 @@ test("a round belongs to the user, and an agent cannot open one", () => {
 test("a flag one letter off is refused, and the nearest name is guessed", () => {
   const cwd = workspace("spec-guess");
   deed(cwd, "init", "--said", "起点");
-  deed(cwd, "task", "add", "一件事", "--criteria", "做完");
-  const behind = deed(cwd, "task", "done", "T1", "--evidence", "跑了", "--criterias", "proof.txt");
+  const behind = deed(cwd, "ask", "一件事", "--readings", "我理解成", "x");
   assert.equal(behind.status, 1, behind.stdout);
-  assert.match(behind.stderr, /不认 --criterias/);
-  assert.match(behind.stderr, /--criteria/);
+  assert.match(behind.stderr, /不认 --readings/u);
+  assert.match(behind.stderr, /--reading/u);
   // 开关写在子命令的位置上：先说开关错在哪，不拿"子命令不存在"糊过去。
-  const upfront = deed(cwd, "task", "--criterias", "proof.txt");
+  const upfront = deed(cwd, "submit", "--runs", "node --test");
   assert.equal(upfront.status, 1, upfront.stdout);
-  assert.match(upfront.stderr, /--criteria/);
+  assert.match(upfront.stderr, /--run/u);
 });
 
 
@@ -134,8 +132,8 @@ test("a sealed segment with no reason written says what it is, without empty bra
   const cwd = workspace("seal-why-blank");
   deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
   setGoal(cwd, "把文档写完", "--by", "user");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  addTask(cwd, "写文档", "读完能上手");
+  assert.equal(deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" }).status, 0);
   assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent").status, 0);
   const logDir = path.join(cwd, ".deed", "log");
   const name = fs.readdirSync(logDir).find((one) => one.endsWith(".jsonl"));

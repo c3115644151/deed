@@ -14,6 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
 
@@ -53,8 +54,8 @@ test("a period with one segment still owes the period judgement, and that judgem
   deed(cwd, "init", "--said", "开始");
   fs.mkdirSync(path.join(cwd, "core"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "a\n");
-  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test");
+  addTask(cwd, "甲", "能跑", "--files", "core/a.mjs");
+  deliverTask(cwd, "T1", "node --test");
   const alone = judged(cwd, "review", "--all");
   assert.equal(alone.status, 1, "整期上没有审查这件事");
   assert.match(alone.stderr, /--all/);
@@ -90,26 +91,27 @@ test("a turn cannot record a did it never wrote", () => {
 test("a closed period cannot be written into, and no verb invents a new one", () => {
   const cwd = workspace("closed");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent");
+  addTask(cwd, "写文档", "读完能上手");
+  // 交付落在免审路径上，这一段才封得掉（审查设置只 exempt docs/**）。
+  assert.equal(deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" }).status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent").status, 0);
   judged(cwd, "review", "--all", "--by", "period-1");
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
   signHere(cwd, "可以");
   const after = readEvents(cwd).length;
-  const stray = deed(cwd, "task", "add", "又一件", "--criteria", "x");
-  assert.equal(stray.status, 1, "签收之后不能靠 task add 开新期");
-  assert.match(stray.stderr, /还没有会话|已经结束/);
+  const stray = addTask(cwd, "又一件", "x");
+  assert.equal(stray.status, 1, "签收之后不能靠清单开新期");
+  assert.match(stray.stderr, /没有在推进的会话|已经签收/u, "签收之后清单开不出新一期：得先有一轮");
   assert.equal(readEvents(cwd).length, after);
   assert.equal(deed(cwd, "say", "新的一轮").status, 0, "只有一轮对话能开新期");
-  assert.equal(deed(cwd, "task", "add", "又一件", "--criteria", "x").status, 0);
+  assert.equal(addTask(cwd, "又一件", "x").status, 0);
   // The turn that opens a period carries no pointer: it is the birth itself.
   const events = readEvents(cwd);
   const signAt = events.map((one) => one.k).lastIndexOf("sign");
   const afterSign = events.slice(signAt + 1);
-  assert.deepEqual(afterSign.map((one) => one.k), ["turn", "task.add"], "签收之后只多一轮与它开出的新条目");
+  assert.deepEqual(afterSign.map((one) => one.k), ["turn", "segment.plan", "task.add"], "签收之后只多一轮与它开出的新条目（条目自己开一段）");
   assert.equal(afterSign[0].s ?? "-", "-", "开新期的那一轮没有指向前一期");
-  assert.equal(afterSign[1].s, "S02", "新活落在新一期");
+  assert.equal(afterSign.at(-1).s, "S02", "新活落在新一期");
 });
 
 
@@ -123,8 +125,8 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   config.review.required = [];
   config.review.exempt = ["**"];
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test");
+  addTask(cwd, "改重放", "同账本同文档", "--files", "core/fold.mjs");
+  deliverTask(cwd, "T1", "node --test");
   const blocked = deed(cwd, "review", "--skip", "--why", "全部免审", "--by", "user");
   assert.equal(blocked.status, 1, "改文件不改变规则");
   assert.match(blocked.stderr, /要审|审查/);
@@ -155,10 +157,14 @@ test("a lock left by a dead process is taken at once, not after ten seconds", ()
   deed(cwd, "init", "--said", "开始");
   fs.writeFileSync(path.join(cwd, ".deed", "log", "lock"), JSON.stringify({ pid: 999999, start: Date.now() }));
   const began = Date.now();
-  const added = deed(cwd, "task", "add", "写服务", "--criteria", "能推事件", "--files", "core/serve.mjs");
+  const added = addTask(cwd, "写服务", "能推事件", "--files", "core/serve.mjs");
   assert.equal(added.status, 0, "持有者不在了，锁就是一个残留文件");
   assert.ok(Date.now() - began < 3000, "不该为一把死锁等满等待预算");
-  assert.deepEqual(kinds(cwd).filter((one) => one !== "config.change"), ["turn", "task.add"]);
+  assert.deepEqual(
+    kinds(cwd).filter((one) => one !== "config.change" && one !== "segment.plan"),
+    ["turn", "task.add"],
+    "锁被接手之后落下的还是那两条（条目自己开出来的那段先不算）",
+  );
 });
 
 

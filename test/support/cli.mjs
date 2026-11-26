@@ -73,6 +73,74 @@ export const planFile = (cwd) => path.join(cwd, ".deed", "plan.md");
 export const writePlan = (cwd, text) => fs.writeFileSync(planFile(cwd), text, "utf8");
 export const readPlan = (cwd) => fs.readFileSync(planFile(cwd), "utf8");
 // 目的不再是独立动作：它写在清单第一行（# 这一期要做成什么 下面那句），submit 记账。
+
+// 命令面里已经没有 deed task 了：加条目、交付、撤回都走清单 + submit。
+// 这三个助手只是把"改文件"写短，做的事与人在编辑器里做的一样。
+const planLines = (cwd) => readPlan(cwd).split("\n");
+
+const writeEntry = (cwd, id, change) => {
+  const lines = planLines(cwd);
+  const at = lines.findIndex((one) => one.startsWith("- ") && one.includes(" " + id + " "));
+  if (at < 0) throw new Error("清单里没有 " + id + "：先 addTask");
+  const next = lines.findIndex((one, i) => i > at && (one.startsWith("- ") || one.startsWith("## ") || one.startsWith("<!--")));
+  const end = next < 0 ? lines.length : next;
+  const body = lines.slice(at + 1, end);
+  const tail = body.filter((one) => !one.startsWith("  交付：") && !one.startsWith("  理由："));
+  lines[at] = change.box === "x" ? lines[at].replace(/^- \[[ x]\]/, "- [x]") : lines[at].replace(/^- \[[ x]\]/, "- [ ]");
+  const extra = change.box === "x" && change.claim ? ["  交付：" + change.claim] : change.why ? ["  理由：" + change.why] : [];
+  lines.splice(at + 1, end - at - 1, ...tail, ...extra);
+  writePlan(cwd, lines.join("\n"));
+};
+
+// 加一条：写进清单再 submit（条目与段都是 submit 领的）。
+// 草稿尾部有一节「## 下一段」占位：留着它，新条目就会被当成"要开的下一段"。
+export const addTask = (cwd, title, criteria, opts = {}) => {
+  // 每次从账本重出一份草稿：加一条就 submit，磁盘上那份从不领先账本。
+  // 这样换来的是，"上一期签收之后再加一条"落到新一期，而不是撞在旧清单上。
+  deed(cwd, "plan", "--force");
+  let lines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
+  const placeholder = lines.findIndex((one) => one.startsWith("## 下一段"));
+  if (placeholder >= 0) lines = lines.slice(0, placeholder);
+  while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  lines.push("", "- ? " + title, "  标准：" + criteria);
+  writePlan(cwd, lines.join("\n") + "\n");
+  return opts.session ? deed(cwd, "submit", "--session", opts.session) : deed(cwd, "submit");
+};
+
+// 交付：先真的动一个文件（submit 按快照差记下动过哪些路径），再勾上写一句。
+export const deliverTask = (cwd, id, claim, opts = {}) => {
+  // 默认替它写一个凭据文件；删文件那类场景用 keep，让"删掉"本身成为这次改动。
+  const file = opts.file ?? "proof-" + id + ".txt";
+  if (!opts.keep) {
+    fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
+    fs.writeFileSync(path.join(cwd, file), claim);
+  }
+  // 被拒时把清单还原：一次没落地的改动不该留在文件里，下一次交付会被它连坐。
+  const before = readPlan(cwd);
+  writeEntry(cwd, id, { box: "x", claim });
+  const out = deed(cwd, "submit");
+  if (out.status !== 0) writePlan(cwd, before);
+  return out;
+};
+
+export const undoDelivery = (cwd, id, why) => {
+  const before = readPlan(cwd);
+  writeEntry(cwd, id, { box: " ", why });
+  const out = deed(cwd, "submit");
+  if (out.status !== 0) writePlan(cwd, before);
+  return out;
+};
+
+export const dropTask = (cwd, id, why) => {
+  const lines = planLines(cwd);
+  const at = lines.findIndex((one) => one.startsWith("- ") && one.includes(" " + id + " "));
+  if (at < 0) throw new Error("清单里没有 " + id);
+  lines[at] = lines[at].replace(/^- \[[ x]\]/, "~~");
+  lines.splice(at + 1, 0, "  理由：" + why);
+  writePlan(cwd, lines.join("\n"));
+  return deed(cwd, "submit");
+};
+
 export const setGoal = (cwd, text) => {
   const file = planFile(cwd);
   if (!fs.existsSync(file)) {

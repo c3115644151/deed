@@ -14,13 +14,17 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
 
-test("a task needs a promise and a standard of done", () => {
+test("an entry needs a standard of done, and the plan says so instead of recording it", () => {
   const cwd = workspace("task");
   deed(cwd, "init", "--said", "开始");
-  assert.equal(deed(cwd, "task", "add", "只有标题").status, 1);
+  writePlan(cwd, ["# 这一期要做成什么", "写一句话。", "", "- ? 只有标题"].join("\n"));
+  const run = deed(cwd, "submit");
+  assert.equal(run.status, 1, "没有标准就没有做完的样子");
+  assert.match(run.stderr, /标准/u);
 });
 
 
@@ -29,8 +33,8 @@ test("a task needs a promise and a standard of done", () => {
 test("a fail sends the named work back, so a pass cannot land until it is delivered again", () => {
   const cwd = workspace("verdict-order");
   deed(cwd, "init", "--said", "改重放函数");
-  deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test");
+  addTask(cwd, "改重放", "同账本同文档", "--files", "core/fold.mjs");
+  deliverTask(cwd, "T1", "node --test");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const failed = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录");
   assert.equal(failed.status, 0, failed.stderr);
@@ -40,7 +44,7 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   assert.equal(early.status, 1, "在案的不合格不能被一条 pass 顶掉");
   assert.match(early.stderr, /还有没交付的（T1）/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.log").length, 1, "被拒的那条不进账本");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "跑了 8 个并发").status, 0);
+  assert.equal(deliverTask(cwd, "T1", "跑了 8 个并发").status, 0);
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const after = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "pass", "--result-all", "met");
   assert.equal(after.status, 0, "重新交付、重新审过才放行");
@@ -52,10 +56,10 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
 test("a fail names every task it sends back", () => {
   const cwd = workspace("rework-many");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "一", "--criteria", "c", "--files", "core/a.mjs");
-  deed(cwd, "task", "add", "二", "--criteria", "c", "--files", "core/b.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "task", "done", "T2", "--evidence", "写完了");
+  addTask(cwd, "一", "c", "--files", "core/a.mjs");
+  addTask(cwd, "二", "c", "--files", "core/b.mjs");
+  deliverTask(cwd, "T1", "写完了");
+  deliverTask(cwd, "T2", "写完了");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const back = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--rework", "T1,T2", "--why", "两处都要补");
   assert.equal(back.status, 0, back.stdout + back.stderr);
@@ -69,19 +73,19 @@ test("a fail names every task it sends back", () => {
 test("a delivery that said the wrong thing is taken back, not rewritten", () => {
   const cwd = workspace("undo");
   deed(cwd, "init", "--said", "开始");
-  const said = deed(cwd, "task", "add", "先说一句要做的事", "--criteria", "做完了", "--files", "proof.txt");
+  const said = addTask(cwd, "先说一句要做的事", "做完了", "--files", "proof.txt");
   assert.equal(said.status, 0);
   const pinned = proof(cwd);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "说要被撤回的那条").status, 0);
-  const undo = deed(cwd, "task", "undo", "T1", "--why", "这条交付是我手滑打进去的乱码");
+  assert.equal(deliverTask(cwd, "T1", "说要被撤回的那条", { file: pinned }).status, 0);
+  const undo = undoDelivery(cwd, "T1", "这条交付是我手滑打进去的乱码");
   assert.equal(undo.status, 0);
-  assert.match(undo.stdout, /撤回交付 · T1/);
+  assert.match(undo.stdout, /撤回 · T1/, "撤回这一个动词就够了");
 
   const after = deed(cwd, "state");
   assert.match(after.stdout, /（未做 1 · 已交付 0）/, "收回之后这条又回到未做");
   assert.match(after.stdout, /deed submit/, "下一步重新是在清单里交付它");
 
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "这次说的是真的").status, 0);
+  assert.equal(deliverTask(cwd, "T1", "这次说的是真的").status, 0);
   assert.deepEqual(kinds(cwd).filter((one) => one.startsWith("task.")), ["task.add", "task.done", "task.undo", "task.done"]);
 
   assert.equal(deed(cwd, "review", "--by", "qa").status, 0);
@@ -108,9 +112,9 @@ test("a delivery that only removes a file still points at the change it made", (
   const cwd = workspace("delete-only");
   deed(cwd, "init", "--said", "开始");
   fs.writeFileSync(path.join(cwd, "gone.md"), "x");
-  deed(cwd, "task", "add", "先把文件建出来", "--criteria", "它在", "--files", "gone.md");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "建了 gone.md").status, 0);
-  deed(cwd, "task", "add", "再把它删掉", "--criteria", "它不在了", "--files", "gone.md");
+  addTask(cwd, "先把文件建出来", "它在", "--files", "gone.md");
+  assert.equal(deliverTask(cwd, "T1", "建了 gone.md").status, 0);
+  addTask(cwd, "再把它删掉", "它不在了", "--files", "gone.md");
   fs.rmSync(path.join(cwd, "gone.md"));
   deed(cwd, "plan", "--force");
   fs.writeFileSync(
@@ -133,8 +137,8 @@ test("taking a delivery back from the plan records the bytes too", () => {
   const cwd = workspace("undo-plan");
   deed(cwd, "init", "--said", "开始");
   const pinned = proof(cwd);
-  deed(cwd, "task", "add", "先说一句要做的事", "--criteria", "做完了", "--files", "proof.txt");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "说要被撤回的那条").status, 0);
+  addTask(cwd, "先说一句要做的事", "做完了");
+  assert.equal(deliverTask(cwd, "T1", "说要被撤回的那条", { file: pinned }).status, 0);
   deed(cwd, "plan", "--force");
   fs.writeFileSync(
     path.join(cwd, ".deed", "plan.md"),
@@ -150,10 +154,10 @@ test("taking a delivery back from the plan records the bytes too", () => {
 test("taking back a delivery that never landed is refused, and nothing is written", () => {
   const cwd = workspace("undo-empty");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "一条还没交的任务", "--criteria", "做完了");
-  const run = deed(cwd, "task", "undo", "T1", "--why", "手滑");
+  addTask(cwd, "一条还没交的任务", "做完了");
+  const run = undoDelivery(cwd, "T1", "手滑");
   assert.equal(run.status, 1);
-  assert.match(run.stderr, /没有可撤回的交付/);
+  assert.match(run.stderr, /没有要落的改动|没有可撤回的交付/u);
   assert.equal(kinds(cwd).includes("task.undo"), false);
 });
 
@@ -173,8 +177,8 @@ test("taking back a delivery that never landed is refused, and nothing is writte
 test("a fail that names nobody is refused, and a pass cannot carry a rework", () => {
   const cwd = workspace("fail-names");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "交一条", "--criteria", "交了", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "交了");
+  addTask(cwd, "交一条", "交了", "--files", "proof.txt");
+  deliverTask(cwd, "T1", "交了");
   deed(cwd, "review", "--segment", "S01.1", "--by", "qa");
   const nameless = deed(cwd, "review", "--segment", "S01.1", "--by", "qa", "--verdict", "fail", "--why", "不行");
   assert.equal(nameless.status, 1, "不点名的结论没人能接");

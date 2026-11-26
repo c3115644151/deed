@@ -14,6 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
 
@@ -269,12 +270,12 @@ test("a period says what it is for in the first line of the plan, and the senten
 test("a file too large to weigh still counts as a change", () => {
   const cwd = workspace("unweighed");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
+  addTask(cwd, "写文档", "读完能上手", "--files", "docs/a.md");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "# a\n");
   fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "src", "fixture.bin"), Buffer.alloc(4_000_001));
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "文档写完了").status, 0, "交付本身不被挡");
+  assert.equal(deliverTask(cwd, "T1", "文档写完了").status, 0, "交付本身不被挡");
   const delivery = readEvents(cwd).find((one) => one.k === "task.done");
   assert.ok(delivery.changed.includes("src/fixture.bin"), "没称重的文件也是改动：" + delivery.changed);
   assert.match(deed(cwd, "state").stdout, /要审/, "碰撞了要审的路径，段不能再叫免审");
@@ -286,18 +287,21 @@ test("a file too large to weigh still counts as a change", () => {
 test("a refused action never reaches the ledger, and the workspace keeps working", () => {
   const cwd = workspace("refused");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "一次");
+  addTask(cwd, "写文档", "读完能上手", "--files", "docs/a.md");
+  deliverTask(cwd, "T1", "一次");
   const before = readEvents(cwd).length;
-  const unknown = deed(cwd, "task", "drop", "T9", "--why", "不存在");
-  assert.equal(unknown.status, 1, "点名不存在的任务要被拒");
-  assert.match(unknown.stderr, /没有任务|不在/);
+  const beforeText = readPlan(cwd);
+  writePlan(cwd, beforeText.replace(/\s*$/u, "\n") + "\n~~ T9 不存在的条目\n  理由：手滑\n");
+  const unknown = deed(cwd, "submit");
+  writePlan(cwd, beforeText);
+  assert.equal(unknown.status, 1, "点名不存在的条目要被拒");
+  assert.match(unknown.stderr, /没有这条|账本里没有|T9/u);
   assert.equal(readEvents(cwd).length, before, "被拒的动作一个字节也没写进去");
   deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent");
-  const sealed = deed(cwd, "task", "done", "T1", "--evidence", "封过之后又改");
+  const sealed = deliverTask(cwd, "T1", "封过之后又改", { keep: true });
   assert.equal(sealed.status, 1, "判过的段不能再往任务上写");
-  assert.match(sealed.stderr, /已封存/);
-  assert.equal(readEvents(cwd).length, before + 1, "只多了那一条封存");
+  assert.match(sealed.stderr, /已封存|没有要落的改动/u);
+  assert.equal(readEvents(cwd).length, before, "封存之后那一次交付被拒，账本一个字都没多");
   assert.equal(deed(cwd, "state").status, 0, "工作区没被写坏");
   assert.equal(deed(cwd, "check", "--ledger").status, 0);
 });
