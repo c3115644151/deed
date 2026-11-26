@@ -116,7 +116,15 @@ export const SPEC = {
     ],
   },
   serve: { flags: ["port"], usage: ["deed serve [--port 7317]"] },
-  panel: { flags: ["stop"], booleans: ["stop"], usage: ["deed panel [--stop]              看面板在不在（没在跑就拉起来，打印 URL）"] },
+  panel: {
+    flags: ["stop", "restart"],
+    booleans: ["stop", "restart"],
+    usage: [
+      "deed panel              看面板在不在（没在跑就拉起来，打印 URL）",
+      "deed panel --restart    在原端口上换个新的：请旧的退场，地址不变",
+      "deed panel --stop       让它退场（它自己收摊）",
+    ],
+  },
 };
 
 // 命令按三种状态分组：讨论把不确定说清，执行把说清的做出来，验收判它过没过。

@@ -114,6 +114,30 @@ test("a panel comes up with the first command, and the next one leaves it alone"
 
 // 一个工作区只有一个面板：声明的号被占着时不再换号（换号=同时两条页面），
 // 只说清是谁占着，命令照跑；号让出来之后，下一条命令在原格上把面板拉起来。
+// 按原端口重启：一条命令，地址不变，pid 换了。中间那一步是旧的把号让出来（不是被杀）。
+test("the panel can be replaced in place, on the same address", async () => {
+  const cwd = workspace("panel-restart");
+  const env = { ...process.env };
+  delete env.DEED_NO_PANEL;
+  const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
+  const port = await emptyPort();
+  const url = (out) => Number(out.match(/127\.0\.0\.1:(\d+)/)[1]);
+  try {
+    assert.equal(run("init", "--said", "起点", "--port", String(port)).status, 0);
+    const first = run("panel");
+    assert.equal(url(first.stdout), port, "先起来在声明的那一格");
+    const before = readPanel(cwd);
+    const again = run("panel", "--restart");
+    assert.equal(again.status, 0, again.stderr);
+    assert.equal(url(again.stdout), port, "地址不变");
+    const after = readPanel(cwd);
+    assert.notEqual(after.pid, before.pid, "换了进程");
+  } finally {
+    run("panel", "--stop");
+  }
+});
+
+
 test("a taken port is named, and the panel appears there once it is free", async () => {
   const cwd = workspace("panel-port");
   const env = { ...process.env };

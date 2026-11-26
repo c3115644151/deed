@@ -86,6 +86,7 @@ deed check --ledger      # 账本能不能重放：事件形状、编号撞车�
 deed check --ledger      # 逐行校验账本；坏了报哪一行哪一条，并给出唯一人工修法。顺带两行：接入（规则文件里有没有 deed state）、心跳（认得的宿主配置里跑不跑 deed say，账本最后一条是几点的）
 deed check --gates   # 按账本里的审查设置顺序跑门命令，第一条不过就停，报名字与退出码
 deed panel       # 面板在不在；不在就用后台进程拉起来，URL 打在这里（账本一变页面自己变）
+deed panel --restart  # 按原端口换个新的：请旧的让位，地址不变
 deed serve       # 前台版：只占 7317 这一格，号被占着就报出是谁并退出；Ctrl+C 就停
 ```
 

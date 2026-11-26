@@ -208,6 +208,27 @@ export async function ensurePanel(root) {
   return startPanel(root);
 }
 
+// 在原格上换个新的：先请旧的退场（它自己收摊），端口空了再起。不是"杀掉再启动"，
+// 中间那一步是旧的把号让出来——TCP 一格只能有一个听众，这件事绕不过去。
+export async function restartPanel(root) {
+  const asked = portOf(root);
+  const who = await askPanel(asked);
+  if (who?.legacy === true)
+    return { running: false, port: asked, blocked: { port: asked, legacy: true, why: LEGACY_WHY(asked) } };
+  if (who && path.resolve(who.root) !== path.resolve(root))
+    return {
+      running: false,
+      port: asked,
+      blocked: { port: asked, why: "端口上坐着另一个工作区的面板（" + who.root + "）" },
+    };
+  if (who) await retirePanel(asked);
+  await holdFor(asked, 1500);
+  if (!(await canBind(asked)))
+    return { running: false, port: asked, blocked: { port: asked, why: "让位之后那一格还没空出来" } };
+  const one = await startPanel(root);
+  return one.running ? { ...one, restarted: true } : one;
+}
+
 export function stopPanel(root) {
   const one = readPanel(root);
   const port = one?.port ?? portOf(root);
