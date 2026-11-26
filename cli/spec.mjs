@@ -45,9 +45,8 @@ export const SPEC = {
     ],
   },
   plan: {
-    flags: ["format", "print", "force", "session"],
-    booleans: ["format", "print", "force"],
-    usage: ["deed plan [--format|--print] [--force]   把这一期的清单写成草稿（--format 打印格式，--force 覆盖磁盘上那份）"],
+    flags: ["session"],
+    usage: ["deed plan [--session S01]   这一期还没有清单时写一份（写法印在文件头部；再要一份，submit 记账之后自己会重画）"],
   },
   submit: {
     flags: ["session", "run"],

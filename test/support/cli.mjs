@@ -76,6 +76,14 @@ export const readPlan = (cwd) => fs.readFileSync(planFile(cwd), "utf8");
 
 // 命令面里已经没有 deed task 了：加条目、交付、撤回都走清单 + submit。
 // 这三个助手只是把"改文件"写短，做的事与人在编辑器里做的一样。
+// 重出一份草稿：清单是账本画出来的，所以"重画"就是把盘上那份扔掉再来一次。
+// submit 记账之后自己也会重画，这里只在测试要"一份没有编辑过的现行草稿"时用。
+export const freshPlan = (cwd) => {
+  const file = path.join(cwd, ".deed", "plan.md");
+  if (fs.existsSync(file)) fs.rmSync(file);
+  return deed(cwd, "plan");
+};
+
 const planLines = (cwd) => readPlan(cwd).split("\n");
 
 const writeEntry = (cwd, id, change) => {
@@ -97,7 +105,8 @@ const writeEntry = (cwd, id, change) => {
 export const addTask = (cwd, title, criteria, opts = {}) => {
   // 每次从账本重出一份草稿：加一条就 submit，磁盘上那份从不领先账本。
   // 这样换来的是，"上一期签收之后再加一条"落到新一期，而不是撞在旧清单上。
-  deed(cwd, "plan", "--force");
+  const fresh = freshPlan(cwd);
+  if (fresh.status !== 0) return fresh;
   let lines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const placeholder = lines.findIndex((one) => one.startsWith("## 下一段"));
   if (placeholder >= 0) lines = lines.slice(0, placeholder);

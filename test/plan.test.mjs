@@ -142,3 +142,43 @@ test("a section says which segment it is, and an unnamed one asks for a number",
   assert.deepEqual(plan.sections.map((one) => one.title), ["S01.1", ""]);
   assert.deepEqual(plan.items.map((item) => item.sectionTitle), ["S01.1", ""], "条目知道自己在哪一节");
 });
+
+
+// 已关闭的段不再常驻：它们的事实全在账本里，草稿上只留一行数。
+// 常驻的只有"还要动手的那几段"，份文件才值得被人读。
+test("a closed segment is one line of history, not a pile of rows", () => {
+  const session = {
+    goal: { text: "把清单做成一个文件。" },
+    segments: [
+      { id: "S01.1", closedAt: "2026-11-01T00:00:00.000Z" },
+      { id: "S01.2", closedAt: null },
+    ],
+    tasks: [
+      { id: "T1", segment: "S01.1", title: "判过的活", criteria: "做完了", status: "done", evidence: [{ claim: "跑过" }] },
+      { id: "T2", segment: "S01.2", title: "正在做", criteria: "还要做", status: "todo", evidence: [] },
+    ],
+  };
+  const text = draft(session);
+  assert.doesNotMatch(text, /T1 判过的活/u, "已关闭段里的条目不再逐条画出来");
+  assert.match(text, /已关闭 1 段/u);
+  assert.match(text, /S01\.1 1/u, "那一行还得说清是哪一段、几条");
+  assert.match(text, /T2 正在做/u);
+  // 读回来只有开着的那些：文件里没有的东西，不该被当成"少了"。
+  assert.deepEqual(parse(text).items.map((one) => one.id), ["T2"]);
+});
+
+// 说明是注释：解析器整段跳过它，它里面也不写任何像真条目的字样。
+test("the legend is a comment, and reading it back yields no items", () => {
+  const text = draft({ goal: { text: "一件事。" }, segments: [{ id: "S01.1", closedAt: null }], tasks: [] });
+  assert.match(text, /<!-- 这份文件就是这一期的清单/u);
+  assert.ok(text.indexOf("-->") > text.indexOf("<!--"), "说明要真的闭合");
+  assert.doesNotMatch(text, /T\d/, "说明里不出现条目号：否则按行改文件的脚本会改错行");
+  assert.deepEqual(parse(text).items, []);
+});
+
+// 旧写法照读：以前新条目写 "- ? 标题"、放弃写 "~~ T1 标题"。
+test("the two shapes the draft no longer prints are still read", () => {
+  const plan = parse(section(["- ? 新条目", "  标准：甲", "~~ T3 放弃的", "  理由：不做了"]));
+  assert.deepEqual(plan.items.map((one) => [one.id, one.box]), [[null, "?"], ["T3", "~"]]);
+  assert.equal(plan.problems.length, 0);
+});

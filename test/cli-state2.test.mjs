@@ -14,6 +14,8 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  freshPlan,
+
   addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
@@ -189,7 +191,7 @@ test("the draft keeps judged entries ticked", () => {
   assert.equal(deed(cwd, "submit").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
-  const draft = deed(cwd, "plan", "--force");
+  const draft = freshPlan(cwd);
   assert.equal(draft.status, 0, draft.stderr);
   assert.match(readPlan(cwd), /- \[x\] T1 写一句话/, "判过的条目在草稿里还是勾上的");
   const again = deed(cwd, "submit");

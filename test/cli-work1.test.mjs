@@ -14,6 +14,8 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  freshPlan,
+
   addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
@@ -116,7 +118,7 @@ test("a delivery that only removes a file still points at the change it made", (
   assert.equal(deliverTask(cwd, "T1", "建了 gone.md").status, 0);
   addTask(cwd, "再把它删掉", "它不在了", "--files", "gone.md");
   fs.rmSync(path.join(cwd, "gone.md"));
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   fs.writeFileSync(
     path.join(cwd, ".deed", "plan.md"),
     ["# 这一期要做成什么", "把那份文件建出来，再删掉。", "", "- [x] T1 先把文件建出来", "  标准：它在", "  交付：建了 gone.md", "", "- [x] T2 再把它删掉", "  标准：它不在了", "  交付：gone.md 已删"].join("\n") + "\n",
@@ -139,7 +141,7 @@ test("taking a delivery back from the plan records the bytes too", () => {
   const pinned = proof(cwd);
   addTask(cwd, "先说一句要做的事", "做完了");
   assert.equal(deliverTask(cwd, "T1", "说要被撤回的那条", { file: pinned }).status, 0);
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   fs.writeFileSync(
     path.join(cwd, ".deed", "plan.md"),
     ["# 这一期要做成什么", "先说一句要做的事。", "", "- [ ] T1 先说一句要做的事", "  标准：做完了", "  理由：这条交付是我手滑打进去的乱码"].join("\n") + "\n",

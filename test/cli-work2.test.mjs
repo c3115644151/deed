@@ -14,6 +14,8 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  freshPlan,
+
   addTask, deliverTask, undoDelivery, dropTask,
 } from "./support/cli.mjs";
 
@@ -137,14 +139,14 @@ test("removing a file in a submit is not a small change either", () => {
   fs.writeFileSync(path.join(cwd, "docs", "big.md"), "x".repeat(15000));
   addTask(cwd, "写一份一万五的文档", "它在", "--files", "docs/big.md");
   const plan = path.join(cwd, ".deed", "plan.md");
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   fs.writeFileSync(plan, ["# 这一期要做成什么", "写一份，再删掉。", "", "- [x] T1 写一份一万五的文档", "  标准：它在", "  交付：写了 docs/big.md"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   assert.match(deed(cwd, "state").stdout, /免审（全部落在 exempt）/u, "一万五千字节落在免审路径上，本来不用审");
 
   addTask(cwd, "再把它删掉", "它不在了", "--files", "docs/big.md");
   fs.rmSync(path.join(cwd, "docs", "big.md"));
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   fs.writeFileSync(plan, ["# 这一期要做成什么", "写一份，再删掉。", "", "- [x] T1 写一份一万五的文档", "  标准：它在", "  交付：写了 docs/big.md", "", "- [x] T2 再把它删掉", "  标准：它不在了", "  交付：docs/big.md 已删"].join("\n") + "\n");
   const run = deed(cwd, "submit");
   assert.equal(run.status, 0, run.stderr);
@@ -161,7 +163,7 @@ test("an entry still to be done is carried to the next segment from the plan", (
   deliverTask(cwd, "T1", "跑了 1/1");
   addTask(cwd, "下一段再做", "也做完");
   const plan = path.join(cwd, ".deed", "plan.md");
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   // 改到下一段要有落脚的地方：清单里那一段先排出来，条目才挪得过去。
   fs.writeFileSync(
     plan,
@@ -178,7 +180,7 @@ test("an entry still to be done is carried to the next segment from the plan", (
   // 交付过的条目改不了段：那等于把一条交付换个段说话，账本里没有这件事的位置。
   // 这一条要按清单自己画出来的形状写——交过的条目画的是 [x] + 交付：，
   // 按勾判会让这一行被当成"没有要落的改动"吞掉，用户只得到一句和 改到下一段： 无关的话。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const drawn = fs.readFileSync(plan, "utf8");
   assert.match(drawn, /- \[x\] T1 先做这一件/u, "清单自己把交过的条目画成勾着的");
   fs.writeFileSync(plan, drawn.replace(/(  交付：跑了 1\/1\n)/u, "$1  改到下一段：换个段\n"));
@@ -216,7 +218,7 @@ test("the counts in a delivery are taken by running the command, not copied", ()
   // 清单里早交过的那条还带着当时的数：再接一条新活，--run 只核这一次真交的那条
   addTask(cwd, "再写一条", "也是 2/2");
   fs.writeFileSync(path.join(cwd, "note.txt"), "这次真动了一下\n");
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   fs.writeFileSync(
     file,
     fs.readFileSync(file, "utf8").replace(/- \[ \] T2 (.*)\n/, "- [x] T2 $1\n  交付：也报 2/2 通过\n"),
@@ -287,7 +289,7 @@ test("a delivery that says what it will show has to show it when the ledger is w
 
   // 说得出现象却跑不出来：记账前就拒
   addTask(cwd, "再写一句", "印 bye");
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const next = fs
     .readFileSync(file, "utf8")
     .replace(/- \[ \] T2 (.*)\n/, "- [x] T2 $1\n  交付：说 bye 就印 bye；期望：node say.mjs => bye\n");
@@ -313,14 +315,14 @@ test("a drop can be taken back in the plan, and then the entry can be delivered 
   writePlan(cwd, ["# 这一期要做成什么", "- ? 写一份说明", "  标准：docs/a.md 有一句话"].join("\n"));
   assert.equal(deed(cwd, "submit").status, 0);
 
-  writePlan(cwd, readPlan(cwd).replace("- [ ] T1 写一份说明", "~~ T1 写一份说明").replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  理由：过时的活"));
+  writePlan(cwd, readPlan(cwd).replace("- [ ] T1 写一份说明", "- [~] T1 写一份说明").replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  理由：过时的活"));
   assert.equal(deed(cwd, "submit").status, 0);
 
   // 撤回来却没写理由：账本里会留下一条谁也读不出原因的事实，先拒。
-  writePlan(cwd, readPlan(cwd).replace("~~ T1 写一份说明", "- [ ] T1 写一份说明").replace("\n  理由：过时的活", ""));
+  writePlan(cwd, readPlan(cwd).replace("- [~] T1 写一份说明", "- [ ] T1 写一份说明").replace("\n  理由：过时的活", ""));
   const bare = deed(cwd, "submit");
   assert.equal(bare.status, 1);
-  assert.match(bare.stderr, /已经放弃过：要撤回来接着做，就在这一行下面写一条 理由：/u);
+  assert.match(bare.stderr, /已经放弃过：要撤回来接着做，把它写回 - \[ \] 并在下面写一条 理由：/u);
 
   writePlan(cwd, readPlan(cwd).replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  理由：其实还得做"));
   const back = deed(cwd, "submit");
@@ -359,12 +361,10 @@ test("the order of the rows is the order the work happens in", () => {
   assert.equal(added.status, 0, added.stderr);
   assert.match(added.stdout, /下一步 · agent · 交付：T1 · 先做的事/u, "下一步挑清单上头一条");
 
-  const draft = deed(cwd, "plan", "--print");
-  assert.match(draft.stdout, /- \[ \] T1 先做的事/u);
-  assert.ok(
-    draft.stdout.indexOf("- [ ] T1 先做的事") < draft.stdout.indexOf("- [ ] T2 后做的事"),
-    "草稿按账本里的位置印，不按编号印",
-  );
+  // 草稿就是盘上那份文件：submit 记账之后按账本重画过，读它等于看命令印的那一份。
+  const draft = readPlan(cwd);
+  assert.match(draft, /- \[ \] T1 先做的事/u);
+  assert.ok(draft.indexOf("- [ ] T1 先做的事") < draft.indexOf("- [ ] T2 后做的事"), "草稿按账本里的位置印，不按编号印");
 
   // 把两条换个位置：账本里落 task.order，最后那条交付先做。
   // 草稿按状态分组印，所以不能拿「两条挨着」去换——按条目整块挪。

@@ -242,7 +242,7 @@ export default function submit(argv) {
             // 同一批再勾上就是重新交付。没有 理由： 的撤回转不成一条能读的事实。
             if (task.status === "dropped") {
               if (!item.why)
-                fail(item.id + " 已经放弃过：要撤回来接着做，就在这一行下面写一条 理由：——撤回一条放弃得说清为什么");
+                fail(item.id + " 已经放弃过：要撤回来接着做，把它写回 - [ ] 并在下面写一条 理由：——撤回一条放弃得说清为什么");
               specs.push({ k: "task.undo", s: one.id, id: item.id, why: item.why, by });
             }
             if (item.box === "x") {
@@ -325,9 +325,15 @@ export default function submit(argv) {
                 "先交此刻在做的那一条（deed state 说是 " + dones[0].id + "），写完 交付： 提交一次，再做下一条。" +
                 "账本一个字都没动",
             );
-          const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped");
+          // 已关闭的段不在这份文件里（它们的事实全在账本上）：缺不等于"消失"。
+          // 只有还没关闭的那几段，条目不许自己不见。
+          const open = new Set(one.segments.filter((seg) => seg.closedAt === null).map((seg) => seg.id));
+          const gone = one.tasks.filter((t) => !mentioned.has(t.id) && t.status !== "dropped" && open.has(t.segment));
           if (gone.length > 0)
-            fail("清单里少了 " + gone.map((t) => t.id).join("、") + "：账本里有的条目不能自己消失——不做了就写 ~~ " + gone[0].id + " " + gone[0].title + "，再加一行 理由：");
+            fail(
+              "清单里少了 " + gone.map((t) => t.id).join("、") + "：还没关闭的段里，账本有的条目不能自己消失——不做了就写成 - [~] " +
+                gone[0].id + " " + gone[0].title + "，再加一行 理由：",
+            );
           return specs;
         },
         (stamped) => {

@@ -11,35 +11,21 @@ import { groupsOf } from "../core/rules.mjs";
 
 export const HEAD = "# 这一期要做成什么";
 
-export const FORMAT = [
-  HEAD,
-  "一句话说清这一期要做成什么。",
-  "",
-  "## 段 S01.1",
-  "- [x] T1 已经交付的条目",
-  "  标准：做完的标准",
-  "  交付：跑了什么，结果几比几",
-  "- [ ] T2 还没做的条目",
-  "  标准：做完的标准",
-  "- ? 还没有编号的条目",
-  "  标准：做完的标准",
-  "~~ T3 不做了的条目",
-  "  理由：为什么不做了",
-  "",
-  "四件事：勾上 = 交付（必须写 交付：），取消勾选 = 撤回（必须写 理由：），",
-  "? = 新条目（submit 时领号），~~ = 放弃（必须写 理由：）；把 ~~ 改回 - [ ] 就是撤回放弃（也要写 理由：）；",
-  "延后写一行 延后：为什么。同段里谁先做，就是你在文件里排的先后：把条目上下挪一下，再 submit 一次。",
-  "这一段已经有交过的活、正要送审时，没做的条目写一行 改到下一段： 它就真挪到下一段——",
-  "它不是放弃，是换个段接着做；那一段自己从此不接新活。",
-].join("\n");
 
-const FIELD = /^\s*(标准|交付|理由|延后|改到下一段)\s*[：:]\s*(.*)$/u;
-const CHECK = /^\s*-\s*\[([ xX])\]\s+(?:(T\d+)\s+)?(.*)$/u;
-const FRESH = /^\s*-\s*\?\s+(.*)$/u;
-const DROPPED = /^\s*~~\s*(T\d+)\s*(.*)$/u;
+// 条目只有一种形状：一个方框 + 可选号 + 标题。四种状态都在方框里说，
+// 不再有 "~~" 这种挂在行首的记号——那是第二套语法。
+//   - [?] 标题       新条目（submit 领号）
+//   - [ ] T1 标题    还没做
+//   - [x] T1 标题    已交付（必须写 交付：）
+//   - [~] T1 标题    不做了（必须写 理由：）
+// 注记只有一种开头：两个空格一个箭头，后面跟一个词——延后 或 下一段。
+const FIELD = /^\s*(?:→\s*)?(标准|交付|理由|延后|下一段|改到下一段)\s*[：:]\s*(.*)$/u;
+const CHECK = /^\s*-\s*\[([ xX~?])\]\s+(?:(T\d+)\s+)?(.*)$/u;
+const LEGACY_FRESH = /^\s*-\s*\?\s+(.*)$/u;
+const LEGACY_DROPPED = /^\s*~~\s*(T\d+)\s*(.*)$/u;
 const HEADING = /^(#{1,6})\s*(.*)$/u;
 
-const fieldOf = (word) => ({ 标准: "criteria", 交付: "claim", 理由: "why", 延后: "later", 改到下一段: "carry" })[word];
+const fieldOf = (word) => ({ 标准: "criteria", 交付: "claim", 理由: "why", 延后: "later", 下一段: "carry", 改到下一段: "carry" })[word];
 
 // What the file says, in the order it says it. Nothing here decides whether the
 // batch is allowed; that is the command's business, and fold has the last word.
@@ -55,13 +41,22 @@ export function parse(text) {
   let item = null;
   // 条目一出现，前面的散文就不再是「这一期要做成什么」了：那是写错位置的句子。
   let started = false;
+  let inComment = false;
   const lines = text.replace(/^\uFEFF/u, "").split(/\r?\n/u);
   for (const [index, raw] of lines.entries()) {
     const at = index + 1;
     const line = raw.replace(/\s+$/u, "");
     if (line.trim() === "") continue;
-    // 注释行是给人看的：它不是这一期要做成什么的一部分。
-    if (line.trim().startsWith("<!--")) continue;
+    // 注释是给人看的（写法和现在的形状都印在那里）：它不是这一期要做成什么的一部分。
+    // 从 <!-- 到 --> 之间整段跳过，所以注释可以写好几行。
+    if (inComment) {
+      if (line.includes("-->")) inComment = false;
+      continue;
+    }
+    if (line.trim().startsWith("<!--")) {
+      inComment = !line.includes("-->");
+      continue;
+    }
     const heading = HEADING.exec(line);
     if (heading) {
       where = heading[1].length === 1 ? "goal" : "segment";
@@ -76,19 +71,23 @@ export function parse(text) {
     }
     const check = CHECK.exec(line);
     if (check) {
-      item = { id: check[2] ?? null, title: check[3].trim(), box: check[1].toLowerCase() === "x" ? "x" : " ", at, section };
+      const mark = check[1].toLowerCase();
+      const box = mark === "x" ? "x" : mark === "~" ? "~" : mark === "?" ? "?" : " ";
+      // 「?」那条没有号：新条目在 submit 那一刻才领。
+      item = { id: box === "?" ? null : (check[2] ?? null), title: check[3].trim(), box, at, section };
       items.push(item);
       started = true;
       continue;
     }
-    const fresh = FRESH.exec(line);
+    // 旧写法照读：以前新条目写 "- ? 标题"、放弃写 "~~ T1 标题"。
+    const fresh = LEGACY_FRESH.exec(line);
     if (fresh) {
       item = { id: null, title: fresh[1].trim(), box: "?", at, section };
       items.push(item);
       started = true;
       continue;
     }
-    const dropped = DROPPED.exec(line);
+    const dropped = LEGACY_DROPPED.exec(line);
     if (dropped) {
       item = { id: dropped[1], title: dropped[2].trim(), box: "~", at, section };
       items.push(item);
@@ -141,26 +140,43 @@ const GROUP_NOTE = {
 };
 
 const bullet = (task) => {
-  if (task.status === "dropped") return "~~ " + task.id + " " + task.title;
+  if (task.status === "dropped") return "- [~] " + task.id + " " + task.title;
   // 判过的条目也算交过了：草稿把它们画成未勾选，下一次 submit 就会当成
   // 「还没做」，或者让已经判过的一段重新被勾一遍。
   const box = task.status === "done" || task.status === "accepted" ? "[x]" : "[ ]";
   return "- " + box + " " + task.id + " " + task.title;
 };
 
-// The draft the ledger can account for: every task it already knows, under the
-// segment it sits in, with the words it was given. Nothing is invented here.
+// 草稿只画要过目的东西：目的、现在收活的段、排着的下一段、还没做完的条目。
+// 已关闭的段不再常驻——它们的事实全在账本里，草稿上只留一行数。
+// 说明印成注释：解析器整段跳过它。这里不写任何像真条目的字样（不出现号、不以方框开头），
+// 免得按行改文件的脚本把说明本身当成一条任务改了。
+const LEGEND = [
+  "<!-- 这份文件就是这一期的清单：改它，然后 deed submit 一次记账。",
+  "     每条任务一行，开头是一个方框：方框里 ? = 新条目、空着 = 还没做、x = 已交付、~ = 不做了。",
+  "     方框后面跟着号和标题；改的时候只动方框与下面那几行，别改号和标题。",
+  "     勾上就得写一行「交付：」——跑了什么、结果几比几；不做了就得写一行「理由：」。",
+  "     注记两行：箭头加「延后：」这一次不做；箭头加「下一段：」送去下一段接着做，不是放弃。",
+  "     先后就是你排的行序：上下挪一下再 submit；一次只交一条。 -->",
+].join("\n");
+
 export function draft(session) {
-  const out = [HEAD, session.goal?.text ?? "（还没写：一句话说清这一期要做成什么）", ""];
-  for (const segment of session.segments) {
+  const out = [HEAD, session.goal?.text ?? "（还没写：一句话说清这一期要做成什么）", "", LEGEND, ""];
+  // 关闭与否只有一种写法：closedAt 有值就是关了（null 与 undefined 都是没关）。
+  const open = session.segments.filter((one) => one.closedAt == null);
+  const closed = session.segments.filter((one) => one.closedAt != null);
+  if (closed.length > 0) {
+    // 一行说清沉下去的：几条、哪几段。要看细节去 deed state 或账本，不在这份文件里。
+    const counts = closed.map((one) => one.id + " " + session.tasks.filter((task) => task.segment === one.id).length);
+    out.push("<!-- 已关闭 " + closed.length + " 段（不再过目）：" + counts.join(" · ") + " -->", "");
+  }
+  for (const segment of open) {
     const tasks = session.tasks.filter((one) => one.segment === segment.id);
     if (tasks.length === 0) continue;
     out.push("## 段 " + segment.id);
-    // 还没轮到的那一段：条目写着，交付等前面的段判过。
-    if (segment.closedAt === null && session.segments.find((one) => one.closedAt === null) !== segment)
-      out.push("<!-- 还没轮到：前面那一段判过，这一段才收活 -->");
-    // 印的次序：在做（最多一条）→ 等着（按你要的先后）→ 已完成 → 撤回或放弃。
-    // 越往下越是过去的事；新活永远在最上面那一条。
+    // 只有"排好的下一段"才印这句：它前面还有一段没收活。这是 takingSegment 的那一条。
+    const taking = session.segments.find((one) => one.closedAt == null && one.plannedAt == null) ?? null;
+    if (taking && taking.id !== segment.id) out.push("<!-- 还没轮到：现在收活的是 " + taking.id + "，轮到了这一段才收交付 -->");
     for (const group of groupsOf(tasks)) {
       out.push("<!-- " + group.label + "（" + group.tasks.length + " 条）" + GROUP_NOTE[group.key] + " -->");
       for (const task of group.tasks) {
@@ -168,26 +184,18 @@ export function draft(session) {
         out.push("  标准：" + task.criteria);
         const last = task.evidence[task.evidence.length - 1];
         if (last) out.push("  交付：" + last.claim);
-        if (task.status === "deferred") out.push("  延后：" + (task.deferredWhy ?? ""));
+        if (task.status === "deferred") out.push("  → 延后：" + (task.deferredWhy ?? ""));
         if (task.status === "dropped") out.push("  理由：" + (task.dropWhy ?? task.deferredWhy ?? ""));
       }
     }
     out.push("");
   }
-  // 新条目落到哪一段，不是文件里写着哪一节就算哪一段：一段送审还在等结论时，
-  // 它不再收新东西。那一节既然印不出来，就把它印出来，让人知道自己的 ? 会去哪儿。
-  const open = session.segments.filter((one) => one.closedAt === null).at(-1) ?? null;
-  if (!open) out.push("## 下一段（这一段的活都结束了：写在这里的 ? 会开下一段）", "");
-  else if (awaitingVerdict(session, open))
-    out.push(
-      "## 下一段（" + open.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）",
-      "",
-    );
-  else if (awaitingJudgement(session, open))
-    out.push(
-      "## 下一段（" + open.id + " 审查通过了、等你判决，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）",
-      "",
-    );
-  out.push("<!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->");
+  // 新条目落在哪一段：正在等结论/等判决的段不再收新东西，那时 ? 落到下一段。
+  const last = open.at(-1) ?? null;
+  if (!last) out.push("## 下一段（这一段的活都结束了：写在这里的 ? 会开下一段）", "");
+  else if (awaitingVerdict(session, last))
+    out.push("## 下一段（" + last.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）", "");
+  else if (awaitingJudgement(session, last))
+    out.push("## 下一段（" + last.id + " 审查通过了、等你判决，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）", "");
   return out.join("\n");
 }

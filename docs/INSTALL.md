@@ -62,7 +62,7 @@ deed init --review "src/**,apps/**" --exempt "docs/**,*.md"
 ```
 .deed/config.json     审查设置（要审/免审的路径、门命令、端口）与它们的镜像
 .deed/log/2026-11.jsonl   账本，按月份片，只追加
-.deed/plan.md         这一期的清单草稿（deed plan 出，deed submit 记账）
+.deed/plan.md         这一期的清单（deed plan 写，改完 deed submit 记账；记账后按账本重画）
 .deed/review/         审查清单（发出去时才有文件）
 .deed/workspace.json  上一次交付的内容指纹（第一次交付时才有）
 .deed/log/lock        写锁，只在写的那一瞬间存在

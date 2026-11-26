@@ -13,6 +13,8 @@ import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
+  freshPlan,
+
   addTask, deliverTask, undoDelivery, dropTask, writeLines, planFile, writePlan, readPlan,
   setGoal,
 } from "./support/cli.mjs";
@@ -65,7 +67,7 @@ test("new work waits for the verdict in the next segment, and a brief only ages 
   // 清单发出去了还在等结论：这一段不再收新活，新条目自己落到下一段——
   // 旧清单没被这一条顶掉，这一段从发出去到现在确实没变过。
   // 这一段已经送审：新活写在空标题的 ## 段里，submit 时领下一段的号。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const briefLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const briefAt = briefLines.findIndex((one) => one.startsWith("## 下一段"));
   writePlan(cwd, [...briefLines.slice(0, briefAt), "", "## ", "", "- ? 又想起一条", "  标准：也得做到"].join("\n") + "\n");
@@ -160,7 +162,7 @@ test("a frozen segment refuses work until the brief is withdrawn, and the withdr
   assert.equal(deed(cwd, "say", "再看看").status, 0, "记轮次不受冻结影响");
   assert.equal(deed(cwd, "point", "换一种做法，先记着").status, 0, "记要点不受冻结影响");
   // 新活不进冻结的段：清单里另开空标题的一节，submit 时领下一段的号。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const frozenLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const frozenAt = frozenLines.findIndex((one) => one.startsWith("## 下一段"));
   writePlan(cwd, [...frozenLines.slice(0, frozenAt), "", "## ", "", "- ? 又想起一条", "  标准：也行"].join("\n") + "\n");
@@ -298,7 +300,7 @@ test("a period whose segments all sat out review signs without anything else", (
   assert.equal(deed(cwd, "review", "--skip", "--segment", "S01.1", "--why", "只改文档").status, 0);
   fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
   // S01.1 已经封存关闭：新活写在空标题的 ## 段里，submit 时领 S01.2。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const exemptLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const exemptAt = exemptLines.findIndex((one) => one.startsWith("## 下一段"));
   writePlan(cwd, [...exemptLines.slice(0, exemptAt), "", "## ", "", "- ? 改 b", "  标准：docs/b.md 有一句话"].join("\n") + "\n");
@@ -415,7 +417,7 @@ test("a period verdict that names a segment reopens it, and its items stay deliv
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   fs.writeFileSync(path.join(cwd, "core", "b.mjs"), "b\n");
   // S01.1 审查通过、等你判决：新活排到 S01.2，交付等这一段判过、关闭。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const periodLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const periodAt = periodLines.findIndex((one) => one.startsWith("## 下一段"));
   writePlan(cwd, [...periodLines.slice(0, periodAt), "", "## ", "", "- ? 写 b", "  标准：b 在"].join("\n") + "\n");

@@ -13,7 +13,7 @@ import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
-  addTask, deliverTask, dropTask, writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, dropTask, writeLines, planFile, writePlan, readPlan, freshPlan,
 } from "./support/cli.mjs";
 
 
@@ -56,7 +56,7 @@ test("the last segment closed is not the end: the period judgement comes before 
   assert.match(state1.stdout, /下一步 · user · 判决/, "第一段审查通过了，轮到你判它");
   proof(cwd, "b.mjs");
   // 第一段还在等你判，新活先在清单里排到下一段；交付要等它判过、关闭。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const draftLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const placeholder = draftLines.findIndex((one) => one.startsWith("## 下一段"));
   writePlan(cwd, [...draftLines.slice(0, placeholder), "", "## ", "", "- ? 乙", "  标准：能跑"].join("\n") + "\n");
@@ -282,7 +282,7 @@ test("a pass seals the segment, so later work opens a new one instead of making 
   assert.doesNotMatch(sealed.stdout, /结论过期/);
   // 封了段之后再想起一件事：新任务开出 S01.2，上一段的结论不会因此变旧。
   // 这一段判过、已经关闭：新活写在空标题的 ## 段里，submit 时领号。
-  deed(cwd, "plan", "--force");
+  freshPlan(cwd);
   const laterLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
   const laterAt = laterLines.findIndex((one) => one.startsWith("## 下一段"));
   writePlan(cwd, [...laterLines.slice(0, laterAt), "", "## ", "", "- ? 再改一处", "  标准：还是一样"].join("\n") + "\n");

@@ -297,3 +297,38 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.equal(deed(cwd, "state").status, 0, "工作区没被写坏");
   assert.equal(deed(cwd, "check", "--ledger").status, 0);
 });
+
+// plan 只剩一件事：还没有清单时写一份。看内容读文件，语法印在文件头部——
+// 所以 --print／--format／--force 都不在了，敲它们会被当成拼错的开关拒掉。
+test("plan writes the file once, and nothing has to be printed or forced", () => {
+  const cwd = workspace("plan-one-job");
+  deed(cwd, "init", "--said", "开始");
+  const first = deed(cwd, "plan");
+  assert.equal(first.status, 0);
+  assert.match(first.stdout, /改它，再 deed submit/u);
+  const second = deed(cwd, "plan");
+  assert.equal(second.status, 1, "已经在的那份不再重写：改它就行");
+  assert.match(second.stderr, /直接改它/u);
+  for (const flag of ["--print", "--format", "--force"]) {
+    const gone = deed(cwd, "plan", flag);
+    assert.equal(gone.status, 1, flag + " 已经不在这个动词上");
+    assert.match(gone.stderr, /不认/u);
+  }
+});
+
+// 被拒的动作不进账本（那是原则），但"这个面好不好用"要靠数回答：
+// 每一次拒绝在 .deed/tmp 里留一行，账本上一个字都不多。
+test("a refusal leaves no ledger line, and one line where the numbers are counted", () => {
+  const cwd = workspace("refusal-count");
+  deed(cwd, "init", "--said", "开始");
+  const before = readEvents(cwd).length;
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1);
+  assert.equal(readEvents(cwd).length, before, "账本一个字都没多");
+  const log = fs.readFileSync(path.join(cwd, ".deed", "tmp", "refusals.log"), "utf8").trim().split("\n");
+  assert.equal(log.length, 1);
+  const one = JSON.parse(log[0]);
+  assert.equal(one.verb, "submit");
+  assert.match(one.why, /还没有清单：先 deed plan/u, "记下的是那句拒绝，原话");
+  assert.match(one.at, /^\d{4}-\d{2}-\d{2}T/u, "带时间：看得出是哪一轮");
+});
