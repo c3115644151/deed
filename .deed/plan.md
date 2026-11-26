@@ -289,13 +289,9 @@
 <!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
 - [ ] T120 发现是主张不是判决：可 fix / defer / reject，结论只判标准
   标准：每条发现落账时带处置与依据——fix（已改，指到改在哪）／defer（登记成条目，说清为什么不在这轮做）／reject（不认，给依据）；账本里读得出曾经打过哪条、作者怎么回的；下一次出清单时，上一份里还没被回答的发现要印在材料上，等审查者回答那条反驳；段结论只判「标准在这一份字节上成立不成立」，不因为「作者没照建议做」单独判不合格（除非那条事实使标准不成立）；有用例（reject 一条并给依据 → 账本可读、下一份清单印出那条反驳；只写形容词的 reject 被拒）
-<!-- 等着（16 条）：上面那条做完再动 -->
+<!-- 等着（14 条）：上面那条做完再动 -->
 - [ ] T137 六条交付记录只有一句话、没有能核的命令或数字：把它们改成能当场跑出来的
   标准：`S02.19` 那六条（T100、T104、T107、T109、T110、T112）的记录里，每条都带一条当场能跑的命令，以及它该印出来的那句话（或一条由 `--run` 采到条数的命令）；清单上不再出现「这条没配命令核过」的批注；剩下的数字与当天跑出来的一致；改完由审查者复核
-- [ ] T79 T79 一轮只记一句话：deed say 取代 tick
-  标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
-- [ ] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
-  标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
 - [ ] T81 T81 收口与免审并进已有动词：review --skip、sign --shelve，删 goal
   标准：deed review --skip --why 封免审段（取代 deed seal）；deed sign --shelve --why 归档（取代 shelve）；deed goal 删除（目的来自清单第一行，submit 已落 goal.set）；三个旧动词 exit 1；有用例覆盖
 - [ ] T82 T82 视图与推翻：state --check/--gates，judge 变 overturn
@@ -322,22 +318,13 @@
   标准：submit --run 在「自上次记录以来工作区内容没变」时复用那次结果并把它记进交付记录（记着那份结果的来源与工作区指纹），变了就照旧真跑；用例覆盖复用与失效两条路；不得出现「复制来的数字」——复用的是同一份字节上的真跑
 - [ ] T142 一条命令换掉「撤回再重交」：task renew
   标准：交付过的条目在字节变了之后可以一条命令重记（记新内容与为什么），账本上留一条事件而不是 undo+done 两条；verify 不再把重记过的那条当过期；用例覆盖 renew 之后 verify 干净、事件种类只有 one 条
-<!-- 已完成（27 条）：交过的，往下沉 -->
-- [x] T145 结构检查对着范式判格：必需格、目录归属、extras 豁免
-  标准：core/checks.mjs 有 PARADIGM（software/document/data/work/free）；结构检查四步：范式要求的格都在、声明的目录都在盘上、盘上每个顶层目录都有归属（认领或 extras）、跨格方向按 mayImport；layers 写 role=dir，role 缺省取 dir；project.declare 收 role 与 extras；deed project 支持 --extras；缺格/无归属/方向反三种失败各有具体 detail 与修法；本仓声明 tests=test、extras=docs,examples,support 后 3/3；沿用三种状态的语义，未通过不挡任何动作
-  交付：node --test 215/215（全量；checks 11 条含缺格、无归属目录、extras 豁免、目录名与格名不同）；npm run test:fast 103/103；本仓重新声明 --layers "core=core:,lib=lib:core,app=cli:core+lib+board,board=board:core+lib,tests=test:core+lib+app+board" --extras "docs,examples,support" → deed check 3/3（5 个目录认领 5 格，方向都对）；顺手删掉仓根一个误建的 %SystemDrive% 目录（正是「无归属目录」那种野地）
-- [x] T144 体检层：这个工作区还是不是一个项目，用一张有序的检查表算出来
-  标准：core/checks.mjs 是纯函数（账本 + 目录快照 → 逐条结论），CHECKS 有序、每行登记"事实/判定/修法/能力"；三种结论 pass/fail/na，未声明项目时项目级检查一律 na 且不算未结项；projectState 给 declared/shape/passed/total/missing 且会随树走样退回去；project.declare 事件（含义 25）进账本，认可不落盘；deed check 只读、exit 0、逐条印结论与修法；deed state 顶上印"项目 · 形态 · k/n"或"没有声明（工作区模式）"；未通过不挡三种状态；既有用例全绿
-  交付：node --test 212/212（全量，含新 test/checks.test.mjs 8 条与 cli-state2 的 standing 用例）；core/checks.mjs 的 CHECKS 三行（工作区/树/背景）各有 事实·判定·修法·能力 四样，checkAll/projectState 不读盘不读钟；lib/tree.mjs 只提供目录与相对 import；deed check 只读、未通过也 exit 0，逐条印 ✓/✗/— 与修法；deed state 顶上那行随说了算的账本变（本仓已声明 software，4 层方向都对，3/3）；project.declare 是含义第 25 版的事件，package 0.22.0；DESIGN §13、README 命令表与事件表、规则块三份同步
-- [x] T143 把不对的机制删掉：账本不对字节、清单每份列全部、去掉「先做后记」与每段花了多少
-  标准：cli/audit.mjs 与 deed verify 动词删除（cli/spec.mjs、cli/deed.mjs 里不再有），$digest 开关不再收；交付记录只记路径与字节数（evidence.files=[{path}]、changed、bytes），清单只记两份路径（review.brief 的 brief/guide），都不带 sha256 或内容指纹；送审冻结仍然挡住「这一段的活在被审期间被改动」；清单每份列全部条目（没有「判过了、这次不再重判」一节）；「先做后记」（lateWork）与 costOf 及 state/面板上的「花了 · N 份清单」都删除；doc/README/DESIGN/HANDOFF/规则块与代码同一口径；删掉的机制对应的用例一并删除，留下的用例全绿
-  交付：node --test 203/203（全量，含 board/docs/fold/plan/rules 与八个 cli 文件）；cli/audit.mjs 与 cli/verbs/verify.mjs 删除，SPEC 与 commands 里不再有 verify，--digest 拒收（`deed task --help` 的开关表里只剩 --evidence/--files/--by/--why）；交付记录只留 files:[{path}] + changed + bytes，review.brief 只留两份路径；送审冻结照旧（在审的那一段交付被拒）；清单每份列全部条目；lateWork 与 costOf 删除，state 与面板不再印「花了」；README/DESIGN/HANDOFF/AGENTS 与 lib/words.mjs 的规则块同一口径（test/docs.test.mjs 6/6 逐字比对通过）
-- [x] T139 拆开最慢的那个测试文件，让每一轮验证从两分半降到一分钟
-  标准：test/cli.test.mjs（154 秒，占全量 98%）按主题拆成若干文件并抽公共步骤到 test/support/cli.mjs；node --test 的用例总数与拆分前一致（121 条），单条断言不变；`node --test` 的实际耗时降到原来的 40% 以下（同一台机器、同一份字节），package.json 加 `test:fast`（core+board+docs，1 秒级）
-  交付：跑：node --test 224/224（全量，同一份字节；拆完之后全量 63.8 秒，拆之前单文件 test/cli.test.mjs 一条就 154.1 秒）；test/cli.test.mjs 按主题拆成八个（review1/2、work1/2、state1/2、rules1/2，共 121 条，一条不少），公共步骤抽到 test/support/cli.mjs（CLI、OFF、deed、later、gate、judgeAll、judgeHere、signHere、judged、kinds、briefs、proof、writeLines、planFile、writePlan、readPlan 共 15 个具名导出，从 test/ 里 import 一个就够）；每条用例的断言一句没动——拆分只挪行；package.json 加 test:fast（fold+rules+plan+docs+board，1.5 秒）与原有的 test（node --test）。量：拆前 $t=154.1s（test/cli.test.mjs 单跑），拆成四文件 71.7s，八文件 62.7s；全量 223→224 条、63.8s。
-- [x] T126 送审即冻结只挡交付与撤回交付：记录层面的照旧，落结论不比字节
-  标准：清单发出去、还没被回答的这段时间，这一段拒收交付与撤回一条交付（新活落进下一段）；记轮次、写题、延后、放弃、改到下一段照收，它们是决定不是文件；`deed review --segment S0x.N --withdraw --why "…"` 是唯一出路，撤回后这一段回到执行态、可以继续改，旧清单记一条 review.withdraw 并留下撤回的人与理由；落结论前只问交付记录有没有指到工作区外面，不再比字节——盘上被别的进程改了是 `deed verify` 该报的账；有用例（交付与撤回交付被拒并说清出路、tick／ask／drop／carry 放行、撤回要 --by、字节变了 verdict 仍落得下来）
-  交付：测试夹具与公共步骤：test/cli.test.mjs 拆成 test/cli-review1/2、work1/2、state1/2、rules1/2 八个文件，公共步骤在 test/support/cli.mjs（15 个具名导出）；拆的时候一条断言没改。
+<!-- 已完成（29 条）：交过的，往下沉 -->
+- [x] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
+  标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
+  交付：deed ask answer A1 --decision "…" --by user 落账并关题；deed ask drop A1 --why "…" 关题；ask resolve 与 ask withdraw 两条旧路 exit 1 并指到新名（ask resolve 实测报「已经改成 ask answer A1」）；ask 的开关表里没有 why（给 raise 传 --why 会被拒）；裁定里的「边界：」「弃：」照旧从账本算出来（边界仍 2 条）；事件含义第 26 版：ask.raise 只有 v<26 的旧行才要 why；规则块、README 围栏、AGENTS 尾段三处同一段话已同步；这一份字节上 node --test 217 条（216 过，1 条面板端口用例在并发下红，单跑 test/cli-state1 12/12）（agent）
+- [x] T146 T79b 一轮只记一句话：deed 说一句话就记下这一轮（say 取代 tick）
+  标准：deed say "…" 记下这一轮，said 是位置参数；没有 --said、--did，也没有 --who（轮次只认 user，agent 的进展写交付记录或结论）；tick 这个名字从开关表、帮助与文档里消失，敲它 exit 1 并指到 deed say；state 与面板不读 did；有用例覆盖（tick 被拒且指路、say 落账、state 打印这一轮）
+  交付：deed say "我改了三处" 落账为一条轮次（said 是位置参数，报告「已记一轮」）；deed say "…" --who user 被拒（不认 --who）；deed say "…" --said x 被拒（不认 --said）；deed tick "…" exit 1 并指到 deed say（cli/deed.mjs 的 MOVED 表）；帮助与开关表里 tick 0 处；state 只印原文，不读 did；这一份字节上 node --test 218/218（agent）
 - [x] T101 审查结论按条落下：判过的条目下一轮不再重判
   标准：review.log 带 results:[{id, verdict, note}]，一条条目一个判定（达成／未达成／无法判断）；pass 只在段里每条条目都有判定时才封段，缺哪条就拒并说出号；重审的清单只列「还没判过」与「自上次判定以来字节变过」的条目，其余条目的判定沿用；旧账本里没有 results 的结论照读（按整段 pass／fail）；有用例（判过 T1 之后改 T2，重审清单只列 T2，pass 之后 T1 的旧判定仍算数）
   交付：跑：node --test 215/215（test/cli.test.mjs 的 a verdict is per item…、test/fold.test.mjs 的 pass 覆盖一条）；review.log 带 results:[{id,verdict,note,files}]，fold 在 meaning>=19 时要求 pass 覆盖这一段每条、否则拒并点名；清单只列没判过的与字节变过的（cli/brief.mjs 的 still/again），已判的印成「判过了、这次不再判」；旧行没有 results 照读
@@ -374,6 +361,9 @@
 - [x] T125 段可以在清单里预先排：多段一次写出，按行序依次开段，只有当前段收活
   标准：清单里写多个 `## 段`，submit 按行序把条目归到各段（不是一律塞进当前开段）；同一时刻只有一段收活，前一段有结局后下一段才开；`deed plan --print` 与 state 显示各段处于哪一步；没预排的清单行为不变（条目仍落当前开段）；有用例覆盖两段预排、依次开、前面没结局时后面不开
   交付：跑：node --test 223/223（全量）；core/events.mjs 含义第 24 版加 segment.plan（空标题的一节 submit 领号）；core/fold.mjs 的 task.add 认 segment（落在清单排好的段里），nextSegment 按已有最大号 +1 编号（旧账本重放仍落同一段），task.carry 第 24 版起目标是「下一个还没关闭的段」，没有就拒（先在清单里加一节），旧行按当时那套读（含自己开段的旧读法）——预备段这个概念删了；core/rules.mjs 加 takingSegment（收活的那一段＝队列里第一个非清单排出来的未关闭段）与 queuedSegments；cli/plan.mjs 的 parse 收 sections 与 sectionTitle，draft 对排队段多印一行注释；cli/verbs/submit.mjs 按节映射段（段号写了就用、空标题领号、同批递增防重号）、先把段声明在条目前面落账、给排队段勾交付整批拒；cli/session.mjs 与 cli/verbs/review.mjs、seal.mjs 对排队段的交付/送审/封存当场拒并说清现在收活的是哪一段；board/render.mjs 排队段挂「等前面」（验收屏与执行屏）并按 takingSegment 判当前段；deed state 同时印出排队段与收活段。用例：test/fold.test.mjs 39/39（改到下一段落进清单排好的段、没有下一段当场拒、旧行照旧读）、test/plan.test.mjs 与 rules 72/72、test/cli.test.mjs 121/121 里 the plan can line up several segments, and only the first takes work 与 an entry still to be done is carried to the next segment from the plan。
+- [x] T126 送审即冻结只挡交付与撤回交付：记录层面的照旧，落结论不比字节
+  标准：清单发出去、还没被回答的这段时间，这一段拒收交付与撤回一条交付（新活落进下一段）；记轮次、写题、延后、放弃、改到下一段照收，它们是决定不是文件；`deed review --segment S0x.N --withdraw --why "…"` 是唯一出路，撤回后这一段回到执行态、可以继续改，旧清单记一条 review.withdraw 并留下撤回的人与理由；落结论前只问交付记录有没有指到工作区外面，不再比字节——盘上被别的进程改了是 `deed verify` 该报的账；有用例（交付与撤回交付被拒并说清出路、tick／ask／drop／carry 放行、撤回要 --by、字节变了 verdict 仍落得下来）
+  交付：测试夹具与公共步骤：test/cli.test.mjs 拆成 test/cli-review1/2、work1/2、state1/2、rules1/2 八个文件，公共步骤在 test/support/cli.mjs（15 个具名导出）；拆的时候一条断言没改。
 - [x] T127 一段结束后段审，全段结束后期审，签收在期审之后
   标准：`deed review --segment S0x.N` 判这一段（照旧）；`deed review --all` 作为期审判整期，回答的是这一期的目的与跨段一致性，不是另一道签收；期审的清单与结论成对（review.brief 与 review.log 记 scope:"session"），旧账本里早先的 session 结论仍只作历史、不挡签收；每一段都有结局、无未做、无已交付未判之后才出期审清单，期审 pass 才轮到签收，fail 点名哪一段就重开那一段；`deed state` 在段全关之后先给「出期审清单／落期审结论」，面板同步；EVENT_VERSION 升 1、旧行照读；有用例（段没关全不出发期审清单；期审 pass 之后签收可行；期审 fail 点名一段则那一段重新打开）
   交付：deed review --all 以期审的身份回来：清单与角色包由 cli/brief.mjs 的 planWhole 生成，列目的、各段结局、这一期定下的边界与弃、还挂着的东西，不列段里的条目；core/rules.mjs 的 needsPeriodReview／periodState／stalePeriod／periodFresh／periodReviewers／segmentReviewers 说得出现在这一步；signBlockers 多一条「这一期的期审没通过」，nextAction 在段全关之后先给期审，写清换一双手；期审 pass 才轮到签收，fail 点名段号则那一段重新打开、条目保持交付（core/fold.mjs 的 session-scope fail 分支）；EVENT_VERSION 20 / MEANING.periodReview，更早的 session 结论只作历史、不挡签收。全量 219/219 跑在这一份字节上（另一次运行由 --run 采）；变异：把 signBlockers 里期审那道门注掉 → rules 两条用例红（0 过 2 败）
@@ -404,7 +394,25 @@
 - [x] T138 判决是审查通过之后用户按的第二道闸：段由判决关闭，签收按期
   标准：审查者的 pass 只把这一段交回来（segment.verdict="pass"、reviewedAt/reviewedBy，closedAt 仍为空），这一段不再收新活、交付与撤回交付照样冻结；用户只在面板上按「判决通过」（落 verdict.pass，带 by 与 via:"panel"），按下之后这一段才关闭、段内已交付转 accepted；没有审查通过时限不了判决、判过的段不能重判；签收等每一段都有结局（判决或 seal）、无未做/未判/待裁、期审通过；deed state 在审查通过后给的下一步是 user·判决，面板在等判决的段上出那个按钮；旧账本里 pass 即关闭的行按旧含义读；三条用例（审查未通过判不了、pass 之后签收仍被挡且交付被冻、判决之后段关闭并可签收）
   交付：判决是审查通过之后用户按的第二道闸（含义第 23 版）；T125 改了状态的印法，按今天的字节重记。
-<!-- 撤回或放弃（7 条）：不做了的，沉到最后 -->
+- [x] T139 拆开最慢的那个测试文件，让每一轮验证从两分半降到一分钟
+  标准：test/cli.test.mjs（154 秒，占全量 98%）按主题拆成若干文件并抽公共步骤到 test/support/cli.mjs；node --test 的用例总数与拆分前一致（121 条），单条断言不变；`node --test` 的实际耗时降到原来的 40% 以下（同一台机器、同一份字节），package.json 加 `test:fast`（core+board+docs，1 秒级）
+  交付：跑：node --test 224/224（全量，同一份字节；拆完之后全量 63.8 秒，拆之前单文件 test/cli.test.mjs 一条就 154.1 秒）；test/cli.test.mjs 按主题拆成八个（review1/2、work1/2、state1/2、rules1/2，共 121 条，一条不少），公共步骤抽到 test/support/cli.mjs（CLI、OFF、deed、later、gate、judgeAll、judgeHere、signHere、judged、kinds、briefs、proof、writeLines、planFile、writePlan、readPlan 共 15 个具名导出，从 test/ 里 import 一个就够）；每条用例的断言一句没动——拆分只挪行；package.json 加 test:fast（fold+rules+plan+docs+board，1.5 秒）与原有的 test（node --test）。量：拆前 $t=154.1s（test/cli.test.mjs 单跑），拆成四文件 71.7s，八文件 62.7s；全量 223→224 条、63.8s。
+- [x] T143 把不对的机制删掉：账本不对字节、清单每份列全部、去掉「先做后记」与每段花了多少
+  标准：cli/audit.mjs 与 deed verify 动词删除（cli/spec.mjs、cli/deed.mjs 里不再有），$digest 开关不再收；交付记录只记路径与字节数（evidence.files=[{path}]、changed、bytes），清单只记两份路径（review.brief 的 brief/guide），都不带 sha256 或内容指纹；送审冻结仍然挡住「这一段的活在被审期间被改动」；清单每份列全部条目（没有「判过了、这次不再重判」一节）；「先做后记」（lateWork）与 costOf 及 state/面板上的「花了 · N 份清单」都删除；doc/README/DESIGN/HANDOFF/规则块与代码同一口径；删掉的机制对应的用例一并删除，留下的用例全绿
+  交付：node --test 203/203（全量，含 board/docs/fold/plan/rules 与八个 cli 文件）；cli/audit.mjs 与 cli/verbs/verify.mjs 删除，SPEC 与 commands 里不再有 verify，--digest 拒收（`deed task --help` 的开关表里只剩 --evidence/--files/--by/--why）；交付记录只留 files:[{path}] + changed + bytes，review.brief 只留两份路径；送审冻结照旧（在审的那一段交付被拒）；清单每份列全部条目；lateWork 与 costOf 删除，state 与面板不再印「花了」；README/DESIGN/HANDOFF/AGENTS 与 lib/words.mjs 的规则块同一口径（test/docs.test.mjs 6/6 逐字比对通过）
+- [x] T144 体检层：这个工作区还是不是一个项目，用一张有序的检查表算出来
+  标准：core/checks.mjs 是纯函数（账本 + 目录快照 → 逐条结论），CHECKS 有序、每行登记"事实/判定/修法/能力"；三种结论 pass/fail/na，未声明项目时项目级检查一律 na 且不算未结项；projectState 给 declared/shape/passed/total/missing 且会随树走样退回去；project.declare 事件（含义 25）进账本，认可不落盘；deed check 只读、exit 0、逐条印结论与修法；deed state 顶上印"项目 · 形态 · k/n"或"没有声明（工作区模式）"；未通过不挡三种状态；既有用例全绿
+  交付：node --test 212/212（全量，含新 test/checks.test.mjs 8 条与 cli-state2 的 standing 用例）；core/checks.mjs 的 CHECKS 三行（工作区/树/背景）各有 事实·判定·修法·能力 四样，checkAll/projectState 不读盘不读钟；lib/tree.mjs 只提供目录与相对 import；deed check 只读、未通过也 exit 0，逐条印 ✓/✗/— 与修法；deed state 顶上那行随说了算的账本变（本仓已声明 software，4 层方向都对，3/3）；project.declare 是含义第 25 版的事件，package 0.22.0；DESIGN §13、README 命令表与事件表、规则块三份同步
+- [x] T145 结构检查对着范式判格：必需格、目录归属、extras 豁免
+  标准：core/checks.mjs 有 PARADIGM（software/document/data/work/free）；结构检查四步：范式要求的格都在、声明的目录都在盘上、盘上每个顶层目录都有归属（认领或 extras）、跨格方向按 mayImport；layers 写 role=dir，role 缺省取 dir；project.declare 收 role 与 extras；deed project 支持 --extras；缺格/无归属/方向反三种失败各有具体 detail 与修法；本仓声明 tests=test、extras=docs,examples,support 后 3/3；沿用三种状态的语义，未通过不挡任何动作
+  交付：node --test 215/215（全量；checks 11 条含缺格、无归属目录、extras 豁免、目录名与格名不同）；npm run test:fast 103/103；本仓重新声明 --layers "core=core:,lib=lib:core,app=cli:core+lib+board,board=board:core+lib,tests=test:core+lib+app+board" --extras "docs,examples,support" → deed check 3/3（5 个目录认领 5 格，方向都对）；顺手删掉仓根一个误建的 %SystemDrive% 目录（正是「无归属目录」那种野地）
+<!-- 撤回或放弃（9 条）：不做了的，沉到最后 -->
+~~ T79 T79 一轮只记一句话：deed say 取代 tick
+  标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
+  理由：标准里写的「--who 默认 agent，可写 user」和后来的口径冲突——轮次只认 user（agent 自己的进展写交付记录或结论）。工作照做，另开 T79b 用对的标准交。
+~~ T147 T79b 一轮只记一句话：说一句话就记下这一轮（say 取代 tick）
+  标准：deed say "…" 记下这一轮，said 是位置参数；没有 --said、--did，也没有 --who（轮次只认 user，agent 的进展写交付记录或结论）；tick 从开关表、帮助与文档里消失，敲它 exit 1 并指到 deed say；state 与面板不读 did；有用例覆盖（tick 被拒且指路、say 落账、state 打印这一轮）
+  理由：同一条写了两遍（T146 才是那一条），不重复做
 ~~ T94 有清单的段不再收新条目：送审之后新活开下一段
   标准：一段一旦发过清单，就不再接收新条目（后来加的活开下一段，段号自己往上走）；在案的那份清单不因后来加的条目而作废，只有这一段自己被动过（撤回、改写）才算旧；state 在段等结论时先给「落结论」而不是「写新条目」；整期审打回一段只重开那一段，点名的条目回未做、其余保持交付，之后新加的活仍开下一段；有用例覆盖上面四条，把 core/fold.mjs 的这条判断改回去就红
   理由：并入 T123：冻结不只是「不收新条目」，清单没被回答之前连交付与撤回也不能动，还要有撤回清单这条路

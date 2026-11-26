@@ -23,7 +23,7 @@ const deed = (...args) => {
 fs.rmSync(path.join(root, ".deed"), { recursive: true, force: true });
 
 deed("init", "--said", "给这个示例工作区接上 deed", "--review", ".deed/config.json,NOTES.md", "--exempt", "");
-deed("tick", "--who", "user", "--said", "先做账本，别急着加门", "--did", "读了 README 与 DESIGN");
+deed("say", "先做账本，别急着加门");
 
 // 第一期：两条都交完，审查者放行就是结局，用户签收。
 deed("task", "add", "接上这个工作区", "--criteria", "deed state 说得出这一期在做什么", "--files", ".deed/config.json");
@@ -36,7 +36,7 @@ deed("review", "--segment", "S01.1", "--by", "reviewer:independent", "--verdict"
 deed("sign", "--words", "可以，示例就这样", "--title", "示例账本立起来", "--by", "user");
 
 // 第二期第一段：门与面板各一条，交完由审查者放行关闭这一段，下一批任务自然开新段。
-deed("tick", "--who", "user", "--said", "再补一段：让门、打回、未结项各出现一次");
+deed("say", "再补一段：让门、打回、未结项各出现一次");
 deed("task", "add", "让门说出失败在哪", "--criteria", "一条命令就能看到是哪条命令、退出码几", "--files", ".deed/config.json");
 deed("task", "done", "T3", "--evidence", "deed gate 在空 gates 时说「这个工作区没有门」");
 deed("task", "add", "让面板跟着账本动", "--criteria", "GET / 与渲染字节一致；SSE 推 change", "--files", ".deed/config.json");
@@ -60,7 +60,7 @@ deed("ask", "resolve", "A1", "--decision", "一起提交，账本随仓库走", 
 deed("task", "add", "给面板加跨会话历史", "--criteria", "能翻看已签收那一期的全部轮次", "--files", ".deed/config.json");
 deed("task", "defer", "T6", "--why", "先把账本这件事稳住，页面等下一轮");
 deed("task", "add", "让陌生人只读六行就能动手", "--criteria", "照 NOTES.md 从 init 走到 sign", "--files", "NOTES.md");
-deed("tick", "--who", "user", "--said", "打回的那一段补完了，接着往下", "--did", "两段都已判过并关闭，新活开在下一段");
+deed("say", "打回的那一段补完了，接着往下");
 deed("ask", "这一段要不要现在审？", "--reading", "等 T7 交付再审", "--why", "还差一条没交付");
 
 console.log(deed("state"));

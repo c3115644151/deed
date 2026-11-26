@@ -49,7 +49,7 @@ test("an unknown verb is refused in one line, not a stack trace", () => {
 
 test("a directory with no ledger cannot be written into, or read as if it were fine", () => {
   const cwd = workspace("unbound");
-  const tick = deed(cwd, "tick", "--who", "user", "--said", "我先说一句");
+  const tick = deed(cwd, "say", "我先说一句");
   assert.equal(tick.status, 1);
   assert.equal(tick.stderr.trim(), "deed: 这个目录还没接 deed：先 deed init（没有审查设置的账本，读不出状态，也判不了任何一段）");
   assert.deepEqual(kinds(cwd), [], "被拒的那一轮一个字也不该落盘");
@@ -97,11 +97,11 @@ test("a flag given twice is refused instead of quietly keeping the last one", ()
 test("a round belongs to the user, and an agent cannot open one", () => {
   const cwd = workspace("round-user-only");
   deed(cwd, "init", "--said", "开始");
-  const mine = deed(cwd, "tick", "--who", "agent", "--said", "我改了三处");
+  const mine = deed(cwd, "say", "我改了三处", "--who", "agent");
   assert.equal(mine.status, 1);
-  assert.match(mine.stderr, /轮次只记你和用户之间的一轮/);
+  assert.match(mine.stderr, /不认 --who/u, "say 不收 --who：轮次只有人开口的那一轮");
   assert.equal(kinds(cwd).filter((one) => one === "turn").length, 1, "被拒的那轮不记账");
-  assert.equal(deed(cwd, "tick", "--said", "再改一处").status, 0, "不写 --who 就是替用户记");
+  assert.equal(deed(cwd, "say", "再改一处").status, 0, "不写 --who 就是替用户记");
   assert.match(deed(cwd, "state").stdout, /· 2 轮 ·/);
 });
 

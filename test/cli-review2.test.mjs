@@ -141,7 +141,7 @@ test("a frozen segment refuses work until the brief is withdrawn, and the withdr
     assert.match(refused.stderr, /在审/, what + "要说出冻结这件事");
   }
   // 冻结挡的是文件改动：记录层面的交互照旧——记轮次、写题、放弃一条。
-  assert.equal(deed(cwd, "tick", "--who", "user", "--said", "再看看").status, 0, "记轮次不受冻结影响");
+  assert.equal(deed(cwd, "say", "再看看").status, 0, "记轮次不受冻结影响");
   assert.equal(deed(cwd, "ask", "要不要换做法", "--reading", "换成另一种", "--why", "拿不准").status, 0, "写题不受冻结影响");
   assert.equal(deed(cwd, "task", "add", "又想起一条", "--criteria", "也行").status, 0, "新活不进冻结的段");
   assert.equal(deed(cwd, "task", "drop", "T2", "--why", "不做了").status, 0, "放弃是记录，不是换字节");
@@ -268,7 +268,7 @@ test("a delivery weighs what it moved, and a big change asks for a review", () =
 test("a period whose segments all sat out review signs without anything else", () => {
   const cwd = workspace("all-exempt-sign");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
-  deed(cwd, "tick", "--who", "user", "--said", "改两份文档");
+  deed(cwd, "say", "改两份文档");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");

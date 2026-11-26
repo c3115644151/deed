@@ -74,7 +74,7 @@ test("a panel comes up with the first command, and the next one leaves it alone"
   const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", env });
   try {
     run("init", "--said", "起点");
-    const first = run("tick", "--who", "user", "--said", "看看面板");
+    const first = run("say", "看看面板");
     assert.equal(first.status, 0, first.stderr);
     assert.match(first.stdout, /面板 · http:\/\/127\.0\.0\.1:\d+/, "第一条命令就把面板拉起来了");
 
@@ -141,7 +141,7 @@ test("a panel says when the declared port was taken, and goes back to it when th
   try {
     assert.equal(run("init", "--said", "起点", "--port", String(base)).status, 0);
     await listen();
-    const taken = run("tick", "--who", "user", "--said", "看看面板");
+    const taken = run("say", "看看面板");
     assert.equal(taken.status, 0, taken.stderr);
     const fell = url(taken.stdout);
     assert.ok(fell > base && fell <= base + 9, "被占着就挨着往后找，落点离声明号不超过九格：" + fell + " 对 " + base);
@@ -227,7 +227,7 @@ test("init --print-agents hands over the rules without writing into the workspac
   const said = deed(cwd, "init", "--print-agents");
   assert.equal(said.status, 0);
   assert.match(said.stdout, /deed state/, "那段里得点名查下一步的命令");
-  assert.match(said.stdout, /deed tick/);
+  assert.match(said.stdout, /deed say/);
   assert.equal(fs.existsSync(path.join(cwd, ".deed")), false, "只打印，不建账本");
   assert.equal(fs.existsSync(path.join(cwd, "AGENTS.md")), false, "规则归属人，deed 不替它写文件");
 });

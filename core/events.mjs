@@ -43,7 +43,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 25;
+export const EVENT_VERSION = 26;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -90,6 +90,8 @@ export const MEANING = {
   // 项目声明：工作区可以是项目，也可以只是干活的地方。声明之后才有项目级的东西
   // （结构约束、条目、期审拿背景当尺子），没有声明时三种状态照常跑。
   projectDeclared: 25,
+  // 题只记"我不确定的是什么"：--why 与 --reading 说的是同一件事，两处写就两处对不上。
+  askNoWhy: 26,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -231,7 +233,8 @@ export function validateEvent(ev, at) {
       need(ev, "id");
       need(ev, "text");
       need(ev, "reading");
-      need(ev, "why");
+      // 第 26 版起题不再收 --why：说不确定的那句话就在 reading 里，再多一处只会两边对不上。
+      if (meaningOf(ev) < MEANING.askNoWhy) need(ev, "why");
       break;
     case "ask.resolve":
       need(ev, "id");

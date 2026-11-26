@@ -8,7 +8,7 @@ import { ensurePanel, panelOff } from "./panel.mjs";
 import { ROOT, guard, reject } from "./session.mjs";
 import { HEAD, ORDER, SPEC } from "./spec.mjs";
 import init from "./verbs/init.mjs";
-import tick from "./verbs/tick.mjs";
+import say from "./verbs/say.mjs";
 import task from "./verbs/task.mjs";
 import ask from "./verbs/ask.mjs";
 import goal from "./verbs/goal.mjs";
@@ -28,7 +28,7 @@ import panel from "./verbs/panel.mjs";
 
 const HELP = [...HEAD, ...ORDER.flatMap((one) => SPEC[one].usage), "", "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。"].join("\n");
 
-const commands = { init, tick, task, ask, goal, project, check, plan, submit, review, seal, sign, shelve, state, doctor, gate, serve, panel };
+const commands = { init, say, task, ask, goal, project, check, plan, submit, review, seal, sign, shelve, state, doctor, gate, serve, panel };
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。
@@ -66,7 +66,11 @@ if (!panelOff() && verb !== "serve" && verb !== "panel") {
 }
 // An unknown verb is refused, not thrown: fail() raises, and the raise would
 // reach the terminal as a stack trace with nobody left to swallow it.
+// 改过名的动作：拒绝，并把新写法写在拒绝里。留着旧名比删掉更糟——
+// 两条路通向同一件事，读账本的人就分不清哪条是真入口。
+const MOVED = { tick: 'deed say "…"' };
 const command = commands[verb];
+if (!command && MOVED[verb]) reject(verb + " 已经改成 " + MOVED[verb] + "（deed help 看全部）");
 if (!command) reject("没有这个动作：" + verb + "（deed help 看全部）");
 else guard(() => command(rest));
 

@@ -11,11 +11,11 @@ export const SPEC = {
       'deed init [--said "…"] [--review "src/**,…"] [--exempt "docs/**"] [--port 7317]',
     ],
   },
-  tick: {
-    flags: ["who", "said", "did", "session", "by"],
+  say: {
+    flags: ["session", "by"],
     usage: [
-      'deed tick --who user --said "…" [--did "…"] [--session S01]',
-      '                 轮次只记你和用户之间的一轮：我自己的进展写进交付记录或结论，不记成轮次',
+      'deed say "…" [--session S01]   记下一轮：只记你和用户之间那一轮，said 是位置参数',
+      '                 我自己的进展写进交付记录或结论，不记成轮次',
     ],
   },
   task: {
@@ -32,8 +32,9 @@ export const SPEC = {
   ask: {
     flags: ["reading", "decision", "why", "session", "by", "id"],
     usage: [
-      'deed ask "<问题>" --reading "我理解成…" --why "…"',
-      'deed ask resolve|withdraw <A1> --decision "…" --by "谁"   只有人裁：从管道里跑要写清谁按的',
+      'deed ask "<问题>" --reading "我理解成…"   记下一道待裁的题：说不确定的那句话就是 reading',
+      'deed ask answer <A1> --decision "…" --by "谁"   只有人裁：从管道里跑要写清谁按的',
+      'deed ask drop <A1> --why "…" --by "谁"         这道题不裁了，说清为什么',
     ],
   },
   plan: {
@@ -101,7 +102,7 @@ export const SPEC = {
 };
 
 // 帮助里的顺序就是这里的顺序：帮助从 SPEC 出，不再有一份手抄的清单。
-export const ORDER = ["init", "tick", "task", "ask", "goal", "project", "plan", "submit", "review", "seal", "sign", "check", "shelve", "state", "doctor", "gate", "serve", "panel"];
+export const ORDER = ["init", "say", "task", "ask", "goal", "project", "plan", "submit", "review", "seal", "sign", "check", "shelve", "state", "doctor", "gate", "serve", "panel"];
 
 export const HEAD = ["deed · 一个工作区的放行协议", "", "deed --version                   打印这个程序自己的版本"];
 

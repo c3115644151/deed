@@ -446,7 +446,7 @@ export function nextAction(doc, config) {
       who: "agent",
       what: "记一轮",
       text: "这个工作区还没有在推进的会话；把这一轮谁说了什么写进账本（--who 写开口的人），会话自己开出来",
-      command: `deed tick --who user --said "…"`,
+      command: `deed say "…"`,
     };
   }
   // 段里正在等结论时，这一步排在待裁前面：清单不发出去这一段的活就走不动，
@@ -633,7 +633,7 @@ export function nextAction(doc, config) {
         who: "user",
         what: "开新一期",
         text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，这一期到此为止——开新一期把要补的记进去`,
-        command: 'deed tick --said "开新一期，把要补的记进去" --who user',
+        command: 'deed say "开新一期，把要补的记进去"',
       };
     // 点名的条目改主意不做了：没有活可以重交，放行落下来会把它记为放弃并留下理由。
     const gave = named.filter((one) => one.status === "dropped");

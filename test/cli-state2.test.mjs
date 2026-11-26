@@ -171,7 +171,7 @@ test("the word --help inside evidence is evidence", () => {
 test("a batch written into an old ledger still reads, and taking one back does not shrink it", () => {
   const cwd = workspace("plan-batchundo");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "一次交两条");
+  deed(cwd, "say", "一次交两条");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
@@ -219,7 +219,7 @@ test("a batch written into an old ledger still reads, and taking one back does n
 test("the draft keeps judged entries ticked", () => {
   const cwd = workspace("plan-draft-accepted");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "写一条");
+  deed(cwd, "say", "写一条");
   writePlan(cwd, ["# 这一期要做成什么", "写一句话。", "", "- ? 写一句话", "  标准：docs/a.md 有一句话"].join("\n"));
   assert.equal(deed(cwd, "submit").status, 0);
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
@@ -327,4 +327,15 @@ test("a workspace is not a project until it says so, and the standing is compute
   assert.match(fell.stdout, /2\/3 条通过/u);
   assert.match(fell.stdout, /✗ 文件树符合范式/u);
   assert.match(fell.stdout, /未通过 1 条；它们不挡三种状态/u);
+});
+
+// 旧名字不静默消失：敲 tick 要当场被拒，并且指到新名字。
+test("the old round verb points at the new one instead of doing nothing", () => {
+  const cwd = workspace("moved");
+  deed(cwd, "init", "--said", "开始");
+  const old = deed(cwd, "tick", "--said", "一句话");
+  assert.equal(old.status, 1);
+  assert.match(old.stderr, /tick 已经改成/, "被拒时要说清新名字是什么");
+  assert.match(old.stderr, /deed say/u);
+  assert.equal(deed(cwd, "say", "一句话").status, 0);
 });

@@ -41,9 +41,9 @@ test("init says what else can be done, so one round can finish it", () => {
 
 
 test("a turn must say what was said", () => {
-  const cwd = workspace("tick");
+  const cwd = workspace("say");
   deed(cwd, "init", "--said", "开始");
-  assert.equal(deed(cwd, "tick").status, 1);
+  assert.equal(deed(cwd, "say").status, 1);
 });
 
 
@@ -101,7 +101,7 @@ test("a closed period cannot be written into, and no verb invents a new one", ()
   assert.equal(stray.status, 1, "签收之后不能靠 task add 开新期");
   assert.match(stray.stderr, /还没有会话|已经结束/);
   assert.equal(readEvents(cwd).length, after);
-  assert.equal(deed(cwd, "tick", "--who", "user", "--said", "新的一轮").status, 0, "只有一轮对话能开新期");
+  assert.equal(deed(cwd, "say", "新的一轮").status, 0, "只有一轮对话能开新期");
   assert.equal(deed(cwd, "task", "add", "又一件", "--criteria", "x").status, 0);
   // The turn that opens a period carries no pointer: it is the birth itself.
   const events = readEvents(cwd);

@@ -21,7 +21,7 @@ test("the README carries exactly the block init --print-agents prints", () => {
 
 test("the block names the commands an agent needs, and no verb it does not have", () => {
   // verify 动词已经删了：账本不再对字节，规则里不许再提它。
-  for (const verb of ["deed state", "deed tick", "deed plan", "deed submit", "deed review", "deed sign", "deed doctor"])
+  for (const verb of ["deed say", "deed state", "deed plan", "deed submit", "deed review", "deed sign", "deed doctor", "deed check"])
     assert.ok(BLOCK.includes(verb), "那段里少了 " + verb);
   assert.doesNotMatch(BLOCK, /deed (start|close|switch)\b/u, "没有的动作不要写进规则里");
 });
@@ -83,14 +83,15 @@ test("no retired word is left in the prose or the code", () => {
   assert.deepEqual(left, [], "这些词已经不在名词表里了：「" + RETIRED.join("」「") + "」。改回通行词，别让两份词表并存");
 });
 // 同一个动作，帮助、文档、代码三处各说一句，读的人就会照着最松的那一句做事。
-// --who 就是踩过的：帮助写着 user|agent，文档写着只认 user，代码真拒。
-test("the help line about --who says what the docs and the code say", () => {
-  const usage = SPEC.tick.usage.join("\n");
-  assert.doesNotMatch(usage, /user\|agent/u, "帮助里不能再写 agent 也能开一轮：代码会拒（deed tick --who agent 实测 exit 1）");
-  assert.match(usage, /--who user(?!\|)/u, "帮助里要写 --who user：轮次只记你和用户之间的一轮");
+// 轮次这件事现在是"只有一个说法"：say 不收 --who，代码只认用户那一轮，文档也这么写。
+test("the round is a user's round in the help, the docs and the code alike", () => {
+  const usage = SPEC.say.usage.join("\n");
+  assert.doesNotMatch(usage, /--who/u, "say 不收 --who：轮次只有人开口的那一轮");
+  assert.doesNotMatch(usage, /--said/u, "said 是位置参数：再给一个 --said 就有两个说法");
   assert.deepEqual(WHO, ["user"], "代码里只认用户那一轮");
   for (const name of ["README.md", "AGENTS.md"]) {
     const text = fs.readFileSync(path.join(ROOT, name), "utf8");
-    assert.match(text, /--who[^\n]*user/u, name + " 里要写清 --who 只认 user");
+    assert.match(text, /deed say "…"/u, name + " 里要写清轮次怎么记");
+    assert.doesNotMatch(text, /deed tick/u, name + " 里不能再留旧动词");
   }
 });

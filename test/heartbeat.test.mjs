@@ -9,15 +9,15 @@ import { hookNotice, silenceNotice } from "../lib/heartbeat.mjs";
 // person sees.
 const stamp = (iso) => new Date(iso).toISOString().slice(5, 16).replace("T", " ");
 
-test("a hook that runs deed tick is a fact about the host, not a guess", () => {
+test("a hook that runs deed say is a fact about the host, not a guess", () => {
   const cwd = workspace("hook");
   assert.match(hookNotice(cwd), /未接/, "没有配置就是未接，不猜");
   fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
-  fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "deed tick --who agent --said hi" }] } }));
+  fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ command: "deed say --who agent --said hi" }] } }));
   assert.match(hookNotice(cwd), /已接（\.claude\/settings\.json/);
   // The config is read as text, not parsed: whatever shape a host invents, a
   // file that runs the command is what "接上了" means.
-  fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify({ note: "deed tick 是每轮的心跳" }));
+  fs.writeFileSync(path.join(cwd, ".claude", "settings.json"), JSON.stringify({ note: "deed say 是每轮的心跳" }));
   assert.match(hookNotice(cwd), /已接/);
 });
 

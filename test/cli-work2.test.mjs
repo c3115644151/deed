@@ -20,7 +20,7 @@ import {
 test("a plan with a line nobody can read lands nothing, and a task cannot vanish", () => {
   const cwd = workspace("plan-bad");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "写一条");
+  deed(cwd, "say", "写一条");
   writePlan(cwd, ["# 这一期要做成什么", "- ? 一条", "  标准：有", "这不是任何格式"].join("\n"));
   const before = kinds(cwd).length;
   const bad = deed(cwd, "submit");
@@ -47,7 +47,7 @@ test("a plan with a line nobody can read lands nothing, and a task cannot vanish
 test("one submit takes one delivery, not a batch", () => {
   const cwd = workspace("one-at-a-time");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "一次交两条");
+  deed(cwd, "say", "一次交两条");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   writePlan(
@@ -100,7 +100,7 @@ test("one submit takes one delivery, not a batch", () => {
 test("an entry that is new cannot be ticked in the same submit", () => {
   const cwd = workspace("plan-newtick");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "写一条");
+  deed(cwd, "say", "写一条");
   writePlan(cwd, ["# 这一期要做成什么", "写一句话。", "", "- [x] ? 写一句话", "  标准：docs/a.md 有一句话", "  交付：写了"].join("\n"));
   const landed = deed(cwd, "submit");
   assert.equal(landed.status, 1);
@@ -114,7 +114,7 @@ test("an entry that is new cannot be ticked in the same submit", () => {
 test("a submit with nothing to point at refuses to write the delivery", () => {
   const cwd = workspace("empty-delivery");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "写一份说明");
+  deed(cwd, "say", "写一份说明");
   writePlan(cwd, ["# 这一期要做成什么", "把说明写完。", "", "- ? 写一份说明", "  标准：docs/a.md 有一句话"].join("\n"));
   assert.equal(deed(cwd, "submit").status, 0, "新条目先记账");
   writePlan(
@@ -156,12 +156,12 @@ test("removing a file in a submit is not a small change either", () => {
 test("a settled decision keeps its border and what it gave up, and they are not tasks", () => {
   const cwd = workspace("decision-edges");
   deed(cwd, "init", "--said", "起点");
-  deed(cwd, "tick", "--who", "user", "--said", "先谈谈怎么收尾");
+  deed(cwd, "say", "先谈谈怎么收尾");
   deed(cwd, "ask", "收尾要不要连文档一起改", "--reading", "只改代码", "--why", "两种都说得通");
-  const refused = deed(cwd, "ask", "resolve", "A1", "--decision", "边界：", "--by", "user");
+  const refused = deed(cwd, "ask", "answer", "A1", "--decision", "边界：", "--by", "user");
   assert.equal(refused.status, 1, "空边界要挡：写了个词根没写内容");
   assert.match(refused.stderr, /没写内容/);
-  const settled = deed(cwd, "ask", "resolve", "A1", "--by", "user", "--decision", "只改代码\n边界：文档里的旧词不再新增\n弃：导出功能不做了");
+  const settled = deed(cwd, "ask", "answer", "A1", "--by", "user", "--decision", "只改代码\n边界：文档里的旧词不再新增\n弃：导出功能不做了");
   assert.equal(settled.status, 0, settled.stderr);
   assert.match(settled.stdout, /记下 · 2 条/);
   const state = deed(cwd, "state");
@@ -326,7 +326,7 @@ test("a delivery that says what it will show has to show it when the ledger is w
 test("a drop can be taken back in the plan, and then the entry can be delivered again", () => {
   const cwd = workspace("plan-undrop");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "写一份说明");
+  deed(cwd, "say", "写一份说明");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   writePlan(cwd, ["# 这一期要做成什么", "- ? 写一份说明", "  标准：docs/a.md 有一句话"].join("\n"));
@@ -371,7 +371,7 @@ test("a drop can be taken back in the plan, and then the entry can be delivered 
 test("the order of the rows is the order the work happens in", () => {
   const cwd = workspace("plan-order");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "排活");
+  deed(cwd, "say", "排活");
   const first = ["- ? 先做的事", "  标准：做第一件", "- ? 后做的事", "  标准：做第二件"];
   writePlan(cwd, ["# 这一期要做成什么", "排活。", "", ...first].join("\n"));
   const added = deed(cwd, "submit");

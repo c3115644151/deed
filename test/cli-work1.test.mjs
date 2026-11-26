@@ -195,7 +195,7 @@ test("a fail that names nobody is refused, and a pass cannot carry a rework", ()
 test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () => {
   const cwd = workspace("plan-batch");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "把清单做成一个文件");
+  deed(cwd, "say", "把清单做成一个文件");
   assert.equal(deed(cwd, "plan").status, 0);
   assert.match(readPlan(cwd), /# 这一期要做成什么/);
   writePlan(
@@ -249,7 +249,7 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
 test("adding an entry does not swallow the changes waiting to be delivered", () => {
   const cwd = workspace("plan-baseline");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "tick", "--who", "user", "--said", "写一份说明");
+  deed(cwd, "say", "写一份说明");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   writePlan(cwd, ["# 这一期要做成什么", "- ? 写一份说明", "  标准：docs/a.md 有一句话"].join("\n"));
