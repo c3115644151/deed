@@ -9,6 +9,7 @@ import { ROOT, guard, reject } from "./session.mjs";
 import { GROUPS, HEAD, ORDER, SPEC } from "./spec.mjs";
 import init from "./verbs/init.mjs";
 import say from "./verbs/say.mjs";
+import reply from "./verbs/reply.mjs";
 import point from "./verbs/point.mjs";
 import topic from "./verbs/topic.mjs";
 import task from "./verbs/task.mjs";
@@ -32,7 +33,7 @@ const HELP = [
   "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
 
-const commands = { init, say, point, topic, task, project, check, plan, submit, review, sign, state, serve, panel };
+const commands = { init, say, reply, point, topic, task, project, check, plan, submit, review, sign, state, serve, panel };
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。

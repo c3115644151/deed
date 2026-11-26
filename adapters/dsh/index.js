@@ -19,14 +19,28 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 export const name = "deed-dsh";
-export const inject = ["sessions", "systemPrompt"];
+export const inject = ["sessions"];
 
-const CONVENTION =
-  "（deed · 环境规则）这个工作区用 deed 记账。每轮结束时，把你这一轮真正留下的判断记成一条要点：" +
-  "deed point \"一句话\"（值得记才记，没有就跳过）。原文由宿主交来，你不要转述用户说了什么；" +
-  "我的进展写进交付记录（deed submit）或结论（deed review），不记成轮次。";
+// 每一轮开始前递到眼前的一句：不是常驻系统段，而是跟着"用户这一轮开口"发生的一次询问。
+// 这样每一轮都经过一次"这轮有没有值得留下的判断"，而不是靠 agent 自己想起来。
+const CONVENTION = [
+  "<system-reminder>",
+  "deed · 这一轮开始前的一句（环境规则，不是用户说的话）：",
+  "1. 这一轮结束时，把你真正留下的判断记成要点：deed point \"一句话\"；没有就跳过。",
+  "2. 原文已经由钩子交来（你和用户两边都记了），不要转述谁说了什么。",
+  "3. 你的进展写进交付记录（deed submit）或结论（deed review），不记成轮次。",
+  "</system-reminder>",
+].join("\n");
 
 const REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
+
+// 一段消息里的纯文本：reasoning、工具块、图片都不算"说了什么"。
+const textOf = (content) =>
+  (content ?? [])
+    .filter((part) => part?.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n")
+    .trim();
 
 const clip = (value, max = 400) => {
   const text = typeof value === "string" ? value : JSON.stringify(value ?? null);
@@ -107,34 +121,53 @@ export function apply(ctx, config = {}) {
   // ---- 1. 原文 ------------------------------------------------------------------
   // 人说的话由钩子交来：话仍是人说的，只是通道写着 hook。同一个消息号交过就不再交。
   ctx.on("session/event", (session, event) => {
-    // 起子代理要求父 agent 的循环活着（"agent loop is not active" 是它的原话）：
-    // 所以只看两种时刻——交付落下时（这一轮还在跑）、下一轮开步时（上一轮结束时错过的那一下）。
-    if (event?.type === "task.done" || event?.type === "task.undo" || event?.type === "turn/start") {
-      checkDue(session).catch((err) => {
-        try {
-          const root = session?.header?.cwd;
-          if (root) note(root, "审查钩子异步出错 · " + clip(err?.message ?? err, 200));
-        } catch {}
-      });
-      return;
-    }
     try {
-      if (event?.type !== "user/message") return;
-      const source = event.data?.source;
-      if (source?.kind !== "user") return; // 系统注入的那几条（指令链、运行时上下文、技能目录）不是人说的
       const root = session?.header?.cwd;
       if (!root || !boundRoot(root)) return;
-      const text = (event.data?.content ?? [])
-        .filter((part) => part?.type === "text" && typeof part.text === "string")
-        .map((part) => part.text)
-        .join("\n")
-        .trim();
-      if (!text) return;
-      const mid = typeof event.data?.id === "string" ? event.data.id : null;
-      if (!mid) return;
-      const args = ["say", "--from", "dsh:" + session.id + ":" + mid];
-      const run = runDeed(root, args, text);
-      if (run.code !== 0) note(root, "say 失败 · " + clip(run.why || run.err || run.out, 200));
+      // 子代理（审查者）的会话不是这一场对话：它的开场提示词不是人说的，
+      // 它的答复也不进账本，惯例也不往它那里塞。
+      const sub = session?.header?.parentSession !== undefined || session?.header?.origin === "subagent";
+      const type = event?.type;
+
+      // 一轮开始：这一轮要问一次「有没有值得记下的判断」。挂在 turn/start 上而不是
+      // 用户消息上——实测 user/message 落在第一个 pre-step 之后，那时注入已经错过了。
+      if (type === "turn/start") {
+        if (!sub) askPoint.add(session.id);
+        checkDue(session).catch((err) => note(root, "审查钩子异步出错 · " + clip(err?.message ?? err, 200)));
+        return;
+      }
+      // 交付落下时也看一眼：agent 刚 submit 完，材料齐了就把审查交出去。
+      if (type === "task.done" || type === "task.undo") {
+        checkDue(session).catch((err) => note(root, "审查钩子异步出错 · " + clip(err?.message ?? err, 200)));
+        return;
+      }
+
+      // 人说的话：记一轮。系统注入的那几条（指令链、运行时上下文、技能目录、deed 自己的提醒）
+      // 不是人说的，一律不进账本。
+      if (type === "user/message") {
+        if (sub) return;
+        if (event.data?.source?.kind !== "user") return;
+        const text = textOf(event.data?.content);
+        const mid = typeof event.data?.id === "string" ? event.data.id : null;
+        if (!text || !mid) return;
+        askPoint.add(session.id);
+        const run = runDeed(root, ["say", "--from", "dsh:" + session.id + ":" + mid], text);
+        if (run.code !== 0) note(root, "say 失败 · " + clip(run.why || run.err || run.out, 200));
+        return;
+      }
+
+      // 我说的话：原文的另一半。只取文本：reasoning 与工具块不进账本。
+      if (type === "assistant/message") {
+        if (sub) return;
+        const message = event.data?.message;
+        if (!message || message.role !== "assistant") return;
+        const text = textOf(message.content);
+        const mid = typeof message.id === "string" ? message.id : null;
+        if (!text || !mid) return;
+        const run = runDeed(root, ["reply", "--from", "dsh:" + session.id + ":" + mid], text);
+        if (run.code !== 0) note(root, "reply 失败 · " + clip(run.why || run.err || run.out, 200));
+        return;
+      }
     } catch (err) {
       try {
         const root = session?.header?.cwd;
@@ -143,12 +176,42 @@ export function apply(ctx, config = {}) {
     }
   });
 
-  // ---- 2. 惯例 ------------------------------------------------------------------
-  // 系统提示词段：模型读的是"环境规则"，不是"用户说的话"。
-  ctx.effect(
-    () => ctx.systemPrompt.section({ name: "deed:convention", order: 500, text: CONVENTION }),
-    "deed-dsh.convention",
-  );
+  // ---- 2. 惯例：每一轮开口时注入一次 ------------------------------------------------
+  // 写在系统段里是"一直在"，挂在用户消息上是"每到一轮就问一次"——后者才会真的形成一道门。
+  // 它只跟着人说的话触发：子代理（审查者）没有这一轮，所以不会被这条规则打扰。
+  const askPoint = new Set(); // 这一轮已经问过没有：用户一开口就置位，注入之后清掉
+
+  ctx.on("agent/pre-step", async (payload, next) => {
+    const decision = await next();
+    try {
+      const session = payload?.agent?.session;
+      const sid = session?.header?.id;
+      const root = session?.header?.cwd;
+      if (!sid || !root || !boundRoot(root)) return decision;
+      if (!askPoint.has(sid)) return decision;
+      if (payload?.step !== 1) return decision;
+      askPoint.delete(sid);
+      const text = CONVENTION;
+      return {
+        ...decision,
+        messages: [
+          ...decision.messages,
+          {
+            role: "user",
+            content: [{ type: "text", text }],
+            source: { kind: "deed-reminder", form: "snapshot" },
+            id: "deed-reminder-" + Date.now(),
+          },
+        ],
+      };
+    } catch (err) {
+      try {
+        const root = payload?.agent?.session?.header?.cwd;
+        if (root) note(root, "惯例注入出错 · " + clip(err?.message ?? err, 160));
+      } catch {}
+      return decision;
+    }
+  }, { prepend: true });
 
   // 起子代理要用"精确的在线父级"：agent/created 那一刻抓到它，agent 走了就忘掉。
   ctx.on("agent/created", (agent) => {
@@ -269,7 +332,7 @@ export function apply(ctx, config = {}) {
   const checkDue = async (session) => {
     const root = session?.header?.cwd;
     if (!root || !boundRoot(root)) return;
-    note(root, "轮次结束，问 due");
+    note(root, "问 due · " + (session?.id ?? "?"));
     if (running.has(session.id)) return;
     running.add(session.id);
     try {

@@ -107,3 +107,34 @@ test("the period asks for a fresh reviewer, and only after every segment has an 
   assert.equal(deed(cwd, "review", "--all", "--verdict", "pass").status, 0);
   assert.deepEqual(due(cwd), { kind: null }, "期审过了：下一步是签收，不是再审");
 });
+
+
+// 原文的另一半：我说的话也进账本。它不数轮次、不开会话，同一个消息号只记一次。
+test("my own side of the conversation is raw text too, and it never counts as a round", () => {
+  const cwd = workspace("reply-from");
+  deed(cwd, "init", "--said", "开始");
+  const run = spawnSync(process.execPath, [CLI, "reply", "--from", "dsh:session-abc:a-1"], {
+    cwd, encoding: "utf8", env: OFF, input: '我这边的一句话，带 "引号"\n与换行\n',
+  });
+  assert.equal(run.status, 0, run.stderr);
+  const row = readEvents(cwd).filter((one) => one.k === "reply").at(-1);
+  assert.deepEqual([row.via, row.origin, row.mid], ["hook", "dsh", "a-1"], "通道写着它怎么到的");
+  assert.equal(row.text, '我这边的一句话，带 "引号"\n与换行', "一个字节没少");
+  assert.equal(readEvents(cwd).filter((one) => one.k === "turn").length, 1, "回复不记成轮次");
+  const again = spawnSync(process.execPath, [CLI, "reply", "--from", "dsh:session-abc:a-1"], {
+    cwd, encoding: "utf8", env: OFF, input: "同一句",
+  });
+  assert.match(again.stdout, /已经记过/, "同一个消息号不再记第二遍");
+  assert.match(deed(cwd, "state").stdout, /1 轮/, "状态里的轮次只有人开口那一轮");
+});
+
+
+// 一句空的回复不是话：不许落成一条什么都没有的行。
+test("an empty reply is refused instead of becoming a blank fact", () => {
+  const cwd = workspace("reply-empty");
+  deed(cwd, "init", "--said", "开始");
+  const run = spawnSync(process.execPath, [CLI, "reply", "--from", "dsh:s:m"], { cwd, encoding: "utf8", env: OFF, input: "   \n" });
+  assert.equal(run.status, 1, "空的那一句要被拒");
+  assert.match(run.stdout + run.stderr, /说了什么要写下来/, "拒绝的话要说清怎么写");
+  assert.equal(readEvents(cwd).filter((one) => one.k === "reply").length, 0, "账本上没有一条空话");
+});

@@ -11,6 +11,13 @@ export const SPEC = {
       'deed init [--said "…"] [--review "src/**,…"] [--exempt "docs/**"] [--port 7317]',
     ],
   },
+  reply: {
+    flags: ["session", "from"],
+    usage: [
+      'deed reply --from dsh:<会话>:<消息号>   记下我这一侧说的话：原文的另一半，文本从 stdin 读',
+      "                 它不数轮次、不开会话、不进下一步；同一个消息号只记一次",
+    ],
+  },
   say: {
     flags: ["session", "from"],
     usage: [
@@ -115,7 +122,7 @@ export const SPEC = {
 // 命令按三种状态分组：讨论把不确定说清，执行把说清的做出来，验收判它过没过。
 // 管理面是与状态无关的手（装、看、声明、起面板）。帮助与 ORDER 都从这一处出。
 export const GROUPS = [
-  { title: "讨论 · 把讨论说清", verbs: ["say", "point", "topic"] },
+  { title: "讨论 · 把讨论说清", verbs: ["say", "reply", "point", "topic"] },
   { title: "执行 · 把说清的做出来", verbs: ["plan", "submit", "task"] },
   { title: "验收 · 判它过没过", verbs: ["review", "sign", "check"] },
   { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "serve", "panel"] },

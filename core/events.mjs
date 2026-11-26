@@ -3,6 +3,8 @@
 
 export const EVENT_KINDS = [
   "turn",
+  // 我说的话（原文的另一半）：宿主把 assistant 消息交来，按 mid 认重复。
+  "reply",
   "task.add",
   "task.done",
   "task.undo",
@@ -48,7 +50,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 29;
+export const EVENT_VERSION = 30;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -106,6 +108,9 @@ export const MEANING = {
   // 人的话仍然是人的话（who:"user"）；通道写着它怎么到的（via:"hook"），
   // mid 是宿主给的消息号，重复交来的同一句按它认。旧行没有这三样，照读。
   turnOrigin: 29,
+  // 我这一侧说的话也是原文：宿主把 assistant 消息交来，记成 reply。
+  // 它不参与规则（不数轮次、不开会话、不进下一步），只是让"当时各自说了什么"在账本上成对。
+  replies: 30,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -145,6 +150,15 @@ export function validateEvent(ev, at) {
   // 反过来做——拿今天的版本去核旧行——补一个字段就把历史里合法的行全判成坏账。
   const meaning = ev.v ?? 1;
   switch (ev.k) {
+    // 我说的话（原文的另一半）：不数轮次、不开会话，只把当时那一句留在账本上。
+    case "reply":
+      need(ev, "text");
+      if (typeof ev.text !== "string" || ev.text.trim() === "")
+        throw new Error("reply 的 text 要写成一句话：空的那一句不是话");
+      if (ev.via !== undefined && typeof ev.via !== "string") throw new Error("reply 的 via 要写成一句话（例如 hook）");
+      if (ev.via === "hook" && typeof ev.mid !== "string")
+        throw new Error("钩子交来的回复要带 mid：没有消息号，重复交来的一句没法认出来");
+      break;
     case "turn":
       need(ev, "who");
       // 第 12 版起轮次只记人开口的那一轮。旧行里的 agent 轮照读：

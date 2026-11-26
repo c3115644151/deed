@@ -24,7 +24,9 @@ function newSession(doc, at) {
     closeKind: null,
     title: null,
     words: null,
+    // 原文的两半：turns 是人说的，replies 是我说的。两边都不参与规则。
     turns: [],
+    replies: [],
     goal: null,
     goals: [],
     tasks: [],
@@ -204,7 +206,22 @@ export function fold(events) {
     switch (ev.k) {
       case "turn": {
         const session = sessionOf(doc, ev);
-        session.turns.push({ at: ev.at, who: ev.who, said: ev.said, did: ev.did ?? null });
+        session.turns.push({
+          at: ev.at,
+          who: ev.who,
+          said: ev.said,
+          did: ev.did ?? null,
+          ...(ev.via === undefined ? {} : { via: ev.via, origin: ev.origin ?? null, mid: ev.mid ?? null }),
+        });
+        break;
+      }
+      case "reply": {
+        const session = sessionOf(doc, ev);
+        session.replies.push({
+          at: ev.at,
+          text: ev.text,
+          ...(ev.via === undefined ? {} : { via: ev.via, origin: ev.origin ?? null, mid: ev.mid ?? null }),
+        });
         break;
       }
       // 项目声明：这个工作区是不是一个项目、是哪一类、它自己怎么分层。声明是账本
