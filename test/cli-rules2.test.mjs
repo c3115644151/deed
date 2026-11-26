@@ -14,6 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  setGoal,
 } from "./support/cli.mjs";
 
 
@@ -132,10 +133,10 @@ test("a flag one letter off is refused, and the nearest name is guessed", () => 
 test("a sealed segment with no reason written says what it is, without empty brackets", () => {
   const cwd = workspace("seal-why-blank");
   deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
-  deed(cwd, "goal", "把文档写完", "--by", "user");
+  setGoal(cwd, "把文档写完", "--by", "user");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  assert.equal(deed(cwd, "seal", "--why", "只改了文档", "--by", "agent").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent").status, 0);
   const logDir = path.join(cwd, ".deed", "log");
   const name = fs.readdirSync(logDir).find((one) => one.endsWith(".jsonl"));
   const file = path.join(logDir, name);

@@ -12,7 +12,7 @@ export const SPEC = {
     ],
   },
   say: {
-    flags: ["session", "by"],
+    flags: ["session"],
     usage: [
       'deed say "…" [--session S01]   记下一轮：只记你和用户之间那一轮，said 是位置参数',
       '                 我自己的进展写进交付记录或结论，不记成轮次',
@@ -49,16 +49,13 @@ export const SPEC = {
       '                                            --run 先真跑一遍，把条数记进账本；记录里对不上就整批拒',
     ],
   },
-  goal: {
-    flags: ["text", "why", "session", "by"],
-    usage: ['deed goal "<这一期要做成什么>" [--why "…"]   签收拿它当尺子'],
-  },
   review: {
-    flags: ["segment", "verdict", "by", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all"],
+    flags: ["segment", "verdict", "by", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip"],
     repeat: ["finding", "result"],
-    booleans: ["withdraw", "all"],
+    booleans: ["withdraw", "all", "skip"],
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
+      'deed review --segment S01.1 --skip --why "…" --by "谁"   封一个免审段（没人审过，落款留着）',
       'deed review --segment S01.1 --by "谁" --verdict pass --result T1=met [--result T2=met]   审查通过：把这一段交回给用户判决',
       'deed review --segment S01.1 --by "谁" --verdict fail --rework T1,T2 --why "…" [--finding "…"]',
       "                 --result 逐条写判定（met／unmet／unknown:说明）；--result-all met 是这一句话的省写",
@@ -70,17 +67,13 @@ export const SPEC = {
       "                 审查只在段里做：签收看的是每一段的结论都放行、条件都满足，没有另一道整期审查",
     ],
   },
-  seal: {
-    flags: ["segment", "why", "by", "session"],
-    usage: ['deed seal [--segment S01.1] --why "…"  封一个免审段（审查设置说不用审，没人审过）'],
-  },
   sign: {
-    flags: ["words", "title", "by", "session"],
-    usage: ["deed sign    只说一句：签收在面板上按（命令行不再提供）"],
-  },
-  shelve: {
-    flags: ["why", "by", "session"],
-    usage: ['deed shelve --why "…"'],
+    flags: ["words", "title", "by", "session", "shelve", "why"],
+    booleans: ["shelve"],
+    usage: [
+      "deed sign     只说一句：签收在面板上按（命令行不再提供）",
+      'deed sign --shelve --why "…"   强制归档这一期（未结清也结束，理由留在账本上）',
+    ],
   },
   state: { flags: [], usage: ["deed state"] },
   // 体检层：只读。它回答"这个工作区还是不是一个项目、差哪几条"，
@@ -101,8 +94,16 @@ export const SPEC = {
   panel: { flags: ["stop"], booleans: ["stop"], usage: ["deed panel [--stop]              看面板在不在（没在跑就拉起来，打印 URL）"] },
 };
 
-// 帮助里的顺序就是这里的顺序：帮助从 SPEC 出，不再有一份手抄的清单。
-export const ORDER = ["init", "say", "task", "ask", "goal", "project", "plan", "submit", "review", "seal", "sign", "check", "shelve", "state", "doctor", "gate", "serve", "panel"];
+// 命令按三种状态分组：讨论把不确定说清，执行把说清的做出来，验收判它过没过。
+// 管理面是与状态无关的手（装、看、声明、起面板）。帮助与 ORDER 都从这一处出。
+export const GROUPS = [
+  { title: "讨论 · 把不确定说清", verbs: ["say", "ask"] },
+  { title: "执行 · 把说清的做出来", verbs: ["plan", "submit", "task"] },
+  { title: "验收 · 判它过没过", verbs: ["review", "sign", "check"] },
+  { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "doctor", "gate", "serve", "panel"] },
+];
+
+export const ORDER = GROUPS.flatMap((one) => one.verbs);
 
 export const HEAD = ["deed · 一个工作区的放行协议", "", "deed --version                   打印这个程序自己的版本"];
 

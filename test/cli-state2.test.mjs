@@ -82,7 +82,7 @@ test("--session that names no period is refused by every verb that takes one", (
   for (const args of [
     ["task", "done", "T1", "--evidence", "写完了", "--session", "S99"],
     ["review", "--segment", "S01.1", "--session", "S99"],
-    ["seal", "--why", "免审", "--by", "user", "--session", "S99"],
+    ["review", "--skip", "--why", "免审", "--by", "user", "--session", "S99"],
   ]) {
     const refused = deed(cwd, ...args);
     assert.equal(refused.status, 1, args.join(" ") + " 要点名真存在的会话");
@@ -338,4 +338,19 @@ test("the old round verb points at the new one instead of doing nothing", () => 
   assert.match(old.stderr, /tick 已经改成/, "被拒时要说清新名字是什么");
   assert.match(old.stderr, /deed say/u);
   assert.equal(deed(cwd, "say", "一句话").status, 0);
+});
+
+// 旧名字不静默消失：封免审段、归档、写目的这三条都被并进已有动词了。
+test("the merged verbs point at their new home instead of doing nothing", () => {
+  const cwd = workspace("moved-again");
+  deed(cwd, "init", "--said", "开始");
+  const seal = deed(cwd, "seal", "--why", "不用审");
+  assert.equal(seal.status, 1);
+  assert.match(seal.stderr, /deed review --segment S\d+\.\d+ --skip/u);
+  const shelve = deed(cwd, "shelve", "--why", "换方向");
+  assert.equal(shelve.status, 1);
+  assert.match(shelve.stderr, /deed sign --shelve/u);
+  const goal = deed(cwd, "goal", "把文档写完");
+  assert.equal(goal.status, 1);
+  assert.match(goal.stderr, /清单第一行/u);
 });

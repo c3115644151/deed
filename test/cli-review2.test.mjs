@@ -14,6 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
+  setGoal,
 } from "./support/cli.mjs";
 
 
@@ -225,7 +226,7 @@ test("a review may carry more than one finding, and all of them land", () => {
 
 
 test("a pass names the segment it sealed, and the next step is the signature", () => {
-  const cwd = workspace("seal");
+  const cwd = workspace("skip-seal");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "task", "add", "交一条", "--criteria", "交了", "--files", "proof.txt");
   deed(cwd, "task", "done", "T1", "--evidence", "交了");
@@ -264,7 +265,7 @@ test("a delivery weighs what it moved, and a big change asks for a review", () =
 });
 
 
-// 两段都由 deed seal 关的期：没人需要写的东西，不该有人等到它——直接签收。
+// 两段都由 deed review --skip 关的期：没人需要写的东西，不该有人等到它——直接签收。
 test("a period whose segments all sat out review signs without anything else", () => {
   const cwd = workspace("all-exempt-sign");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**,*.md");
@@ -273,11 +274,11 @@ test("a period whose segments all sat out review signs without anything else", (
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
   deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md");
-  assert.equal(deed(cwd, "seal", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--segment", "S01.1", "--why", "只改文档", "--by", "agent").status, 0);
   fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
   deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
   deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md");
-  assert.equal(deed(cwd, "seal", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--segment", "S01.2", "--why", "只改文档", "--by", "agent").status, 0);
   // 两段都免审也得有人判这一期：段没人看过，不等于这一期做成的样子不用人看。
   assert.match(deed(cwd, "state").stdout, /下一步 · reviewer · 期审/);
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1").status, 0);
@@ -303,7 +304,7 @@ test("a fresh workspace reviews everything until it declares its own paths", () 
   assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "node -e 读过").status, 0);
   assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1/, "没人声明过的路径照样要审");
   assert.equal(deed(cwd, "init", "--force", "--exempt", "app/**", "--why", "服务端不在审查范围").status, 0);
-  const sealed = deed(cwd, "seal", "--why", "app 全部免审", "--by", "user");
+  const sealed = deed(cwd, "review", "--skip", "--why", "app 全部免审", "--by", "user");
   assert.equal(sealed.status, 0, sealed.stderr);
   assert.match(sealed.stdout, /封存/, "工作区自己声明之后才算免审");
 });
@@ -336,10 +337,10 @@ test("the second and third brief of one segment say how many there have been", (
 test("a segment nobody reviewed says at signing why it was not reviewed", () => {
   const cwd = workspace("seal-why");
   deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
-  deed(cwd, "goal", "把文档写完", "--by", "user");
+  setGoal(cwd, "把文档写完", "--by", "user");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  assert.equal(deed(cwd, "seal", "--why", "只改了文档，审查设置说不用审", "--by", "agent").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档，审查设置说不用审", "--by", "agent").status, 0);
   // 段都关了：这一期做成的样子还要有人判，签收压在期审后面。
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1").status, 0, "期审清单出得来");
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0, "期审要落得下结论");

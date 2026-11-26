@@ -233,20 +233,35 @@ test("init --print-agents hands over the rules without writing into the workspac
 });
 
 
-// 一期要做成什么：一句话，可改，账本留每一次；签收核对与签收都拿它当尺子。
-test("a period says what it is for, and the sentence can change", () => {
+// 一期要做成什么：写在清单第一行，可改，账本留每一次；签收核对与签收都拿它当尺子。
+test("a period says what it is for in the first line of the plan, and the sentence can change", () => {
   const cwd = workspace("goal-set");
   deed(cwd, "init", "--said", "开始");
-  const first = deed(cwd, "goal", "把面板做到一眼看懂", "--by", "user");
+  // 只改第一行下面的那句：条目本身还在文件里，改目的不该动清单。
+  const aim = (text) => {
+    const lines = readPlan(cwd).split("\n");
+    lines[1] = text;
+    writePlan(cwd, lines.join("\n"));
+  };
+  writePlan(cwd, ["# 这一期要做成什么", "把面板做到一眼看懂", "", "- ? 把面板做完", "  标准：一眼能看懂"].join("\n"));
+  const first = deed(cwd, "submit");
   assert.equal(first.status, 0, first.stderr);
-  assert.match(first.stdout, /目的 · S01 · 把面板做到一眼看懂/);
-  const changed = deed(cwd, "goal", "这一期只把面板做完", "--why", "范围收窄", "--by", "user");
-  assert.equal(changed.status, 0, changed.stderr);
-  assert.equal(kinds(cwd).filter((one) => one === "goal.set").length, 2, "改一次也是账本上的一次");
+  assert.equal(kinds(cwd).filter((one) => one === "goal.set").length, 1, "第一行的目的随清单记账");
+  assert.match(deed(cwd, "state").stdout, /目的 · 把面板做到一眼看懂/);
+
+  // 改一句也是账本上的一次：旧的那句留在历史里，不是被覆盖。
+  aim("这一期只把面板做完");
+  assert.equal(deed(cwd, "submit").status, 0);
+  assert.equal(kinds(cwd).filter((one) => one === "goal.set").length, 2);
+  const session = fold(readEvents(cwd)).sessions[0];
+  assert.equal(session.goal.text, "这一期只把面板做完");
+  assert.equal(session.goals.length, 1, "旧的那句留着");
+
+  // 清空第一行抹不掉目的：账本只追加，要改就再写一句（清空只是清单上没写字）。
+  aim("");
+  writePlan(cwd, readPlan(cwd).replace("  标准：一眼能看懂", "  标准：一眼能看懂\n\n- ? 再写一句\n  标准：说清"));
+  assert.equal(deed(cwd, "submit").status, 0);
   assert.equal(fold(readEvents(cwd)).sessions[0].goal.text, "这一期只把面板做完");
-  assert.equal(fold(readEvents(cwd)).sessions[0].goals.length, 1, "旧的那句留在历史里");
-  assert.match(deed(cwd, "state").stdout, /目的 · 这一期只把面板做完/);
-  assert.equal(deed(cwd, "goal", "--by", "user").status, 1, "目的要写成一句话");
 });
 
 
@@ -278,7 +293,7 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   assert.equal(unknown.status, 1, "点名不存在的任务要被拒");
   assert.match(unknown.stderr, /没有任务|不在/);
   assert.equal(readEvents(cwd).length, before, "被拒的动作一个字节也没写进去");
-  deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
+  deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent");
   const sealed = deed(cwd, "task", "done", "T1", "--evidence", "封过之后又改");
   assert.equal(sealed.status, 1, "判过的段不能再往任务上写");
   assert.match(sealed.stderr, /已封存/);

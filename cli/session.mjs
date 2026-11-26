@@ -335,7 +335,7 @@ export function printState() {
     const aim = goalOf(open);
     if (aim) console.log("  目的 · " + aim);
     else if (open.segments.length > 1)
-      console.log('  目的 · 还没有（deed goal "…"）：签收拿它当尺子');
+      console.log('  目的 · 还没有（写在清单第一行「# 这一期要做成什么」下面，deed submit 记账）：签收拿它当尺子');
     // 手上有两段时（一段等判决、一段在收活）两段都要露脸：只印"当前那一段"，
     // 读者会以为后来的活没地方去。等判决的那一段排在前面说一句，收活的那一段照旧细印。
     const unclosed = open.segments.filter((one) => one.closedAt === null);

@@ -140,7 +140,7 @@ test("signing needs a judgement and the user own words", () => {
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
   assert.equal(signHere(cwd, "可以").status, 1, "段还没封");
-  deed(cwd, "seal", "--why", "只改了文档，审查设置说不用审", "--by", "agent");
+  deed(cwd, "review", "--skip", "--why", "只改了文档，审查设置说不用审", "--by", "agent");
   judged(cwd, "review", "--all", "--by", "period-1");
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
   assert.equal(signHere(cwd, "").status, 1, "签收要留原话");
@@ -158,10 +158,10 @@ test("a piped seal or signing names the hand that typed it", () => {
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  const unnamed = deed(cwd, "seal", "--why", "只改了文档");
+  const unnamed = deed(cwd, "review", "--skip", "--why", "只改了文档");
   assert.equal(unnamed.status, 1, "管道里跑的封存不能自动记成用户按的");
   assert.match(unnamed.stderr, /--by/);
-  assert.equal(deed(cwd, "seal", "--why", "只改了文档", "--by", "agent:claude").status, 0);
+  assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent:claude").status, 0);
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1").status, 0);
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
   // 签收不再从命令行发生：这条路现在只有一句指向面板的话。

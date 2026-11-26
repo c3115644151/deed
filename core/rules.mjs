@@ -361,7 +361,7 @@ export function signBlockers(doc, session, config = null) {
       blockers.push(
         owed
           ? shut.id + " 还没有审查通过（审查者判的是这一段通不通过）"
-          : shut.id + " 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
+          : shut.id + " 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
       );
   }
   // Work owed outside the open segment is what a segment-level view cannot see;
@@ -667,7 +667,7 @@ export function nextAction(doc, config) {
     who: "agent",
     what: "封存",
     text: `${segment.id} · ${count.total} 条都交付了，审查设置说这一段不用审（改动只落在免审路径，没人需要审）`,
-    command: `deed seal --segment ${segment.id} --why "凭什么不用审" --by "…"`,
+    command: `deed review --segment ${segment.id} --skip --why "凭什么不用审" --by "…"`,
   };
 }
 

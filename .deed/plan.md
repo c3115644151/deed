@@ -289,11 +289,9 @@
 <!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
 - [ ] T120 发现是主张不是判决：可 fix / defer / reject，结论只判标准
   标准：每条发现落账时带处置与依据——fix（已改，指到改在哪）／defer（登记成条目，说清为什么不在这轮做）／reject（不认，给依据）；账本里读得出曾经打过哪条、作者怎么回的；下一次出清单时，上一份里还没被回答的发现要印在材料上，等审查者回答那条反驳；段结论只判「标准在这一份字节上成立不成立」，不因为「作者没照建议做」单独判不合格（除非那条事实使标准不成立）；有用例（reject 一条并给依据 → 账本可读、下一份清单印出那条反驳；只写形容词的 reject 被拒）
-<!-- 等着（14 条）：上面那条做完再动 -->
+<!-- 等着（13 条）：上面那条做完再动 -->
 - [ ] T137 六条交付记录只有一句话、没有能核的命令或数字：把它们改成能当场跑出来的
   标准：`S02.19` 那六条（T100、T104、T107、T109、T110、T112）的记录里，每条都带一条当场能跑的命令，以及它该印出来的那句话（或一条由 `--run` 采到条数的命令）；清单上不再出现「这条没配命令核过」的批注；剩下的数字与当天跑出来的一致；改完由审查者复核
-- [ ] T81 T81 收口与免审并进已有动词：review --skip、sign --shelve，删 goal
-  标准：deed review --skip --why 封免审段（取代 deed seal）；deed sign --shelve --why 归档（取代 shelve）；deed goal 删除（目的来自清单第一行，submit 已落 goal.set）；三个旧动词 exit 1；有用例覆盖
 - [ ] T82 T82 视图与推翻：state --check/--gates，judge 变 overturn
   标准：deed state 带 --check 时跑核交付与体检（取代 verify、doctor），带 --gates 时跑门检查（取代 gate）；deed overturn R1 --why 取代 judge --overturn；旧动词 exit 1；有用例覆盖
 - [ ] T83 T83 删掉旧命令：cli/verbs/task.mjs 真删除，测试改走清单+submit
@@ -318,13 +316,13 @@
   标准：submit --run 在「自上次记录以来工作区内容没变」时复用那次结果并把它记进交付记录（记着那份结果的来源与工作区指纹），变了就照旧真跑；用例覆盖复用与失效两条路；不得出现「复制来的数字」——复用的是同一份字节上的真跑
 - [ ] T142 一条命令换掉「撤回再重交」：task renew
   标准：交付过的条目在字节变了之后可以一条命令重记（记新内容与为什么），账本上留一条事件而不是 undo+done 两条；verify 不再把重记过的那条当过期；用例覆盖 renew 之后 verify 干净、事件种类只有 one 条
-<!-- 已完成（29 条）：交过的，往下沉 -->
+<!-- 已完成（30 条）：交过的，往下沉 -->
+- [x] T81 T81 收口与免审并进已有动词：review --skip、sign --shelve，删 goal
+  标准：deed review --skip --why 封免审段（取代 deed seal）；deed sign --shelve --why 归档（取代 shelve）；deed goal 删除（目的来自清单第一行，submit 已落 goal.set）；三个旧动词 exit 1；有用例覆盖
+  交付：deed review --segment S02.20 --skip --why "…" 落 segment.seal（cli-review1/2 与 rules 的用例都走这条路）；deed sign --shelve --why "…" 落 shelve，不带 --shelve 时仍只回「去面板上按」；deed goal 删除，目的写在清单第一行、submit 落 goal.set（cli-state1 的用例改成改第一行再 submit）；三个旧动词 exit 1 并指到新名（seal→deed review --segment S1.1 --skip --why，shelve→deed sign --shelve --why，goal→清单第一行）；deed help 按「讨论/执行/验收/管理」四组打印（cli/spec.mjs 的 GROUPS 是唯一来源，ORDER 由它摊平）；say 的 --by 删掉；这一份字节上 node --test 219/219（agent）
 - [x] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
   标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
   交付：deed ask answer A1 --decision "…" --by user 落账并关题；deed ask drop A1 --why "…" 关题；ask resolve 与 ask withdraw 两条旧路 exit 1 并指到新名（ask resolve 实测报「已经改成 ask answer A1」）；ask 的开关表里没有 why（给 raise 传 --why 会被拒）；裁定里的「边界：」「弃：」照旧从账本算出来（边界仍 2 条）；事件含义第 26 版：ask.raise 只有 v<26 的旧行才要 why；规则块、README 围栏、AGENTS 尾段三处同一段话已同步；这一份字节上 node --test 217 条（216 过，1 条面板端口用例在并发下红，单跑 test/cli-state1 12/12）（agent）
-- [x] T146 T79b 一轮只记一句话：deed 说一句话就记下这一轮（say 取代 tick）
-  标准：deed say "…" 记下这一轮，said 是位置参数；没有 --said、--did，也没有 --who（轮次只认 user，agent 的进展写交付记录或结论）；tick 这个名字从开关表、帮助与文档里消失，敲它 exit 1 并指到 deed say；state 与面板不读 did；有用例覆盖（tick 被拒且指路、say 落账、state 打印这一轮）
-  交付：deed say "我改了三处" 落账为一条轮次（said 是位置参数，报告「已记一轮」）；deed say "…" --who user 被拒（不认 --who）；deed say "…" --said x 被拒（不认 --said）；deed tick "…" exit 1 并指到 deed say（cli/deed.mjs 的 MOVED 表）；帮助与开关表里 tick 0 处；state 只印原文，不读 did；这一份字节上 node --test 218/218（agent）
 - [x] T101 审查结论按条落下：判过的条目下一轮不再重判
   标准：review.log 带 results:[{id, verdict, note}]，一条条目一个判定（达成／未达成／无法判断）；pass 只在段里每条条目都有判定时才封段，缺哪条就拒并说出号；重审的清单只列「还没判过」与「自上次判定以来字节变过」的条目，其余条目的判定沿用；旧账本里没有 results 的结论照读（按整段 pass／fail）；有用例（判过 T1 之后改 T2，重审清单只列 T2，pass 之后 T1 的旧判定仍算数）
   交付：跑：node --test 215/215（test/cli.test.mjs 的 a verdict is per item…、test/fold.test.mjs 的 pass 覆盖一条）；review.log 带 results:[{id,verdict,note,files}]，fold 在 meaning>=19 时要求 pass 覆盖这一段每条、否则拒并点名；清单只列没判过的与字节变过的（cli/brief.mjs 的 still/again），已判的印成「判过了、这次不再判」；旧行没有 results 照读
@@ -406,13 +404,13 @@
 - [x] T145 结构检查对着范式判格：必需格、目录归属、extras 豁免
   标准：core/checks.mjs 有 PARADIGM（software/document/data/work/free）；结构检查四步：范式要求的格都在、声明的目录都在盘上、盘上每个顶层目录都有归属（认领或 extras）、跨格方向按 mayImport；layers 写 role=dir，role 缺省取 dir；project.declare 收 role 与 extras；deed project 支持 --extras；缺格/无归属/方向反三种失败各有具体 detail 与修法；本仓声明 tests=test、extras=docs,examples,support 后 3/3；沿用三种状态的语义，未通过不挡任何动作
   交付：node --test 215/215（全量；checks 11 条含缺格、无归属目录、extras 豁免、目录名与格名不同）；npm run test:fast 103/103；本仓重新声明 --layers "core=core:,lib=lib:core,app=cli:core+lib+board,board=board:core+lib,tests=test:core+lib+app+board" --extras "docs,examples,support" → deed check 3/3（5 个目录认领 5 格，方向都对）；顺手删掉仓根一个误建的 %SystemDrive% 目录（正是「无归属目录」那种野地）
+- [x] T146 T79b 一轮只记一句话：deed 说一句话就记下这一轮（say 取代 tick）
+  标准：deed say "…" 记下这一轮，said 是位置参数；没有 --said、--did，也没有 --who（轮次只认 user，agent 的进展写交付记录或结论）；tick 这个名字从开关表、帮助与文档里消失，敲它 exit 1 并指到 deed say；state 与面板不读 did；有用例覆盖（tick 被拒且指路、say 落账、state 打印这一轮）
+  交付：deed say "我改了三处" 落账为一条轮次（said 是位置参数，报告「已记一轮」）；deed say "…" --who user 被拒（不认 --who）；deed say "…" --said x 被拒（不认 --said）；deed tick "…" exit 1 并指到 deed say（cli/deed.mjs 的 MOVED 表）；帮助与开关表里 tick 0 处；state 只印原文，不读 did；这一份字节上 node --test 218/218（agent）
 <!-- 撤回或放弃（9 条）：不做了的，沉到最后 -->
 ~~ T79 T79 一轮只记一句话：deed say 取代 tick
   标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）
   理由：标准里写的「--who 默认 agent，可写 user」和后来的口径冲突——轮次只认 user（agent 自己的进展写交付记录或结论）。工作照做，另开 T79b 用对的标准交。
-~~ T147 T79b 一轮只记一句话：说一句话就记下这一轮（say 取代 tick）
-  标准：deed say "…" 记下这一轮，said 是位置参数；没有 --said、--did，也没有 --who（轮次只认 user，agent 的进展写交付记录或结论）；tick 从开关表、帮助与文档里消失，敲它 exit 1 并指到 deed say；state 与面板不读 did；有用例覆盖（tick 被拒且指路、say 落账、state 打印这一轮）
-  理由：同一条写了两遍（T146 才是那一条），不重复做
 ~~ T94 有清单的段不再收新条目：送审之后新活开下一段
   标准：一段一旦发过清单，就不再接收新条目（后来加的活开下一段，段号自己往上走）；在案的那份清单不因后来加的条目而作废，只有这一段自己被动过（撤回、改写）才算旧；state 在段等结论时先给「落结论」而不是「写新条目」；整期审打回一段只重开那一段，点名的条目回未做、其余保持交付，之后新加的活仍开下一段；有用例覆盖上面四条，把 core/fold.mjs 的这条判断改回去就红
   理由：并入 T123：冻结不只是「不收新条目」，清单没被回答之前连交付与撤回也不能动，还要有撤回清单这条路
@@ -434,5 +432,8 @@
 ~~ T131 这一段自己的交付记录不许是「只是说法」：六条按今天的字节重交，数由 --run 采
   标准：`S02.19` 的清单上不再有「只是说法：这条没配命令核过」；`T100`／`T104`／`T107`／`T109`／`T110`／`T112` 六条撤回后按当天字节重交，记录里的数与 `--run` 采到的一致；清单上那三个 207/207 不再出现在现行交付里；重出清单后由审查者复核
   理由：标准里那句「只是说法」只有我们自己看得懂，别人读到不知道自己该做什么；换成白话重登一条（T137），事情本身照旧要做
+~~ T147 T79b 一轮只记一句话：说一句话就记下这一轮（say 取代 tick）
+  标准：deed say "…" 记下这一轮，said 是位置参数；没有 --said、--did，也没有 --who（轮次只认 user，agent 的进展写交付记录或结论）；tick 从开关表、帮助与文档里消失，敲它 exit 1 并指到 deed say；state 与面板不读 did；有用例覆盖（tick 被拒且指路、say 落账、state 打印这一轮）
+  理由：同一条写了两遍（T146 才是那一条），不重复做
 
 <!-- 勾上 = 交付（写 交付：一行）；取消勾选 = 撤回（写 理由：）；? = 新条目；~~ = 放弃（写 理由：）。改完 deed submit -->

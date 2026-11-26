@@ -72,3 +72,18 @@ export const writeLines = (cwd, extra) => {
 export const planFile = (cwd) => path.join(cwd, ".deed", "plan.md");
 export const writePlan = (cwd, text) => fs.writeFileSync(planFile(cwd), text, "utf8");
 export const readPlan = (cwd) => fs.readFileSync(planFile(cwd), "utf8");
+// 目的不再是独立动作：它写在清单第一行（# 这一期要做成什么 下面那句），submit 记账。
+export const setGoal = (cwd, text) => {
+  const file = planFile(cwd);
+  if (!fs.existsSync(file)) {
+    writePlan(cwd, ["# 这一期要做成什么", text].join("\n"));
+  } else {
+    const lines = readPlan(cwd).split("\n");
+    const head = lines.findIndex((one) => one.startsWith("# "));
+    if (head < 0) lines.unshift("# 这一期要做成什么", text);
+    else if (head + 1 < lines.length) lines[head + 1] = text;
+    else lines.push(text);
+    writePlan(cwd, lines.join("\n"));
+  }
+  return deed(cwd, "submit", "--by", "user");
+};

@@ -11,6 +11,7 @@ import {
   periodFresh,
   periodReviewers,
   periodState,
+  sealBlockers,
   segmentReviewers,
   stalePeriod,
   takingSegment,
@@ -18,7 +19,7 @@ import {
 } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, writeBrief } from "../brief.mjs";
-import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
+import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, signer, split, list } from "../session.mjs";
 
 
 // 段审一直用同一双手——除非人推翻过这一段的结论：那一套判断已经被否掉了，
@@ -37,6 +38,37 @@ export default function review(argv) {
       const { doc } = load();
 
       const one = targetSession(doc, flags);
+    // ---- 免审段：deed review --skip ----------------------------------------------------
+    // 审查设置说这一段不用审，于是没有结论可落——但段仍然要封，不然它永远开着，
+    // 谁也签不了收。封存要写清凭什么不用审：账本上"没人看过"必须留字，不能变成默认的沉默。
+    if (flags.skip) {
+      if (flags.all) fail("--skip 封的是一段：--all 判的是整期，一次只用一个");
+      const seg = flags.segment ? one.segments.find((s) => s.id === flags.segment) : openSegment(one);
+      if (!seg)
+        fail(
+          (flags.segment ? "会话 " + one.id + " 里没有段 " + flags.segment : "现在没有开着的段") +
+            "：账本里的段是 " +
+            (one.segments.map((s) => s.id + (s.closedAt ? "（已封存）" : "")).join("、") || "（一个都没有）"),
+        );
+      const take = takingSegment(one);
+      if (seg.plannedAt !== null && take && take.id !== seg.id && seg.closedAt === null)
+        fail("段 " + seg.id + " 还没轮到：现在收活的是 " + take.id + "，它关闭之后才轮到这一段");
+      const blockers = sealBlockers(doc.config, one, seg);
+      if (blockers.length > 0) fail("这一段不能封存：" + blockers.join("；"));
+      if (!flags.why) fail('封存要写清凭什么不用审：--why "…"');
+      const after = transact(flags, () => ({
+        k: "segment.seal",
+        s: one.id,
+        segment: seg.id,
+        why: flags.why,
+        by: signer(flags, "封存"),
+      })).doc;
+      console.log("封存 · " + seg.id + " · " + flags.why);
+      const step = nextAction(after, after.config);
+      console.log("  下一步 · " + step.who + " · " + step.what + "：" + step.text);
+      console.log("  " + step.command);
+      return;
+    }
     // ---- 期审：deed review --all -------------------------------------------------------
     // 段审判「这一段对不对」；期审判「这一期做成的样子对不对、各段之间说不说得通」。
     // 期审每次换一双手：判过段的人不判这一期。段审反过来，一直用同一双手。
@@ -193,7 +225,7 @@ export default function review(argv) {
         // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
         if (!needsReview(doc.config, one, seg)) {
           console.log("审查设置说这一段不用审（改动都落在免审路径）：不出清单与角色包，账本也不记一条等人回答的清单");
-          console.log('  关闭这一段：deed seal --segment ' + seg.id + ' --why "凭什么不审" --by "…"');
+          console.log('  关闭这一段：deed review --segment ' + seg.id + ' --skip --why "凭什么不审" --by "…"');
           return;
         }
         // 清单写的是"这些条目、这些交付记录"。还有条目没交，清单就是一份没人能答的卷子：

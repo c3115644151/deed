@@ -114,7 +114,7 @@ test("a segment the gate says not to review waits to be sealed, not to be review
     { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [], bytes: { "docs/a.md": 100 } },
   ]);
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), [
-    "S01.1 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
+    "S01.1 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
   ]);
 });
 
@@ -133,7 +133,7 @@ test("the step it names is a command that carries its own name", () => {
 test("signing waits for the judgement and for every open question", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
   assert.deepEqual(signBlockers(delivered, delivered.sessions[0], config), [
-    "S01.1 还没有封存（审查设置说这一段不用审：deed seal 记下凭什么不审）",
+    "S01.1 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
   ]);
   const asked = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4), ask(5)]);
   assert.deepEqual(signBlockers(asked, asked.sessions[0], config), ["还有 1 条待裁（A1）", PERIOD_OWED]);
@@ -230,7 +230,7 @@ test("the next step names one actor and one action", () => {
   const afterPeriod = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4), ...periodPass(6)]);
   assert.equal(nextAction(afterPeriod, config).what, "签收");
 });
-// 两段都由 deed seal 关的期也一样：没人需要写的东西，不该有人等到它。
+// 两段都由 deed review --skip 封的期也一样：没人需要写的东西，不该有人等到它。
 test("a period whose segments all sat out review signs without anything else", () => {
   const seal = (n, segment) => ({ v: 5, at: T(n), k: "segment.seal", s: null, segment, why: "只动了文档", by: "agent" });
   const doc = fold([
@@ -302,7 +302,7 @@ test("a segment sealed before the gate got stricter is not pulled back into revi
   // 守卫读的是「真写下过一次封存」，所以两个字段都要当着：sealedBy 有名字、
   // closedAt 是那一刻。少了 closedAt 就不算封过——而且这个形状不是手改账本才有的：
   // 旧账本里那句整期上的不合格把它点回来时，fail 分支就留着 sealedBy、把 closedAt 清成 null。
-  assert.equal(first.sealedBy, "agent", "封它的是 deed seal");
+  assert.equal(first.sealedBy, "agent", "封它的是 deed review --skip");
   assert.notEqual(first.closedAt, null, "账本上真写过一次封存");
   assert.equal(needsReview(tight, session, { ...first, closedAt: undefined }), true, "没有 closedAt 就不是封存");
   assert.deepEqual(signBlockers(doc, session, tight), [PERIOD_OWED], "封过的段不再重算，但这一期仍缺期审");
@@ -316,13 +316,13 @@ test("a segment a reviewer passed is still weighed, so the exemption is only for
     digest: "a".repeat(64), digestPath: path, changed: [path], bytes: { [path]: 92160 } });
   const session = fold([turn(1), goal(2), add(3, "T1", ["docs/a.md"]), heavy(4, "T1", "docs/a.md"), sealed(5, "S01.1")]).sessions[0];
   const first = session.segments[0];
-  assert.equal(first.sealedBy, null, "关闭这一段的是结论，不是 deed seal");
+  assert.equal(first.sealedBy, null, "关闭这一段的是结论，不是 deed review --skip");
   assert.equal(needsReview(config, session, first), true, "这一份 92160 字节，今天的审查设置会把它送去审");
   assert.equal(reviewState(config, session, first), "pass", "可它已经有人看过：结局不因此改变");
   assert.equal(first.sealedBy, null, "半封存不在这条上");
 });
 
-// 半个封存的真实来路：签收核对把一条写在 deed seal 封过的段里的任务点回来，段被重新打开——
+// 半个封存的真实来路：签收核对把一条写在 deed review --skip 封过的段里的任务点回来，段被重新打开——
 // 留着 sealedBy（写过封存的人），closedAt 清成 null。这不是手改账本才出现的形状，
 // 而是 fail 分支每天都会造出来的；对它按审查设置重算是本意，所以这条用例要跟着它走。
 test("an old period verdict that named a segment reopens it, and that half-seal is weighed again", () => {

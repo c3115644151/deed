@@ -92,7 +92,7 @@ test("a closed period cannot be written into, and no verb invents a new one", ()
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
   deed(cwd, "task", "done", "T1", "--evidence", "写完了");
-  deed(cwd, "seal", "--why", "只改了文档", "--by", "agent");
+  deed(cwd, "review", "--skip", "--why", "只改了文档", "--by", "agent");
   judged(cwd, "review", "--all", "--by", "period-1");
   assert.equal(judged(cwd, "review", "--all", "--by", "period-1", "--verdict", "pass").status, 0);
   signHere(cwd, "可以");
@@ -125,7 +125,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/fold.mjs");
   deed(cwd, "task", "done", "T1", "--evidence", "node --test");
-  const blocked = deed(cwd, "seal", "--why", "全部免审", "--by", "user");
+  const blocked = deed(cwd, "review", "--skip", "--why", "全部免审", "--by", "user");
   assert.equal(blocked.status, 1, "改文件不改变规则");
   assert.match(blocked.stderr, /要审|审查/);
   assert.match(deed(cwd, "state").stdout, /审查设置 文件与账本不一致/, "文件与账本不一致由 state 说出来");
@@ -136,7 +136,7 @@ test("the file on disk is a mirror: judgments read the threshold out of the ledg
   assert.equal(last.why, "全部免审，只留文档");
   assert.deepEqual(last.to.required, [], "账本记的是改成什么样");
   assert.deepEqual(last.to.exempt, ["**"]);
-  assert.equal(deed(cwd, "seal", "--why", "全部免审", "--by", "user").status, 0, "账本放开了才算放开");
+  assert.equal(deed(cwd, "review", "--skip", "--why", "全部免审", "--by", "user").status, 0, "账本放开了才算放开");
 });
 
 
