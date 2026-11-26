@@ -15,6 +15,11 @@ export const EVENT_KINDS = [
   "ask.raise",
   "ask.resolve",
   "ask.withdraw",
+  // 讨论域：原文（turn）之外，agent 记要点，要点聚成议题；议题两次由人确认。
+  "point.add",
+  "topic.create",
+  "topic.establish",
+  "topic.release",
   "goal.set",
   "review.brief",
   "review.log",
@@ -43,7 +48,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 26;
+export const EVENT_VERSION = 27;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -92,6 +97,8 @@ export const MEANING = {
   projectDeclared: 25,
   // 题只记"我不确定的是什么"：--why 与 --reading 说的是同一件事，两处写就两处对不上。
   askNoWhy: 26,
+  // 讨论域三层：要点（无状态）、议题（两次由人确认：成立、锁定出口）、原文留给宿主注入。
+  discussionTopics: 27,
 };
 
 // 一行说的是哪一套含义。旧行没有 v（第 0 版，最早的写法）。
@@ -243,6 +250,39 @@ export function validateEvent(ev, at) {
     case "ask.withdraw":
       need(ev, "id");
       need(ev, "why");
+      break;
+    // 要点：agent 每轮记下的一句，没有状态；可挂议题，也可散着。
+    case "point.add":
+      if (meaningOf(ev) < MEANING.discussionTopics)
+        throw new Error("point.add 是含义第 27 版才有的事件：v 要写 " + MEANING.discussionTopics);
+      need(ev, "id");
+      need(ev, "text");
+      break;
+    // 议题：agent 统合要点开一份草稿，之后两次由人在面板上确认。
+    case "topic.create":
+      if (meaningOf(ev) < MEANING.discussionTopics)
+        throw new Error("topic.create 是含义第 27 版才有的事件：v 要写 " + MEANING.discussionTopics);
+      need(ev, "id");
+      need(ev, "title");
+      if (ev.points !== undefined && !Array.isArray(ev.points))
+        throw new Error("topic.create 的 points 要是数组");
+      break;
+    case "topic.establish":
+      if (meaningOf(ev) < MEANING.discussionTopics)
+        throw new Error("topic.establish 是含义第 27 版才有的事件：v 要写 " + MEANING.discussionTopics);
+      need(ev, "id");
+      need(ev, "body");
+      need(ev, "by");
+      if (ev.via !== "panel") throw new Error('议题成立只在面板上按：via 要写 "panel"');
+      if (ev.points !== undefined && !Array.isArray(ev.points))
+        throw new Error("topic.establish 的 points 要是数组");
+      break;
+    case "topic.release":
+      if (meaningOf(ev) < MEANING.discussionTopics)
+        throw new Error("topic.release 是含义第 27 版才有的事件：v 要写 " + MEANING.discussionTopics);
+      need(ev, "id");
+      need(ev, "by");
+      if (ev.via !== "panel") throw new Error('议题锁定只在面板上按：via 要写 "panel"');
       break;
     // 一期要做成什么：签收签的是它，签收核对比的也是它。可以改，改一次一条记录。
     case "goal.set":

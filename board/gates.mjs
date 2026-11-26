@@ -32,9 +32,17 @@ export function gatesOf(doc, config = doc.config) {
         at: shut.reviewedAt ?? null,
       }
     : { open: false, why: "没有等你判决的段" };
-  // 议题还没进账本（那一层还没做）：闸一直在，只是没有东西可放。
-  const topicRelease = { open: false, why: "还没有议题" };
-  return { sign, judgement, topicRelease };
+  // 讨论域的两下：成立（统合要点成正文后由人认）与锁定（允许出口为任务）。
+  const topics = session ? (session.topics ?? []) : [];
+  const establish = topics.find((one) => one.state === "draft" && String(one.body ?? "").trim());
+  const release = topics.find((one) => one.state === "established");
+  const topicEstablish = establish
+    ? { open: true, why: "", topic: establish.id, title: establish.title, body: establish.body }
+    : { open: false, why: topics.some((one) => one.state === "draft") ? "议题还没有正文：先统合要点" : "没有等你确认成立的议题" };
+  const topicRelease = release
+    ? { open: true, why: "", topic: release.id, title: release.title }
+    : { open: false, why: "没有等你确认出口的议题" };
+  return { sign, judgement, topicEstablish, topicRelease };
 }
 
 const demand = (text) => {
@@ -103,7 +111,47 @@ export function applyGate(root, action = {}) {
     );
     return written;
   }
-  if (kind === "topic-release") demand("还没有议题：这一层还没做");
+  if (kind === "topic-establish") {
+    const id = String(action.topic ?? "").trim();
+    if (!id) demand("议题成立要说是哪一个");
+    const written = record(
+      root,
+      (doc) => {
+        const session = sessionOf(doc, action.session ?? null);
+        if (!session) demand("还没有在推进的一期");
+        if (session.closeKind) demand("这一期已经结束");
+        const topic = (session.topics ?? []).find((one) => one.id === id);
+        if (!topic) demand("账本里没有议题 " + id);
+        if (topic.state !== "draft") demand(topic.id + " 已经" + (topic.state === "established" ? "成立" : "锁定"));
+        if (!String(topic.body ?? "").trim()) demand(topic.id + " 还没有正文：先把要点统合成正文");
+        return {
+          k: "topic.establish", s: session.id, id: topic.id,
+          body: topic.body, points: [...topic.points],
+          by: action.by ?? "user", via: "panel",
+        };
+      },
+      { at: action.at ?? null },
+    );
+    return written;
+  }
+  if (kind === "topic-release") {
+    const id = String(action.topic ?? "").trim();
+    if (!id) demand("议题锁定要说是哪一个");
+    const written = record(
+      root,
+      (doc) => {
+        const session = sessionOf(doc, action.session ?? null);
+        if (!session) demand("还没有在推进的一期");
+        if (session.closeKind) demand("这一期已经结束");
+        const topic = (session.topics ?? []).find((one) => one.id === id);
+        if (!topic) demand("账本里没有议题 " + id);
+        if (topic.state !== "established") demand(topic.id + " 还没成立：先按成立那一下");
+        return { k: "topic.release", s: session.id, id: topic.id, by: action.by ?? "user", via: "panel" };
+      },
+      { at: action.at ?? null },
+    );
+    return written;
+  }
   demand("面板不认这个闸：" + (kind || "（空）"));
 }
 

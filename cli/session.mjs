@@ -203,7 +203,10 @@ export const targetSession = (doc, flags) => {
 };
 
 export const nextId = (doc, prefix) => {
-  const used = doc.sessions.flatMap((one) => [...one.tasks.map((t) => t.id), ...one.asks.map((a) => a.id)]);
+  const used = doc.sessions.flatMap((one) => [
+    ...one.tasks.map((t) => t.id), ...one.asks.map((a) => a.id),
+    ...(one.points ?? []).map((p) => p.id), ...(one.topics ?? []).map((t) => t.id),
+  ]);
   const numbers = used
     .filter((id) => id.startsWith(prefix))
     .map((id) => Number(id.slice(prefix.length)))

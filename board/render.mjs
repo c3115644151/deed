@@ -161,6 +161,26 @@ function screenHead(index, name, note, meter) {
 
 function discussScreen(session, zone, on) {
   const turns = session ? session.turns : [];
+  const points = session ? (session.points ?? []) : [];
+  const topics = session ? (session.topics ?? []) : [];
+  const livePoints = points.filter((one) => !one.absorbedBy);
+  const topicRows = [...topics].reverse().map((t) => {
+    const WORD = { draft: "确认成立", established: "确认出口", released: "已锁定" };
+    const gate = t.state === "draft" ? "topic-establish" : t.state === "established" ? "topic-release" : null;
+    return (
+      '<li class="qa" data-state="' + esc(t.state) + '">' +
+      '<div class="qhead"><span class="aid">' + esc(t.id) + "</span>" +
+      '<span class="qstate">' + WORD[t.state] + "</span>" +
+      '<span class="qmeta">' + t.points.length + " 条要点</span></div>" +
+      '<p class="atext">' + esc(t.title) + "</p>" +
+      (t.body ? '<p class="qdone">' + esc(t.body) + "</p>" : '<p class="quiet">还没有正文</p>') +
+      (gate
+        ? '<form class="gate small" data-gate="' + gate + '" data-topic="' + esc(t.id) + '">' +
+          '<button class="gpress" type="submit">' + WORD[t.state] + " " + esc(t.id) + "</button></form>"
+        : '<p class="qdone quiet">可以出口为任务 · deed plan</p>') +
+      "</li>"
+    );
+  }).join("");
   const asks = session ? (session.asks ?? []) : [];
   const open = asks.filter((one) => one.state === "pending");
   const settled = asks.filter((one) => one.state !== "pending");
@@ -212,6 +232,14 @@ function discussScreen(session, zone, on) {
     (turns.length ? '<ol class="turns">' + [...turns].reverse().map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
     "</div>" +
     '<aside class="side">' +
+    '<h3 class="colh">灵感清单 · 要点</h3>' +
+    (livePoints.length
+      ? '<ul class="qlist">' + [...livePoints].reverse().map((p) =>
+          '<li class="clue"><span class="aid">' + esc(p.id) + "</span> " + esc(p.text) + (p.topic ? " · " + esc(p.topic) : "") + "</li>",
+        ).join("") + "</ul>"
+      : '<p class="quiet">没有还没收编的要点</p>') +
+    '<h3 class="colh">核心议题</h3>' +
+    (topicRows ? '<ol class="qlist">' + topicRows + "</ol>" : '<p class="quiet">还没有议题</p>') +
     '<h3 class="colh">等你定</h3>' +
     (open.length ? '<ol class="qlist">' + [...open].reverse().map(card).join("") + "</ol>" : '<p class="quiet">没有等你的题</p>') +
     (settled.length
@@ -541,7 +569,11 @@ export function renderBoard(doc, config, options = {}) {
   const stateKey = session ? reading(doc) : "discuss";
   const state = READING[stateKey];
   // 轮到人按的那两下（判决／签收）就在验收屏上：此刻把这一屏打开，别让他自己找。
-  const here = step.who === "user" && (step.what === "判决" || step.what === "签收") ? "accept" : stateKey;
+  const here = step.who === "user" && (step.what === "判决" || step.what === "签收")
+    ? "accept"
+    : step.who === "user" && (step.what === "确认议题成立" || step.what === "确认议题出口")
+      ? "discuss"
+      : stateKey;
   const open = session ? openSegment(session) : null;
   return (
     '<!doctype html>\n<html lang="zh-CN" data-theme="dark">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>deed · ' +
@@ -969,6 +1001,7 @@ document.addEventListener("submit", (event) => {
   const body = { action };
   if (action === "sign") body.words = (form.querySelector(".gwords") || {}).value || "";
   if (action === "judgement") body.segment = form.getAttribute("data-segment");
+  if (action === "topic-establish" || action === "topic-release") body.topic = form.getAttribute("data-topic");
   const button = form.querySelector(".gpress");
   if (button) button.disabled = true;
   fetch("/gate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })

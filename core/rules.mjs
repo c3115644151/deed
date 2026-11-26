@@ -375,6 +375,9 @@ export function signBlockers(doc, session, config = null) {
     blockers.push(`还有 ${undelivered.length} 条已交付但没判（${undelivered.map((one) => one.id).join("、")}）`);
   const asks = pendingAsks(session);
   if (asks.length > 0) blockers.push(`还有 ${asks.length} 条待裁（${asks.map((one) => one.id).join("、")}）`);
+  const liveTopics = (session.topics ?? []).filter((one) => one.state !== "released");
+  if (liveTopics.length > 0)
+    blockers.push(`还有 ${liveTopics.length} 个议题等你确认（${liveTopics.map((one) => one.id + (one.state === "draft" ? "成立" : "出口")).join("、")}）`);
   // 段都关了还不算这一期过完：要有人判「这一期做成的样子」。签收压在期审后面。
   if (needsPeriodReview(session)) {
     const state = periodState(session);
@@ -449,6 +452,33 @@ export function nextAction(doc, config) {
       command: `deed say "…"`,
     };
   }
+  // 讨论域的两下由用户在面板上按：议题先确认成立，再确认出口；都排在段的事前面，
+  // 因为没有出口的议题不该变成任务，而等用户按的那一下不能藏在别的屏里。
+  const topics = session ? (session.topics ?? []) : [];
+  const toEstablish = topics.find((one) => one.state === "draft" && String(one.body ?? "").trim());
+  if (toEstablish)
+    return {
+      who: "user",
+      what: "确认议题成立",
+      text: `议题 ${toEstablish.id} · ${toEstablish.title} 已经统合成正文，等你确认它成立`,
+      command: "deed panel",
+    };
+  const toRelease = topics.find((one) => one.state === "established");
+  if (toRelease)
+    return {
+      who: "user",
+      what: "确认议题出口",
+      text: `议题 ${toRelease.id} · ${toRelease.title} 已成立，等你确认它能不能出口为任务`,
+      command: "deed panel",
+    };
+  const released = topics.find((one) => one.state === "released" && !(one.exportedAt ?? null));
+  if (released)
+    return {
+      who: "agent",
+      what: "出口议题",
+      text: `议题 ${released.id} · ${released.title} 已锁定出口：把它拆成清单里的任务（deed plan），拆完在正文里记下出口的任务号`,
+      command: "deed plan",
+    };
   // 段里正在等结论时，这一步排在待裁前面：清单不发出去这一段的活就走不动，
   // 而待裁是一句话的事——它一直在，不会因为没人裁而消失。
   const frozenStep = (() => {

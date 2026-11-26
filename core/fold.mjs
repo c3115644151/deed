@@ -29,6 +29,9 @@ function newSession(doc, at) {
     goals: [],
     tasks: [],
     asks: [],
+    // 讨论域的三层：原文在 turns，要点是 agent 记下的句子，议题由要点统合而来。
+    points: [],
+    topics: [],
     briefs: [],
     reviews: [],
     segments: [],
@@ -468,6 +471,87 @@ export function fold(events) {
       }
       // 一期要做成什么：签收和签收核对都比着它。可以改，改一次记一条，
       // 旧的留在 goals 里——"当初说要什么"是能查的事实，不是被覆盖的草稿。
+      // 要点：没有状态，写下来就在。它可以先散着，议题成立时被收编。
+      case "point.add": {
+        const session = sessionOf(doc, ev);
+        if (!/^P\d+$/u.test(String(ev.id))) noway(`要点号要写成 P1：${ev.id}`);
+        const source = ev.replaces ? session.topics.find((one) => one.id === ev.replaces) : null;
+        if (ev.replaces && !source) noway(`账本里没有议题 ${ev.replaces}：补正文要点名那份草稿`);
+        if (source) session.points = session.points.filter((one) => one !== source);
+        else if (taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了`);
+        session.ids.add(ev.id);
+        let topic = null;
+        if (ev.topic) {
+          topic = session.topics.find((one) => one.id === ev.topic);
+          if (!topic) noway(`账本里没有议题 ${ev.topic}：要点挂不上`);
+          if (topic.state !== "draft") noway(`议题 ${topic.id} 已经成立：新要点挂在它上面要开新议题`);
+          if (topic.points.includes(ev.id)) noway(`要点 ${ev.id} 已经在议题 ${topic.id} 里了`);
+        }
+        session.points.push({
+          id: ev.id, text: ev.text, at: ev.at, by: ev.by ?? null,
+          topic: topic ? topic.id : null, absorbedBy: null,
+        });
+        if (topic) topic.points.push(ev.id);
+        break;
+      }
+      // 议题：先由 agent 统合要点写出草稿，人确认成立，再人确认锁定出口。
+      case "topic.create": {
+        const session = sessionOf(doc, ev);
+        const source = ev.replaces ? session.topics.find((one) => one.id === ev.replaces) : null;
+        if (ev.replaces && !source) noway(`账本里没有议题 ${ev.replaces}：补正文要点名那份草稿`);
+        if (source && source.state !== "draft") noway(`议题 ${source.id} 已经${source.state === "established" ? "成立" : "锁定"}：正文不往回改`);
+        if (!source && taken(session, ev.id)) noway(`这个会话里已经有 ${ev.id} 了`);
+        if (!/^I\d+$/u.test(String(ev.id))) noway(`议题号要写成 I1：${ev.id}`);
+        session.ids.add(ev.id);
+        if (source) session.topics = session.topics.filter((one) => one !== source);
+        const listed = ev.points ?? [];
+        for (const id of listed) {
+          const point = session.points.find((one) => one.id === id);
+          if (!point) noway(`账本里没有要点 ${id}：议题不能统合不存在的句子`);
+          if (point.absorbedBy) noway(`要点 ${id} 已经被 ${point.absorbedBy} 收编：同一句不能统合两次`);
+        }
+        session.topics.push({
+          id: ev.id, title: ev.title, body: ev.body ?? "", at: ev.at, by: ev.by ?? null,
+          state: "draft", points: [...listed], establishedAt: null, establishedBy: null,
+          releasedAt: null, releasedBy: null,
+        });
+        break;
+      }
+      case "topic.establish": {
+        const session = sessionOf(doc, ev);
+        const topic = session.topics.find((one) => one.id === ev.id);
+        if (!topic) noway(`账本里没有议题 ${ev.id}`);
+        if (topic.state !== "draft") noway(`议题 ${topic.id} 已经${topic.state === "established" ? "成立" : "锁定"}：账本不往回改`);
+        const named = ev.points ?? topic.points;
+        for (const id of named) {
+          const point = session.points.find((one) => one.id === id);
+          if (!point) noway(`账本里没有要点 ${id}`);
+          if (point.absorbedBy && point.absorbedBy !== topic.id)
+            noway(`要点 ${id} 已经被 ${point.absorbedBy} 收编：不能重复收编`);
+        }
+        // 正文从账本里带过来：面板按的是同一份草稿，不能让页面上另写一份成文。
+        if (!String(ev.body ?? topic.body).trim()) noway(`议题 ${topic.id} 还没有正文：统合后的正文要先写下来`);
+        topic.body = String(ev.body ?? topic.body);
+        topic.state = "established";
+        topic.establishedAt = ev.at;
+        topic.establishedBy = ev.by ?? null;
+        topic.points = [...new Set([...topic.points, ...named])];
+        for (const id of topic.points) {
+          const point = session.points.find((one) => one.id === id);
+          if (point) { point.absorbedBy = topic.id; point.topic = topic.id; }
+        }
+        break;
+      }
+      case "topic.release": {
+        const session = sessionOf(doc, ev);
+        const topic = session.topics.find((one) => one.id === ev.id);
+        if (!topic) noway(`账本里没有议题 ${ev.id}`);
+        if (topic.state !== "established") noway(`议题 ${topic.id} 还没成立：先按成立那一下`);
+        topic.state = "released";
+        topic.releasedAt = ev.at;
+        topic.releasedBy = ev.by ?? null;
+        break;
+      }
       case "goal.set": {
         const session = sessionOf(doc, ev);
         if (session.goal) session.goals.push(session.goal);
