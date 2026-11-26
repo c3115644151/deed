@@ -159,6 +159,9 @@ function screenHead(index, name, note, meter) {
 
 function discussScreen(session, zone, on) {
   const turns = session ? session.turns : [];
+  // 原文是两半：人说的（轮次）与我说的话（回复）。以前只画了前一半，
+  // 于是屏幕上看着像"只有用户在说话"——账本里两半都在，界面得把它们并到一条时间线上。
+  const replies = session ? (session.replies ?? []) : [];
   const points = session ? (session.points ?? []) : [];
   const topics = session ? (session.topics ?? []) : [];
   const livePoints = points.filter((one) => !one.absorbedBy);
@@ -179,19 +182,35 @@ function discussScreen(session, zone, on) {
       "</li>"
     );
   }).join("");
-  const row = (turn) =>
-    '<li class="turn ' + turn.who + '">' +
-    '<span class="tclock">' + when(turn.at, zone) + "</span>" +
-    '<span class="twho">' + (turn.who === "user" ? "你" : "agent") + "</span>" +
-    '<p class="tsaid">' + esc(turn.said) + "</p>" +
-    "</li>";
+  // 一条时间线：轮次与回复按当时发生的顺序并排，谁说的写在左边。
+  // 回复原文可能很长（我的一句话就是几百字），所以默认折起，点开看全文。
+  const line = (who, at, text) => {
+    const long = text.length > 240;
+    return (
+      '<li class="turn ' + who + '">' +
+      '<span class="tclock">' + when(at, zone) + "</span>" +
+      '<span class="twho">' + (who === "user" ? "你" : "我") + "</span>" +
+      (long
+        ? '<details class="tsaid"><summary>' + esc(text.slice(0, 240)) + "…</summary>" +
+          '<p class="tfull">' + esc(text) + "</p></details>"
+        : '<p class="tsaid">' + esc(text) + "</p>") +
+      "</li>"
+    );
+  };
+  const timeline = [
+    ...turns.map((one) => ({ at: one.at, who: one.who === "user" ? "user" : "agent", text: one.said })),
+    ...replies.map((one) => ({ at: one.at, who: "agent", text: one.text })),
+  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const row = (one) => line(one.who, one.at, one.text);
   const live = topics.filter((one) => one.state !== "released").length;
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="discuss" id="screen-discuss">' +
     screenHead("01", "讨论", "你说的每一句、留下的要点、长出来的议题", turns.filter((one) => one.who === "user").length + " 轮 · " + livePoints.length + " 条要点 · " + live + " 个议题") +
     '<div class="cols">' +
     '<div class="col logs">' +
-    (turns.length ? '<ol class="turns">' + [...turns].reverse().map(row).join("") + "</ol>" : '<p class="quiet">还没有轮次</p>') +
+    (timeline.length
+      ? '<ol class="turns">' + [...timeline].reverse().map(row).join("") + "</ol>"
+      : '<p class="quiet">还没有轮次</p>') +
     "</div>" +
     '<aside class="side">' +
     '<h3 class="colh">灵感清单 · 要点</h3>' +
@@ -686,6 +705,10 @@ html[data-theme="light"] body {
 .tclock { font-family: var(--mono); font-size: 9.5px; color: var(--dim); padding-top: 4px; }
 .twho { font-family: var(--mono); font-size: 9px; letter-spacing: .16em; color: var(--dim); text-align: center; padding-top: 4px; }
 .turn.user .twho { color: var(--warn); }
+.turn.agent .twho { color: var(--line2); }
+details.tsaid > summary { cursor: pointer; font-size: 13px; color: var(--dim); line-height: 1.5; }
+details.tsaid[open] > summary { color: var(--dim); }
+.tfull { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
 .tsaid { margin: 0; font-size: 14.5px; line-height: 1.55; overflow-wrap: anywhere; }
 .turn.first .tsaid { font-size: 15.5px; }
 

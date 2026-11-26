@@ -121,3 +121,21 @@ test("the two panel gates write panel-signed lines and refuse to be pressed twic
   assert.throws(() => applyGate(root, { action: "topic-establish", topic: "I1", by: "user", at: T(7) }), /已经锁定/);
   assert.throws(() => applyGate(root, { action: "topic-release", topic: "I1", by: "user", at: T(8) }), /还没成立|已经锁定/);
 });
+
+
+// 原文是两半：讨论屏不能只画人说的那一半，否则看起来像"只有用户在说话"。
+test("the discussion screen shows both halves of the raw text, in one timeline", () => {
+  const events = [
+    turn(1, "你这一句"),
+    { v: V, at: T(2), k: "reply", s: null, text: "我这一句", via: "hook", origin: "dsh", mid: "m-1" },
+  ];
+  const doc = fold(events);
+  const html = renderBoard(doc, { zone: "UTC" });
+  assert.match(html, /你这一句/, "人说的那一半在");
+  assert.match(html, /我这一句/, "我说的那一半也在");
+  const order = [html.indexOf("你这一句"), html.indexOf("我这一句")];
+  assert.ok(order[0] >= 0 && order[1] >= 0, "两句都被画出来");
+  const s = doc.sessions[0];
+  assert.equal(s.replies.length, 1, "回复折在 session.replies 里，与 turns 并列");
+  assert.equal(s.turns.length, 1, "回复不增加轮次");
+});

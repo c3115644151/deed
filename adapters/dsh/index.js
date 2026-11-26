@@ -34,6 +34,11 @@ const CONVENTION = [
 
 const REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
 
+// 热重载发生的时候，钩子里还没有任何事件，拿不到工作区路径。记下最近一次见过的那一个，
+// 只为在重载那一刻留一行日志——否则"到底重载了没有"只能靠猜。
+let lastRoot = null;
+let pendingInfo = null; // 只写一次：这次重载之后的第一行日志里带上 hmr 的实况
+
 // 一段消息里的纯文本：reasoning、工具块、图片都不算"说了什么"。
 const textOf = (content) =>
   (content ?? [])
@@ -95,6 +100,11 @@ export function apply(ctx, config = {}) {
   const logFile = (root) => path.join(root, ".deed", "tmp", "dsh.log");
 
   const note = (root, line) => {
+    if (root) lastRoot = root;
+    if (pendingInfo !== null && root) {
+      line = pendingInfo + " | " + line;
+      pendingInfo = null;
+    }
     try {
       fs.mkdirSync(path.join(root, ".deed", "tmp"), { recursive: true });
       fs.appendFileSync(logFile(root), new Date().toISOString() + "  " + line + "\n");
@@ -174,6 +184,23 @@ export function apply(ctx, config = {}) {
         if (root) note(root, "原文钩子出错 · " + clip(err?.message ?? err, 200));
       } catch {}
     }
+  });
+
+  try {
+    const hmr = ctx.get("hmr");
+    pendingInfo = hmr
+      ? "hmr=开 · base=" + String(hmr.baseDir ?? "?") + " · root=" + JSON.stringify(hmr.config?.root ?? null)
+      : "hmr=没有这个服务";
+  } catch (err) {
+    pendingInfo = "hmr=读不到（" + String(err?.message ?? err).slice(0, 60) + "）";
+  }
+
+  // 重载了就留一行：这是"存盘即生效"唯一能被验证的证据。
+  ctx.on("hmr/reload", () => {
+    if (!lastRoot) return;
+    try {
+      fs.appendFileSync(logFile(lastRoot), new Date().toISOString() + "  适配器已热重载\n");
+    } catch {}
   });
 
   // ---- 2. 惯例：每一轮开口时注入一次 ------------------------------------------------
@@ -391,3 +418,4 @@ export function apply(ctx, config = {}) {
   };
 
 }
+
