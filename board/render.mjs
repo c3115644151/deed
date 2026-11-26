@@ -999,8 +999,33 @@ if (window.EventSource) {
     say("账本动了 · 重排中");
     setTimeout(() => location.reload(), 220);
   });
-  source.addEventListener("hello", () => say("跟着账本刷新"));
-  source.onerror = () => say("离线快照");
+  // hello 里带的是服务端那一版代码的指纹：和页面自己那版不一样，说明面板已经换代，
+  // 整页重来一次才是最新的。断线也照这个路子走——重连之后 hello 会再说一次。
+  let own = null;
+  source.addEventListener("hello", (event) => {
+    let build = null;
+    try {
+      build = JSON.parse(event.data).build ?? null;
+    } catch {
+      build = null;
+    }
+    if (build === null) {
+      say("跟着账本刷新");
+      return;
+    }
+    if (own === null) {
+      own = build;
+      say("跟着账本刷新");
+      return;
+    }
+    if (own !== build) {
+      say("面板换了新的一版 · 重载");
+      setTimeout(() => location.reload(), 120);
+      return;
+    }
+    say("跟着账本刷新");
+  });
+  source.onerror = () => say("断开 · 正在重连");
 } else {
   say("离线快照");
 }

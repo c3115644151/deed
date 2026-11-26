@@ -131,7 +131,8 @@ test("serving is read-only and says so", async () => {
     assert.match(stream.type, /text\/event-stream/);
     // The hello line is the only clock this stream reads, and it must speak the
     // zone the page speaks: one moment cannot read two ways on one screen.
-    const said = stream.text.split("\n").find((line) => line.startsWith("data: ")).slice(6);
+    // hello 里的时刻和指纹一起走：`{"at":"11/27 05:27","build":"…"}`
+    const said = JSON.parse(stream.text.split("\n").find((line) => line.startsWith("data: ")).slice(6)).at;
     const minutes = (text) => {
       const parts = text.match(/^(\d\d\/\d\d) (\d\d):(\d\d)$/);
       return Number(parts[2]) * 60 + Number(parts[3]);

@@ -202,7 +202,9 @@ export function handler(root, onRequest = () => {}, onRetire = null) {
         connection: "keep-alive",
       });
       // Same zone as the page: one moment must not read two ways on one screen.
-      res.write(`event: hello\ndata: ${when(new Date().toISOString(), zoneOfMachine())}\n\n`);
+      // hello 带上"这一版代码的指纹"：页面拿它和自己手上那版比，换了就整页重来。
+      // 没有这个，面板换代之后页面上还是旧代码（浏览器不会替你重新载入）。
+      res.write(`event: hello\ndata: ${JSON.stringify({ at: when(new Date().toISOString(), zoneOfMachine()), build: buildCached() })}\n\n`);
       let timer = null;
       // A workspace that was never initialised has no .deed/log yet: attach when
       // it appears instead of dying with ENOENT on the first request.
