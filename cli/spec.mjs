@@ -44,17 +44,6 @@ export const SPEC = {
       "                 议题成立与锁定出口都在面板上按：两次都是用户确认，命令行不代替",
     ],
   },
-  task: {
-    flags: ["id", "title", "criteria", "session", "files", "evidence", "why"],
-    usage: [
-      'deed task add "<要做的事>" --criteria "<做完的标准>" [--files "src/a.mjs,docs/b.md"]',
-      'deed task done <T1> --evidence "<命令与结果>" [--session S01]',
-      '                 这条只记账：记录里写的数不会被工具采，也不会跑记录里的「要看到的话」',
-      '                 要让数由工具采、话被真跑一遍，用 deed submit --run "<命令>"',
-      'deed task undo <T1> --why "…"         收回最后那条交付（说错了话用它，别改写成对的）',
-      'deed task defer|drop <T1> --why "…"',
-    ],
-  },
   plan: {
     flags: ["format", "print", "force", "session"],
     booleans: ["format", "print", "force"],
@@ -131,7 +120,7 @@ export const SPEC = {
 // 管理面是与状态无关的手（装、看、声明、起面板）。帮助与 ORDER 都从这一处出。
 export const GROUPS = [
   { title: "讨论 · 把讨论说清", verbs: ["say", "reply", "point", "topic"] },
-  { title: "执行 · 把说清的做出来", verbs: ["plan", "submit", "task"] },
+  { title: "执行 · 把说清的做出来", verbs: ["plan", "submit"] },
   { title: "验收 · 判它过没过", verbs: ["review", "sign", "check"] },
   { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "serve", "panel"] },
 ];

@@ -5,6 +5,8 @@ import { nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
 import { changedPaths, rel, writeSnapshot } from "../../lib/store.mjs";
 import { weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
+import { EVENT_VERSION } from "../../core/events.mjs";
+import { frozenFor } from "../../core/fold.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
 
 
@@ -246,7 +248,27 @@ export default function submit(argv) {
             if (item.box === "x") {
               // 判过（accepted）的条目在清单里也是勾着的：它已经交过、也有人判过，
               // 再交一次既没有意义，也会撞上「已关闭的段不能再改」。
-              if (task.status === "done" || task.status === "accepted") continue;
+              // 但已经交付过的条目再勾一次不是在说"交过了"，而是在试"再交一版"——
+              // 那种尝试要看这一段冻没冻：冻着就当场拒（在审 / 等你判决），没冻就说清先撤回。
+              if (task.status === "done" || task.status === "accepted") {
+                // 清单是重印的：勾着、交付那句话和账本里最后一条一模一样——那不是"再交一版"，
+                // 是清单在重画事实，照旧跳过。
+                const recorded = task.evidence.at(-1)?.claim ?? null;
+                if (item.claim === recorded) continue;
+                const session = one;
+                const home = session.segments.find((seg) => seg.id === task.segment);
+                // 冻结的判断只有一处（core/fold.mjs 的 frozenFor）：在审、审查通过等判决都算。
+                if (home && frozenFor(session, task.segment, EVENT_VERSION))
+                  fail(
+                    home.verdict === "pass"
+                      ? task.segment + " 审查通过了、等你判决：这一段先冻着，判过之后才收新的交付（判决在面板上按）"
+                      : task.segment + " 的清单已经发出去、还没人回答：这一段在审，不能交付（要改先把清单撤回：deed review --segment " + task.segment + ' --withdraw --why "…"）',
+                  );
+                fail(
+                  item.id + " 已经交付过" + (task.status === "accepted" ? "、也判过" : "") +
+                    "：要在这一条上再交一版，先把它取消勾选并写一行 理由：——撤回一条交付得说清为什么",
+                );
+              }
               const take = takingSegment(one);
               const home = one.segments.find((seg) => seg.id === task.segment);
               if (!take || (home && home.plannedAt !== null && take.id !== task.segment))
@@ -261,7 +283,7 @@ export default function submit(argv) {
               if (scanned.changed.length === 0)
                 fail(
                   item.id +
-                    " 勾上了，但这一批没有量到任何改动、也没有文件可指：先真的动过再勾，或者用 deed task done " +
+                    " 勾上了，但这一批没有量到任何改动、也没有文件可指：先真的动过一个文件再勾（勾上只记账，改动由 submit 量）" +
                     item.id +
                     " --evidence \"…\"",
                 );

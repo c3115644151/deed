@@ -292,7 +292,7 @@ test("a refused action never reaches the ledger, and the workspace keeps working
   deed(cwd, "review", "--skip", "--why", "只改了文档");
   const sealed = deliverTask(cwd, "T1", "封过之后又改", { keep: true });
   assert.equal(sealed.status, 1, "判过的段不能再往任务上写");
-  assert.match(sealed.stderr, /已封存|没有要落的改动/u);
+  assert.match(sealed.stderr, /已封存|没有要落的改动|已经交付过/u);
   assert.equal(readEvents(cwd).length, before, "封存之后那一次交付被拒，账本一个字都没多");
   assert.equal(deed(cwd, "state").status, 0, "工作区没被写坏");
   assert.equal(deed(cwd, "check", "--ledger").status, 0);

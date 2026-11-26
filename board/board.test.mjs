@@ -9,6 +9,7 @@ import { renderBoard, when } from "../board/render.mjs";
 import { start } from "../board/serve.mjs";
 import { buildNow } from "../lib/panel.mjs";
 import { workspace } from "../support/lib.mjs";
+import { addTask, deliverTask } from "../test/support/cli.mjs";
 import { spawnSync } from "node:child_process";
 import { readEvents } from "../lib/store.mjs";
 
@@ -331,11 +332,11 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
       encoding: "utf8",
       env: { ...process.env, DEED_NO_PANEL: "1" },
     });
-  run("init", "--said", "开始");
-  run("task", "add", "改重放", "--criteria", "同账本同文档", "--files", "core/a.mjs");
+  run("init", "--said", "开始", "--review", "core/**");
+  addTask(root, "改重放", "同账本同文档");
   fs.mkdirSync(path.join(root, "core"), { recursive: true });
   fs.writeFileSync(path.join(root, "core", "a.mjs"), "a\n");
-  run("task", "done", "T1", "--evidence", "写完了");
+  assert.equal(deliverTask(root, "T1", "写完了", { file: "core/a.mjs" }).status, 0, "勾上就是交付");
   // 审查通过只把这一段交回来：判决那一按才是它的结局。
   assert.equal(run("review", "--segment", "S01.1").status, 0);
   assert.equal(run("review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);

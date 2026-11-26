@@ -1570,3 +1570,123 @@
 {"at":"2026-11-26T21:07:02.349Z","k":"reply","s":"S02","text":"能，而且现在就是一条命令：\n\n```\ndeed panel --restart\n```\n\n实测（临时工作区 7331）：起 → `pid 79368`；`--restart` → 同一格 7331、`pid 77032`；`--stop` 收尾。地址不变。\n\n## 但有一件事绕不过去，说清楚\n\n**一格 TCP 端口同一时刻只能有一个听众。** 新建的进程想在同一格上 `listen`，操作系统一定报 `EADDRINUSE`——除非原来那个先放手。所以\"按原端口重启\"必然包含\"旧的让出这一格\"这一步。\n\n**关键是：让位不等于杀。** 旧面板收到 `POST /__deed/retire` 就自己收摊（60ms），端口空出来，新的在原格上起——中间没有 `taskkill`。这是我上一轮改掉的东西，也是 `--restart` 内部做的事。\n\n## 为什么 7317 上那个还是麻烦\n\n因为它是**更早一版**的面板，代码里没有 `retire` 这个路口——它对任何请求只会说\"只有 / 、/state、/events\"。它听不见\"请让位\"，所以只剩两条路：\n\n- 等它自己退（它静默 30 分钟会退，我已经不再发请求替它续命）；\n- 或是重启一次应用，让它跟着走。\n\n这是**一次性的迁移成本**，不是稳态：从下一条新面板起，换人永远是 `deed panel --restart` 一条命令，地址不变。\n\n## 你可以这样看这件事\n\n- 稳态：`deed panel` 看它在哪；`deed panel --restart` 原地换新；不需要知道 pid，也不需要杀任何东西。\n- 过渡：7317 那一个旧进程——等它到期，或重启应用一次。\n\n测试 230/230（新增一条：按原端口重启，地址不变、pid 换了）。已 push：`94071ea`、`3fa371d`。","via":"hook","origin":"dsh","mid":"ddad8930-46f9-4eba-a2e4-27eb1193f9ab","v":30,"w":"0.27.0"}
 {"at":"2026-11-26T21:21:17.404Z","k":"turn","s":"S02","who":"user","said":"我直接把进程杀了，请你优化逻辑，我希望以后在面板上保持最新，不要再老是出现这种低效率问题了","via":"hook","origin":"dsh","mid":"a27a4deb-d391-40d3-8602-0d2d1cbd6ada","v":30,"w":"0.27.0"}
 {"at":"2026-11-26T21:32:28.730Z","k":"point.add","s":"S02","id":"P7","text":"面板保持最新的两件事都齐了：进程自己换代（2 秒对指纹）、页面收到新 build 就整页重载。剩下的只有一格：更早一版没有 retire 路口，那一格只能等它到期。","topic":null,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:33:18.374Z","k":"reply","s":"S02","text":"逻辑已经补成\"不需要人管\"，但有一件跟你说的不一样，先讲这件。\n\n## 你杀的那个没死\n\n`pid 60676` 还在 7317 上听（`Get-NetTCPConnection` 直接给出它；`/__deed` 仍回那句旧 404）。我又试了两次：\n\n```\ntaskkill /PID 60676 /F /T   → Access is denied\nStop-Process -Id 60676 -Force → Access is denied\n```\n\n它父进程 16896 已经没了，成了孤儿，权限比我这一层高。你那条 kill 大概落在别的 node 上了。要真快点了结它：任务管理器里结束 **node (60676)**，或在管理员 PowerShell 里 `taskkill /F /PID 60676`。\n\n另外——**从现在起我不再探它**。它认的是\"30 分钟没有请求就自退\"，我之前每次探活都在替它续命。\n\n## 让它永远最新的两件东西，都已实测\n\n**① 进程自己换代**（上一轮做的，这一轮验透了）\n\n改一行 `board/render.mjs` 再还原，同一个端口：\n\n```\n84704 →（代码变）短暂 down → 85292 →（代码还原）74932\n端口始终 7333，/__deed 报的 build 与当前代码一致\n```\n\n**② 页面自己整页重载**（这一轮补的，之前是缺的）\n\n以前 SSE 断了，浏览器的 `EventSource` 会自己重连，但**重连不重新载入 JS**——于是屏幕上还是旧渲染。现在 `/events` 的 hello 带 `{\"at\":\"11/27 05:27\",\"build\":\"3d7a9108…\"}`，页面记下第一次的 build，之后不一样就整页重来。实测 hello 载荷：\n\n```\nevent: hello\ndata: {\"at\":\"11/27 05:27\",\"build\":\"3d7a9108883ebbb3\"}\n```\n\n所以以后**没有人需要按 F5，也没有人需要记得\"改完重启面板\"**：进程换、页面跟着换，地址一格不变。\n\n## 为什么这一格还是旧的\n\n更早那一版面板的代码里没有 `retire` 路口，也不带 `/__deed`——它听不见\"请让位\"，我只能报出它是谁。**这一次是迁移成本，不是稳态**：从下一个面板起，任何一次换代都是 `POST /__deed/retire`（60ms 收摊）→ 原格起新版，全程无人干预。\n\n测试 230/230。已 push：`335e4de`、`ca450fc`。\n\n## 你现在只要做一件事\n\n把那一个 `node 60676` 结束掉（或等它静默到期）。之后随便跑一条 deed 命令，7317 上会出现面板，从那一刻起它就是\"永远最新\"的那一条。","via":"hook","origin":"dsh","mid":"5b06083d-75a3-459a-bde1-f811c582536f","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:37:48.056Z","k":"turn","s":"S02","who":"user","said":"你能不能直接告诉我要做啥？","via":"hook","origin":"dsh","mid":"cec5c000-7523-40d9-9950-eaca9a5df835","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:38:01.690Z","k":"reply","s":"S02","text":"做两件事：\n\n1. 任务管理器 → 结束 **node (60676)**。\n2. 然后在 `C:\\Users\\NUC\\Desktop\\deed` 跑：\n\n```\nnode cli/deed.mjs state\n```\n\n7317 会起来一条新面板，之后一直是新的。","via":"hook","origin":"dsh","mid":"94314191-e67a-45db-9a29-9e780ec0c9f4","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:38:15.867Z","k":"turn","s":"S02","who":"user","said":"任务管理器哪有这个？","via":"hook","origin":"dsh","mid":"35fa3028-a312-4fb8-b8c5-58cddb863a4e","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:38:32.468Z","k":"reply","s":"S02","text":"任务管理器里要看 **「详细信息」** 那一页（不是「进程」页），往下翻找 **PID 60676** 的 `node.exe`，右键 → 结束任务。\n\n找不到就开一个**管理员** PowerShell，一行：\n\n```\ntaskkill /F /PID 60676\n```\n\n两者都不想做也行：它 30 分钟没请求会自己退，之后跑 `node cli/deed.mjs state` 就起来新的了。","via":"hook","origin":"dsh","mid":"065cc01a-7241-4d6c-8df8-9fcf64a38518","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:38:44.589Z","k":"turn","s":"S02","who":"user","said":"行了","via":"hook","origin":"dsh","mid":"ac01931d-6f00-428e-a5a7-8ea49ff9ab5b","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:39:47.697Z","k":"reply","s":"S02","text":"面板已在 **http://127.0.0.1:7317** 起来（pid 66856，build 就是当前代码），原文两侧中的「我」这一侧已经出现了。\n\n以后只要改代码并保存，这个页面就会自己刷新，不用再管。","via":"hook","origin":"dsh","mid":"accc46b2-584f-4902-810e-be10f1dfe6d8","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:40:14.254Z","k":"turn","s":"S02","who":"user","said":"行，那么我们继续推进，你知道下一步要做什么吗","via":"hook","origin":"dsh","mid":"82c343a4-f259-4837-9e26-648123dad873","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:42:52.387Z","k":"reply","s":"S02","text":"知道。有三步，第一步就是把这段的清单盘清楚——因为 14 条里有几条已经被后来的机制换掉了。\n\n## 这段清单盘出来的结果\n\n**已经落地的（有代码/用例撑着，可以直接交付）**\n\n| 条 | 证据 |\n|---|---|\n| T87 议题是账本上的对象 | `cli/verbs/topic.mjs` 在，`fold` 折出 `topics`，`topic.create/establish/release` 三类事件都在账本里 |\n| T90 放出那道闸 | `board/gates.mjs` 的 `topicRelease`，只在面板上按，命令行没有这条路 |\n| T92 `/events` 断开不带走进程 | `board/serve.mjs` 有 `res.on(\"error\")` 与 `req.on(\"close\")` |\n\n**标准写在已删概念上的（作废，不是没做）**\n\n| 条 | 为什么作废 |\n|---|---|\n| T89 题长在议题里 | 写的是 `deed ask --topic`、`topic.merge`；`ask` 已在 6328b5b 整条下线，题这个概念不存在了 |\n| T142 `task renew` | 它是给 `task` 动词加的命令，而 T83 的方向是删掉 `task` |\n| T149 review 两套用例改清单写法 | 与 T83 是同一件事的下半段，T83 已包含它 |\n\n**真活（按我的顺序）**\n\n1. **T83**——`cli/verbs/task.mjs` 还在、`test/cli-*.mjs` 里 300 多处 `deed task` 夹具还没换。它是「命令面收敛」这条尾巴上唯一挡路的。\n2. **T120**——发现的处置（fix/defer/reject）+ 下一份清单要印出还没被回答的反驳。`core/rules.mjs` 里一行都没有。\n3. **T141**——`submit --run` 复用同一份字节上的结果，现在每次都重跑。\n4. **T91**——清单条目写 `来自：I1`，`submit` 核议题已放出。`plan.mjs` 里没有。\n5. **T88** 轮次挂议题锚点、**T93** state 单段不印目的、**T137** 六条记录改成能当场跑的命令。\n\n## 我从哪开始\n\n**T83。** 理由是它是减法：删掉一个动词、把夹具换成「清单+submit」，不新增机制，做完命令面就从 17 个动词收成 16 个，README/DESIGN 也跟着稳定。\n\n先记录这次的判定（已落地的三条写交付、作废的三条写理由），然后动 T83 的代码。账本上留下理由，你随时可以推翻我哪一条。","via":"hook","origin":"dsh","mid":"fcd03565-3997-4aed-963d-e0c4d784cb20","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T21:44:24.114Z","k":"turn","s":"S02","who":"user","said":"可以，请收尾命令行收敛这个任务","via":"hook","origin":"dsh","mid":"17bf87ad-2ff7-4009-bc8a-4412db9035c8","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T87","order":3,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.done","s":"S02","id":"T87","evidence":"议题是账本上的对象：deed topic \"标题\" 自开 I1，同 id 再 deed topic I1 --body 追加正文；fold 折出 topics；空标题被拒；期望：node --test test/discussion.test.mjs => ℹ pass 8","by":"agent","expects":[{"command":"node --test test/discussion.test.mjs","want":"ℹ pass 8"}],"files":[{"path":"AGENTS.md"},{"path":"HANDOFF.md"},{"path":"README.md"},{"path":"adapters/dsh/README.md"},{"path":"adapters/dsh/cordis.patch.yml"},{"path":"adapters/dsh/index.js"},{"path":"adapters/dsh/package.json"},{"path":"board/board.test.mjs"},{"path":"board/gates.mjs"},{"path":"board/render.mjs"},{"path":"board/serve.mjs"},{"path":"cli/brief.mjs"},{"path":"cli/deed.mjs"},{"path":"cli/panel.mjs"},{"path":"cli/pins.mjs"},{"path":"cli/session.mjs"},{"path":"cli/spec.mjs"},{"path":"cli/verbs/ask.mjs"},{"path":"cli/verbs/check.mjs"},{"path":"cli/verbs/init.mjs"},{"path":"cli/verbs/panel.mjs"},{"path":"cli/verbs/point.mjs"},{"path":"cli/verbs/project.mjs"},{"path":"cli/verbs/reply.mjs"},{"path":"cli/verbs/review.mjs"},{"path":"cli/verbs/say.mjs"},{"path":"cli/verbs/serve.mjs"},{"path":"cli/verbs/sign.mjs"},{"path":"cli/verbs/submit.mjs"},{"path":"cli/verbs/task.mjs"},{"path":"cli/verbs/topic.mjs"},{"path":"core/checks.mjs"},{"path":"core/events.mjs"},{"path":"core/fold.mjs"},{"path":"core/rules.mjs"},{"path":"docs/DESIGN.md"},{"path":"docs/INSTALL.md"},{"path":"docs/README.md"},{"path":"docs/deed-architecture.candidate.json"},{"path":"examples/contract/NOTES.md"},{"path":"examples/rebuild.mjs"},{"path":"lib/panel.mjs"},{"path":"lib/words.mjs"},{"path":"package.json"},{"path":"test/checks.test.mjs"},{"path":"test/cli-due.test.mjs"},{"path":"test/cli-review1.test.mjs"},{"path":"test/cli-review2.test.mjs"},{"path":"test/cli-rules1.test.mjs"},{"path":"test/cli-rules2.test.mjs"},{"path":"test/cli-state1.test.mjs"},{"path":"test/cli-state2.test.mjs"},{"path":"test/cli-work1.test.mjs"},{"path":"test/cli-work2.test.mjs"},{"path":"test/discussion.test.mjs"},{"path":"test/docs.test.mjs"},{"path":"test/fold.test.mjs"},{"path":"test/rules.test.mjs"},{"path":"test/support/cli.mjs"}],"changed":["AGENTS.md","HANDOFF.md","README.md","adapters/dsh/README.md","adapters/dsh/cordis.patch.yml","adapters/dsh/index.js","adapters/dsh/package.json","board/board.test.mjs","board/gates.mjs","board/render.mjs","board/serve.mjs","cli/brief.mjs","cli/deed.mjs","cli/panel.mjs","cli/pins.mjs","cli/session.mjs","cli/spec.mjs","cli/verbs/ask.mjs","cli/verbs/check.mjs","cli/verbs/init.mjs","cli/verbs/panel.mjs","cli/verbs/point.mjs","cli/verbs/project.mjs","cli/verbs/reply.mjs","cli/verbs/review.mjs","cli/verbs/say.mjs","cli/verbs/serve.mjs","cli/verbs/sign.mjs","cli/verbs/submit.mjs","cli/verbs/task.mjs","cli/verbs/topic.mjs","core/checks.mjs","core/events.mjs","core/fold.mjs","core/rules.mjs","docs/DESIGN.md","docs/INSTALL.md","docs/README.md","docs/deed-architecture.candidate.json","examples/contract/NOTES.md","examples/rebuild.mjs","lib/panel.mjs","lib/words.mjs","package.json","test/checks.test.mjs","test/cli-due.test.mjs","test/cli-review1.test.mjs","test/cli-review2.test.mjs","test/cli-rules1.test.mjs","test/cli-rules2.test.mjs","test/cli-state1.test.mjs","test/cli-state2.test.mjs","test/cli-work1.test.mjs","test/cli-work2.test.mjs","test/discussion.test.mjs","test/docs.test.mjs","test/fold.test.mjs","test/rules.test.mjs","test/support/cli.mjs"],"bytes":{"AGENTS.md":2062,"README.md":17497,"adapters/dsh/README.md":3737,"adapters/dsh/cordis.patch.yml":97,"adapters/dsh/index.js":18634,"adapters/dsh/package.json":372,"board/board.test.mjs":20668,"board/gates.mjs":7578,"board/render.mjs":58163,"board/serve.mjs":15484,"cli/brief.mjs":15656,"cli/deed.mjs":4878,"cli/panel.mjs":10800,"cli/pins.mjs":1240,"cli/session.mjs":20117,"cli/spec.mjs":8332,"cli/verbs/check.mjs":2285,"cli/verbs/init.mjs":4804,"cli/verbs/panel.mjs":1920,"cli/verbs/point.mjs":1850,"cli/verbs/project.mjs":2699,"cli/verbs/reply.mjs":1998,"cli/verbs/review.mjs":21787,"cli/verbs/say.mjs":2584,"cli/verbs/serve.mjs":969,"cli/verbs/sign.mjs":1628,"cli/verbs/submit.mjs":21347,"cli/verbs/topic.mjs":3916,"core/checks.mjs":8386,"core/events.mjs":26831,"core/fold.mjs":52377,"core/rules.mjs":35150,"docs/DESIGN.md":65402,"docs/INSTALL.md":7106,"docs/README.md":3002,"docs/deed-architecture.candidate.json":8330,"lib/panel.mjs":3156,"lib/words.mjs":8710,"package.json":661,"test/checks.test.mjs":8209,"test/cli-due.test.mjs":7564,"test/cli-review1.test.mjs":21049,"test/cli-review2.test.mjs":30058,"test/cli-rules1.test.mjs":10346,"test/cli-rules2.test.mjs":8410,"test/cli-state1.test.mjs":14603,"test/cli-state2.test.mjs":17078,"test/cli-work1.test.mjs":14288,"test/cli-work2.test.mjs":22304,"test/discussion.test.mjs":8728,"test/docs.test.mjs":5576,"test/fold.test.mjs":26601,"test/rules.test.mjs":23438,"test/support/cli.mjs":7899},"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T88","order":4,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T89","order":4,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.drop","s":"S02","id":"T89","why":"标准写在已经下线的概念上：deed ask 与「题」在 6328b5b 整条删除（askRetired，含义第 28 版），现在只有要点与议题；要表达的意思已由 topic.create/establish/release 承担","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T90","order":5,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T91","order":6,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T92","order":7,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T93","order":8,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T140","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T141","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T142","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.drop","s":"S02","id":"T142","why":"它给 task 动词加命令（task renew），而 T83 的方向是把 task 整个删掉；换成清单写法之后「撤回再重交」就是改勾再 submit，不需要第三个动词","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T149","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.drop","s":"S02","id":"T149","why":"与 T83 是同一件事的两半（T83 已含「测试改走清单+submit」），并到 T83 一起交付","v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T148","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T80","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T81","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T101","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T113","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T114","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T116","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T117","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T118","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T119","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T121","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T122","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T123","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T124","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T125","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T126","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T127","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T128","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T129","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T130","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T133","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T134","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T135","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T136","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T138","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T139","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T143","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T144","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T145","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T146","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T132","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T82","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T79","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T94","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T97","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T98","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T99","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T102","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T115","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T131","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:02:44.044Z","k":"task.order","s":"S02","id":"T147","order":10,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T83","order":2,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.done","s":"S02","id":"T83","evidence":"命令面收敛收尾：cli/verbs/task.mjs 已删除，cli/spec.mjs 的 SPEC 与 GROUPS 里不再有 task，敲它 exit 1 并指到 deed plan／deed submit；test 里 84 处 deed task 调用改走清单+submit（cli-review1 27、cli-review2 57），board 的闸夹具与 cli-due／cli-state2 一并换掉；submit 对「已交付条目再勾一次」不再静默跳过——冻结的段说在审／等你判决，没冻的说先取消勾选写理由；期望：node --test => ℹ pass 230","by":"agent","expects":[{"command":"node --test","want":"ℹ pass 230"}],"files":[{"path":"cli/verbs/submit.mjs"},{"path":"test/cli-review2.test.mjs"},{"path":"test/cli-state1.test.mjs"}],"changed":["cli/verbs/submit.mjs","test/cli-review2.test.mjs","test/cli-state1.test.mjs"],"bytes":{"cli/verbs/submit.mjs":23096,"test/cli-review2.test.mjs":30404,"test/cli-state1.test.mjs":14619},"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T88","order":3,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T90","order":4,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T91","order":5,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T92","order":6,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T93","order":7,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T140","order":8,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T141","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T87","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T80","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T81","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T101","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T113","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T114","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T116","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T117","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T118","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T119","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T121","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T122","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T123","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T124","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T125","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T126","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T127","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T128","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T129","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T130","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T133","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T134","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T135","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T136","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T138","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T139","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T143","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T144","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T145","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T146","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T148","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T89","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T79","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T82","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T94","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T97","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T98","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T99","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T102","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T115","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T131","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T132","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T142","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T147","order":9,"v":30,"w":"0.27.0"}
+{"at":"2026-11-26T22:21:26.656Z","k":"task.order","s":"S02","id":"T149","order":9,"v":30,"w":"0.27.0"}

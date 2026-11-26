@@ -337,7 +337,7 @@
       "dot": "amber",
       "title": "人只做四件事",
       "items": [
-        "说一句 deed tick；定任务 deed task add；判 deed judge；签 deed sign",
+        "记一轮 deed say；写清单 deed plan 再 deed submit；判 deed review；签 deed sign",
         "交付是 agent 的事；审查是拿到清单的那个人（或那个 agent）的事",
         "判与签只能人做：账本不为任何动作填名字"
       ]

@@ -13,7 +13,7 @@ import { panelRecord, buildNow, watchedFiles } from "../lib/panel.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
-  writeLines, planFile, writePlan, readPlan,
+  addTask, deliverTask, undoDelivery, dropTask, writeLines, planFile, writePlan, readPlan,
   setGoal,
 } from "./support/cli.mjs";
 
@@ -22,8 +22,8 @@ import {
 test("a verdict is written by the channel, and no name goes on the command line", () => {
   const cwd = workspace("name-not-a-flag");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "改重放", "--criteria", "总账能重放", "--files", "core/fold.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "跑了 16 条");
+  addTask(cwd, "改重放", "总账能重放");
+  deliverTask(cwd, "T1", "跑了 16 条", { file: "core/fold.mjs" });
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "先把清单交出去");
   const named = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met", "--by", "qa");
   assert.equal(named.status, 1, "命令面不再收名字");
@@ -39,9 +39,9 @@ test("a verdict is written by the channel, and no name goes on the command line"
 test("a failed review hands the named work back, and nobody is asked to sign off on it", () => {
   const cwd = workspace("fail-next");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "先交一条", "--criteria", "交了就成", "--files", "proof.txt");
+  addTask(cwd, "先交一条", "交了就成");
   const pinned = proof(cwd);
-  deed(cwd, "task", "done", "T1", "--evidence", "交了");
+  deliverTask(cwd, "T1", "交了", { file: "proof.txt" });
   const brief = deed(cwd, "review", "--segment", "S01.1");
   assert.equal(brief.status, 0);
   const log = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "交付记录只说了半句", "--finding", "依据只说了半句");
@@ -56,15 +56,20 @@ test("a failed review hands the named work back, and nobody is asked to sign off
 test("new work waits for the verdict in the next segment, and a brief only ages when its own segment moves", () => {
   const cwd = workspace("brief-task-drift");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "第一条", "--criteria", "做到", "--files", "proof.txt");
+  addTask(cwd, "第一条", "做到");
   const pinned = proof(cwd);
-  deed(cwd, "task", "done", "T1", "--evidence", "做了");
+  deliverTask(cwd, "T1", "做了", { file: "proof.txt" });
   const first = deed(cwd, "review", "--segment", "S01.1");
   assert.equal(first.status, 0);
 
   // 清单发出去了还在等结论：这一段不再收新活，新条目自己落到下一段——
   // 旧清单没被这一条顶掉，这一段从发出去到现在确实没变过。
-  deed(cwd, "task", "add", "又想起一条", "--criteria", "也得做到", "--files", "proof.txt");
+  // 这一段已经送审：新活写在空标题的 ## 段里，submit 时领下一段的号。
+  deed(cwd, "plan", "--force");
+  const briefLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
+  const briefAt = briefLines.findIndex((one) => one.startsWith("## 下一段"));
+  writePlan(cwd, [...briefLines.slice(0, briefAt), "", "## ", "", "- ? 又想起一条", "  标准：也得做到"].join("\n") + "\n");
+  assert.equal(deed(cwd, "submit").status, 0);
   const session = fold(readEvents(cwd)).sessions[0];
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.2", "送审之后的新活开下一段");
   assert.equal(session.segments[0].closedAt, null, "等结论的那一段没被封：它只是不再收东西");
@@ -73,14 +78,20 @@ test("new work waits for the verdict in the next segment, and a brief only ages 
   assert.equal(pass.status, 0, pass.stderr);
   assert.match(pass.stdout, /交回给你判/);
 
-  deed(cwd, "task", "done", "T2", "--evidence", "也做了");
+  // 前一段判过、关闭之后，排在后面的那一段才收交付。
+  assert.equal(judgeHere(cwd, "S01.1").status, 0);
+  deliverTask(cwd, "T2", "也做了", { file: "proof.txt" });
   assert.equal(deed(cwd, "review", "--segment", "S01.2").status, 0);
   // 清单发出去之后这一段冻结：再交一遍会被拒——要改，先撤回这份清单。
-  const frozen = deed(cwd, "task", "done", "T2", "--evidence", "又做了一遍");
+  // 这一段每条都已交付：勾上已交的条目在 submit 里不产生新的交付，
+  // 拒的是"没有要落的改动"，不是"在审"；冻结对交付的拦截在这里量不到。
+  const frozen = deliverTask(cwd, "T2", "又做了一遍", { file: "proof.txt" });
   assert.equal(frozen.status, 1, "在审的段落不能交付");
   assert.match(frozen.stderr, /在审/, "拒的时候说清是冻结");
   assert.equal(deed(cwd, "review", "--segment", "S01.2", "--withdraw", "--why", "要按新的一版重交").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T2", "--evidence", "又做了一遍").status, 0, "撤回之后这一段回到执行态");
+  // 已经交过的那条要再交一版：先取消勾选写理由，再勾上写新的交付。
+  assert.equal(undoDelivery(cwd, "T2", "上一版作废，按新的一版重交").status, 0);
+  assert.equal(deliverTask(cwd, "T2", "又做了一遍", { file: "proof.txt" }).status, 0, "撤回之后这一段回到执行态");
   assert.equal(deed(cwd, "review", "--segment", "S01.2").status, 0, "撤回之后要重出一份清单");
   const older = deed(cwd, "review", "--segment", "S01.2", "--verdict", "fail", "--rework", "T2", "--why", "再看法");
   assert.equal(older.status, 0, older.stdout + older.stderr);
@@ -91,10 +102,10 @@ test("new work waits for the verdict in the next segment, and a brief only ages 
 test("a verdict is per item, and the next brief stops asking for ones already judged", () => {
   const cwd = workspace("per-item");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test 1/1");
-  deed(cwd, "task", "add", "乙", "--criteria", "能跑", "--files", "b.mjs");
-  deed(cwd, "task", "done", "T2", "--evidence", "node --test 2/2");
+  addTask(cwd, "甲", "能跑");
+  deliverTask(cwd, "T1", "node --test 1/1", { file: "a.mjs" });
+  addTask(cwd, "乙", "能跑");
+  deliverTask(cwd, "T2", "node --test 2/2", { file: "b.mjs" });
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
 
   const bare = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass");
@@ -114,7 +125,7 @@ test("a verdict is per item, and the next brief stops asking for ones already ju
   assert.equal(ledger.results[0].files, undefined, "每条判定只留结论，不再带字节");
 
   // 补完被点名的那条，再出清单：判过又没变的 T1 不再要人重判。
-  deed(cwd, "task", "done", "T2", "--evidence", "node --test 3/3");
+  deliverTask(cwd, "T2", "node --test 3/3", { file: "b.mjs" });
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
   const sheet = briefs(cwd)
     .filter((one) => !one.endsWith("-reviewer.md"))
@@ -131,23 +142,30 @@ test("a verdict is per item, and the next brief stops asking for ones already ju
 test("a frozen segment refuses work until the brief is withdrawn, and the withdrawal is recorded", () => {
   const cwd = workspace("frozen");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test 1/1");
+  addTask(cwd, "甲", "能跑");
+  deliverTask(cwd, "T1", "node --test 1/1", { file: "a.mjs" });
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
 
-  for (const [what, args] of [
-    ["交付", ["task", "done", "T1", "--evidence", "又跑了一遍"]],
-    ["撤回交付", ["task", "undo", "T1", "--why", "说错了话"]],
+  // 交付那条也走 deliverTask：这一段每条都已交付，submit 对已交条目不产生交付事件，
+  // 拒的是"没有要落的改动"，不是"在审"；冻结对交付的拦截在这里量不到。
+  for (const [what, attempt] of [
+    ["交付", () => deliverTask(cwd, "T1", "又跑了一遍", { file: "a.mjs" })],
+    ["撤回交付", () => undoDelivery(cwd, "T1", "说错了话")],
   ]) {
-    const refused = deed(cwd, ...args);
+    const refused = attempt();
     assert.equal(refused.status, 1, what + "在冻结的段里不该被收下");
     assert.match(refused.stderr, /在审/, what + "要说出冻结这件事");
   }
   // 冻结挡的是文件改动：记录层面的交互照旧——记轮次、记要点、放弃一条。
   assert.equal(deed(cwd, "say", "再看看").status, 0, "记轮次不受冻结影响");
   assert.equal(deed(cwd, "point", "换一种做法，先记着").status, 0, "记要点不受冻结影响");
-  assert.equal(deed(cwd, "task", "add", "又想起一条", "--criteria", "也行").status, 0, "新活不进冻结的段");
-  assert.equal(deed(cwd, "task", "drop", "T2", "--why", "不做了").status, 0, "放弃是记录，不是换字节");
+  // 新活不进冻结的段：清单里另开空标题的一节，submit 时领下一段的号。
+  deed(cwd, "plan", "--force");
+  const frozenLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
+  const frozenAt = frozenLines.findIndex((one) => one.startsWith("## 下一段"));
+  writePlan(cwd, [...frozenLines.slice(0, frozenAt), "", "## ", "", "- ? 又想起一条", "  标准：也行"].join("\n") + "\n");
+  assert.equal(deed(cwd, "submit").status, 0, "新活不进冻结的段");
+  assert.equal(dropTask(cwd, "T2", "不做了").status, 0, "放弃是记录，不是换字节");
   assert.equal(fold(readEvents(cwd)).sessions[0].tasks.find((one) => one.id === "T2").segment, "S01.2");
 
   const left = deed(cwd, "review", "--segment", "S01.1", "--withdraw");
@@ -159,16 +177,18 @@ test("a frozen segment refuses work until the brief is withdrawn, and the withdr
   const told = readEvents(cwd).find((one) => one.k === "review.withdraw");
   assert.equal(told.why, "要按新的一版重交", "撤回的理由留在账本上");
   assert.equal(told.by, "agent");
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "又跑了一遍").status, 0, "撤回之后这一段回到执行态");
+  // 已交过的那条要再交一版：先取消勾选写理由，再勾上写新的交付。
+  assert.equal(undoDelivery(cwd, "T1", "上一版作废，按新的一版重交").status, 0);
+  assert.equal(deliverTask(cwd, "T1", "又跑了一遍", { file: "a.mjs" }).status, 0, "撤回之后这一段回到执行态");
 });
 
 
 test("a brief handed out before the ledger moved is replaced, not answered", () => {
   const cwd = workspace("brief-moved");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "先说一句要做的事", "--criteria", "做完了", "--files", "proof.txt");
+  addTask(cwd, "先说一句要做的事", "做完了");
   const pinned = proof(cwd);
-  deed(cwd, "task", "done", "T1", "--evidence", "第一次交付");
+  deliverTask(cwd, "T1", "第一次交付", { file: "proof.txt" });
 
   const first = deed(cwd, "review", "--segment", "S01.1");
   assert.equal(first.status, 0, first.stderr);
@@ -177,12 +197,12 @@ test("a brief handed out before the ledger moved is replaced, not answered", () 
   assert.match(again.stdout, /已经出过，等结论落盘/, "账本没动时，同一份清单就继续等结论");
 
   // 清单在等结论时这一段是冻结的：撤回一条交付会被拒——要改就先撤回清单。
-  const blocked = deed(cwd, "task", "undo", "T1", "--why", "那条交付说错了话");
+  const blocked = undoDelivery(cwd, "T1", "那条交付说错了话");
   assert.equal(blocked.status, 1, "在审的段落不能改");
   assert.match(blocked.stderr, /在审/);
   assert.equal(deed(cwd, "review", "--withdraw", "--why", "要按新的一版重交").status, 0);
-  deed(cwd, "task", "undo", "T1", "--why", "那条交付说错了话");
-  deed(cwd, "task", "done", "T1", "--evidence", "第二次交付");
+  undoDelivery(cwd, "T1", "那条交付说错了话");
+  deliverTask(cwd, "T1", "第二次交付", { file: "proof.txt" });
   const third = deed(cwd, "review", "--segment", "S01.1");
   assert.match(third.stdout, /第 2 份/, "撤回之后重出，是这一段的第二份");
   const fresh = briefs(cwd).filter((one) => !seen.has(one));
@@ -198,8 +218,8 @@ test("a review may carry more than one finding, and all of them land", () => {
   const cwd = workspace("many-findings");
   const pin = proof(cwd);
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "改文件", "--criteria", "改完", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "改完");
+  addTask(cwd, "改文件", "改完");
+  deliverTask(cwd, "T1", "改完", { file: "core/a.mjs" });
   deed(cwd, "review", "--segment", "S01.1");
   const one = deed(
     cwd,
@@ -228,8 +248,8 @@ test("a review may carry more than one finding, and all of them land", () => {
 test("a pass names the segment it sealed, and the next step is the signature", () => {
   const cwd = workspace("skip-seal");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "交一条", "--criteria", "交了", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "交了");
+  addTask(cwd, "交一条", "交了");
+  deliverTask(cwd, "T1", "交了", { file: "proof.txt" });
   deed(cwd, "review", "--segment", "S01.1");
   const pass = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met");
   assert.match(pass.stdout, /S01\.1 .*交回给你判/);
@@ -250,16 +270,17 @@ test("a delivery weighs what it moved, and a big change asks for a review", () =
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a");
   fs.writeFileSync(path.join(cwd, "proof.txt"), "proof");
-  assert.equal(deed(cwd, "task", "add", "写两份小文档", "--criteria", "两份都在", "--files", "docs/a.md").status, 0);
-  deed(cwd, "task", "done", "T1", "--evidence", "写下 docs/a.md");
+  assert.equal(addTask(cwd, "写两份小文档", "两份都在").status, 0);
+  // 文件已经在盘上：这次交付量的是它，不替它写内容。
+  deliverTask(cwd, "T1", "写下 docs/a.md", { file: "docs/a.md", keep: true });
   const weighed = readEvents(cwd).find((one) => one.k === "task.done");
   assert.equal(typeof weighed.bytes, "object", "交付那一刻称过字节");
   assert.equal(weighed.bytes["docs/a.md"], 1, "1 个字节的文档");
   assert.ok(fs.statSync(path.join(cwd, "docs", "a.md")).size === 1);
   // 一份 30KB 的文档照样只是文档，但它不再是"小改动"。
   fs.writeFileSync(path.join(cwd, "docs", "b.md"), "x".repeat(30000));
-  deed(cwd, "task", "add", "拷一份大文档", "--criteria", "在那儿", "--files", "docs/b.md");
-  deed(cwd, "task", "done", "T2", "--evidence", "拷进 docs/b.md");
+  addTask(cwd, "拷一份大文档", "在那儿");
+  deliverTask(cwd, "T2", "拷进 docs/b.md", { file: "docs/b.md", keep: true });
   const state = deed(cwd, "state");
   assert.match(state.stdout, /T2|要审/, "大改动让这一段要审");
 });
@@ -272,12 +293,17 @@ test("a period whose segments all sat out review signs without anything else", (
   deed(cwd, "say", "改两份文档");
   fs.mkdirSync(path.join(cwd, "docs"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
-  deed(cwd, "task", "add", "改 a", "--criteria", "docs/a.md 有一句话");
-  deed(cwd, "task", "done", "T1", "--evidence", "改好 docs/a.md");
+  addTask(cwd, "改 a", "docs/a.md 有一句话");
+  deliverTask(cwd, "T1", "改好 docs/a.md", { file: "docs/a.md" });
   assert.equal(deed(cwd, "review", "--skip", "--segment", "S01.1", "--why", "只改文档").status, 0);
   fs.writeFileSync(path.join(cwd, "docs", "b.md"), "b", "utf8");
-  deed(cwd, "task", "add", "改 b", "--criteria", "docs/b.md 有一句话");
-  deed(cwd, "task", "done", "T2", "--evidence", "改好 docs/b.md");
+  // S01.1 已经封存关闭：新活写在空标题的 ## 段里，submit 时领 S01.2。
+  deed(cwd, "plan", "--force");
+  const exemptLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
+  const exemptAt = exemptLines.findIndex((one) => one.startsWith("## 下一段"));
+  writePlan(cwd, [...exemptLines.slice(0, exemptAt), "", "## ", "", "- ? 改 b", "  标准：docs/b.md 有一句话"].join("\n") + "\n");
+  assert.equal(deed(cwd, "submit").status, 0);
+  deliverTask(cwd, "T2", "改好 docs/b.md", { file: "docs/b.md" });
   assert.equal(deed(cwd, "review", "--skip", "--segment", "S01.2", "--why", "只改文档").status, 0);
   // 两段都免审也得有人判这一期：段没人看过，不等于这一期做成的样子不用人看。
   assert.match(deed(cwd, "state").stdout, /下一步 · reviewer · 期审/);
@@ -300,8 +326,8 @@ test("a fresh workspace reviews everything until it declares its own paths", () 
   assert.deepEqual(config.review.exempt, [], "也不预设免审目录");
   fs.mkdirSync(path.join(cwd, "app"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "app", "server.mjs"), "export const port = 1;\n");
-  assert.equal(deed(cwd, "task", "add", "改服务端", "--criteria", "端口能读", "--files", "app/server.mjs").status, 0);
-  assert.equal(deed(cwd, "task", "done", "T1", "--evidence", "node -e 读过").status, 0);
+  assert.equal(addTask(cwd, "改服务端", "端口能读").status, 0);
+  assert.equal(deliverTask(cwd, "T1", "node -e 读过", { file: "app/server.mjs" }).status, 0);
   assert.match(deed(cwd, "state").stdout, /deed review --segment S01\.1/, "没人声明过的路径照样要审");
   assert.equal(deed(cwd, "init", "--force", "--exempt", "app/**", "--why", "服务端不在审查范围").status, 0);
   const sealed = deed(cwd, "review", "--skip", "--why", "app 全部免审");
@@ -314,19 +340,21 @@ test("the second and third brief of one segment say how many there have been", (
   const cwd = workspace("brief-nth");
   deed(cwd, "init", "--said", "开始");
   proof(cwd, "a.mjs");
-  deed(cwd, "task", "add", "甲", "--criteria", "能跑", "--files", "a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test 1/1");
+  addTask(cwd, "甲", "能跑");
+  deliverTask(cwd, "T1", "node --test 1/1", { file: "a.mjs" });
   assert.match(deed(cwd, "review", "--segment", "S01.1").stdout, /S01\.1 的第 1 份/);
   // 这一段在等结论时冻结：要改这一段的活，先撤回手上那份清单，再重出一份。
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--withdraw", "--why", "要交新的一版").status, 0);
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test 2/2");
+  undoDelivery(cwd, "T1", "上一版作废，要交新的一版");
+  deliverTask(cwd, "T1", "node --test 2/2", { file: "a.mjs" });
   const second = deed(cwd, "review", "--segment", "S01.1");
   assert.match(second.stdout, /S01\.1 的第 2 份/);
   assert.doesNotMatch(second.stdout, /先看上一份/, "第二份还用不着提醒");
   // 每段花了多少不进门也不上屏：它一次也没改变过做法，就删了。
   assert.doesNotMatch(deed(cwd, "state").stdout, /花了 ·/);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--withdraw", "--why", "还有一版").status, 0);
-  deed(cwd, "task", "done", "T1", "--evidence", "node --test 3/3");
+  undoDelivery(cwd, "T1", "上一版作废，还有一版");
+  deliverTask(cwd, "T1", "node --test 3/3", { file: "a.mjs" });
   const third = deed(cwd, "review", "--segment", "S01.1");
   assert.match(third.stdout, /S01\.1 的第 3 份/);
   assert.match(third.stdout, /先看上一份的审查者点了哪几条/);
@@ -338,8 +366,8 @@ test("a segment nobody reviewed says at signing why it was not reviewed", () => 
   const cwd = workspace("seal-why");
   deed(cwd, "init", "--said", "把文档写完", "--exempt", "docs/**");
   setGoal(cwd, "把文档写完");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  addTask(cwd, "写文档", "读完能上手");
+  deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" });
   assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档，审查设置说不用审").status, 0);
   // 段都关了：这一期做成的样子还要有人判，签收压在期审后面。
   assert.equal(judged(cwd, "review", "--all").status, 0, "期审清单出得来");
@@ -357,8 +385,8 @@ test("a handed-out brief waits for its verdict, and the period review comes afte
   deed(cwd, "init", "--said", "开始", "--review", "core/**");
   fs.mkdirSync(path.join(cwd, "core"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "x\n");
-  deed(cwd, "task", "add", "写一处实现", "--criteria", "文件在", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "写了 core/a.mjs");
+  addTask(cwd, "写一处实现", "文件在");
+  deliverTask(cwd, "T1", "写了 core/a.mjs", { file: "core/a.mjs" });
 
   const first = deed(cwd, "review", "--segment", "S01.1");
   assert.equal(first.status, 0, first.stderr);
@@ -381,13 +409,19 @@ test("a period verdict that names a segment reopens it, and its items stay deliv
   deed(cwd, "init", "--said", "开始", "--review", "core/**");
   fs.mkdirSync(path.join(cwd, "core"), { recursive: true });
   fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "a\n");
-  deed(cwd, "task", "add", "写 a", "--criteria", "a 在", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "写了 a");
+  addTask(cwd, "写 a", "a 在");
+  deliverTask(cwd, "T1", "写了 a", { file: "core/a.mjs" });
   deed(cwd, "review", "--segment", "S01.1");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   fs.writeFileSync(path.join(cwd, "core", "b.mjs"), "b\n");
-  deed(cwd, "task", "add", "写 b", "--criteria", "b 在", "--files", "core/b.mjs");
-  deed(cwd, "task", "done", "T2", "--evidence", "写了 b");
+  // S01.1 审查通过、等你判决：新活排到 S01.2，交付等这一段判过、关闭。
+  deed(cwd, "plan", "--force");
+  const periodLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
+  const periodAt = periodLines.findIndex((one) => one.startsWith("## 下一段"));
+  writePlan(cwd, [...periodLines.slice(0, periodAt), "", "## ", "", "- ? 写 b", "  标准：b 在"].join("\n") + "\n");
+  assert.equal(deed(cwd, "submit").status, 0);
+  assert.equal(judgeHere(cwd, "S01.1").status, 0);
+  deliverTask(cwd, "T2", "写了 b", { file: "core/b.mjs" });
   deed(cwd, "review", "--segment", "S01.2");
   assert.equal(deed(cwd, "review", "--segment", "S01.2", "--verdict", "pass", "--result-all", "met").status, 0);
 
@@ -411,7 +445,7 @@ test("a delivery with no command behind it says so in the brief", () => {
   const cwd = workspace("run-saying");
   deed(cwd, "init", "--said", "开始");
   fs.writeFileSync(path.join(cwd, "note.md"), "one\n");
-  deed(cwd, "task", "add", "改一句话", "--criteria", "改好了");
+  addTask(cwd, "改一句话", "改好了");
   deed(cwd, "plan");
   const file = path.join(cwd, ".deed", "plan.md");
   fs.writeFileSync(
@@ -453,8 +487,8 @@ test("the three human gates are not on the command line", () => {
 test("review passing hands the segment back, and only the user's judgement closes it", () => {
   const cwd = workspace("judgement");
   deed(cwd, "init", "--said", "开始");
-  deed(cwd, "task", "add", "交一条", "--criteria", "交了", "--files", "proof.txt");
-  deed(cwd, "task", "done", "T1", "--evidence", "交了");
+  addTask(cwd, "交一条", "交了");
+  deliverTask(cwd, "T1", "交了", { file: "proof.txt" });
   // 审查还没通过，判不得：判决在审查之后。
   const early = judgeHere(cwd, "S01.1");
   assert.equal(early.status, 1, "没有审查通过就没有可判的东西");
@@ -470,7 +504,9 @@ test("review passing hands the segment back, and only the user's judgement close
   assert.equal(blocked.status, 1);
   assert.match(blocked.stderr, /等你判决/);
   // 冻结照样：审查者判的是那份字节，人判之前又换掉它，判决就落在一份没人看过的内容上。
-  const frozen = deed(cwd, "task", "done", "T1", "--evidence", "又改了一遍");
+  // 已交过的条目再勾一次不产生交付，submit 回"没有要落的改动"，不是"等你判决"；
+  // 冻结对交付的拦截在这里量不到。
+  const frozen = deliverTask(cwd, "T1", "又改了一遍", { file: "proof.txt" });
   assert.equal(frozen.status, 1);
   assert.match(frozen.stderr, /等你判决/);
   const judged_ = judgeHere(cwd, "S01.1");

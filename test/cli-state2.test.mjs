@@ -51,7 +51,7 @@ test("--session that names no period is refused by every verb that takes one", (
   deed(cwd, "init", "--said", "开始");
   addTask(cwd, "写文档", "读完能上手", "--files", "docs/a.md");
   for (const args of [
-    ["task", "done", "T1", "--evidence", "写完了", "--session", "S99"],
+    ["submit", "--session", "S99"],
     ["review", "--segment", "S01.1", "--session", "S99"],
     ["review", "--skip", "--why", "免审", "--session", "S99"],
   ]) {
@@ -104,9 +104,9 @@ test("asking a verb that takes no arguments answers with its line, not the whole
   assert.equal(run.status, 0);
   assert.equal(run.stdout.trim(), "deed state", "state --help 只该打这一行");
   assert.match(deed(cwd, "check", "--help").stdout, /deed check --ledger/u, "check 收开关：它的帮助是那几行");
-  const task = deed(cwd, "task", "--help");
-  assert.match(task.stdout, /deed task undo/);
-  assert.doesNotMatch(task.stdout, /deed judge --pass/, "问 task 的用法不该回 judge 的行");
+  const plan = deed(cwd, "plan", "--help");
+  assert.match(plan.stdout, /deed plan/);
+  assert.doesNotMatch(plan.stdout, /deed judge --pass/, "问 plan 的用法不该回 judge 的行");
 });
 
 
@@ -120,9 +120,9 @@ test("asking what a verb takes does not run it", () => {
   assert.equal(briefs(cwd).length, before, "问一句用法不该发一份清单");
   assert.equal(kinds(cwd).includes("review.brief"), false);
 
-  const task = deed(cwd, "task", "--help");
-  assert.equal(task.status, 0);
-  assert.match(task.stdout, /deed task undo/);
+  const plan = deed(cwd, "plan", "--help");
+  assert.equal(plan.status, 0);
+  assert.match(plan.stdout, /deed plan/);
 });
 
 
@@ -315,6 +315,13 @@ test("the merged verbs point at their new home instead of doing nothing", () => 
   const goal = deed(cwd, "goal", "把文档写完");
   assert.equal(goal.status, 1);
   assert.match(goal.stderr, /清单第一行/u);
+  // 条目也不再是动词：一条命令记账的做法没了，只剩"写清单 + submit"这条。
+  const task = deed(cwd, "task", "add", "改重放", "--criteria", "同账本同文档");
+  assert.equal(task.status, 1, "deed task 已经下线");
+  assert.match(task.stderr, /deed plan/u);
+  assert.match(task.stderr, /deed submit/u);
+  assert.doesNotMatch(deed(cwd, "help").stdout, /deed task/u, "帮助里也不该再有这个动作");
+  assert.equal(deed(cwd, "plan").status, 0, "写清单这条路照常");
 });
 
 // 账本坏一行时，体检的第一条先红：别的检查都没有输入，也不该报一个通过率。

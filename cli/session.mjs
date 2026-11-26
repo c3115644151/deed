@@ -256,7 +256,7 @@ export const guard = (fn) => {
 export const period = (doc) => "第 " + doc.sessions.length + " 期";
 
 // 撤的是哪份字节，撤的那一刻就写下：重放再去推，等于让后来的形状改口。
-// 两条入口（deed task undo 与 submit 里把勾去掉）落的是同一个事实，共用这一处。
+// 撤回只有一条路：清单里把勾去掉再 submit。这里只负责把那件事记下来。
 export const undoesOf = (task) => {
   const last = task.evidence[task.evidence.length - 1];
   if (!last) return null;

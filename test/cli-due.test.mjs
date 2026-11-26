@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
-import { CLI, OFF, deed, setGoal, proof, briefs } from "./support/cli.mjs";
+import { CLI, OFF, deed, addTask, deliverTask, setGoal, proof, briefs } from "./support/cli.mjs";
 
 
 const due = (cwd, ...args) => {
@@ -56,8 +56,8 @@ test("the due query says what needs a reviewer, and never asks the person", () =
   setGoal(cwd, "把这一件事做成");
   assert.deepEqual(due(cwd), { kind: null }, "还没有交付：没有该审的东西");
 
-  deed(cwd, "task", "add", "写一处实现", "--criteria", "文件在", "--files", "core/a.mjs");
-  deed(cwd, "task", "done", "T1", "--evidence", "写了 core/a.mjs");
+  addTask(cwd, "写一处实现", "文件在");
+  deliverTask(cwd, "T1", "写了 core/a.mjs", { file: "core/a.mjs" });
   const want = due(cwd);
   assert.equal(want.kind, "segment");
   assert.equal(want.segment, "S01.1");
@@ -84,8 +84,8 @@ test("a segment the review setting lets through is never handed to a reviewer", 
   const cwd = workspace("review-due-exempt");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   setGoal(cwd, "把文档写完");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  addTask(cwd, "写文档", "读完能上手");
+  deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" });
   assert.deepEqual(due(cwd), { kind: null }, "免审段不该出一份没人答的卷子");
 });
 
@@ -95,8 +95,8 @@ test("the period asks for a fresh reviewer, and only after every segment has an 
   const cwd = workspace("review-due-period");
   deed(cwd, "init", "--said", "开始", "--exempt", "docs/**");
   setGoal(cwd, "把文档写完");
-  deed(cwd, "task", "add", "写文档", "--criteria", "读完能上手", "--files", "docs/a.md");
-  deed(cwd, "task", "done", "T1", "--evidence", "写完了");
+  addTask(cwd, "写文档", "读完能上手");
+  deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" });
   assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档").status, 0);
   const want = due(cwd);
   assert.equal(want.kind, "period", "段都关了：轮到这一期的样子");

@@ -1,5 +1,5 @@
 // 一条交付记下的两样东西：它碰过哪些路径、每份那一刻是多少字节。
-// 单条交付（deed task done）与整批交付（deed submit）问的是同一组问题，
+// 一条交付与一批交付（submit 一次记好几条）问的是同一组问题，
 // 所以只写一处：分成两份实现，两边就会各自长出一条规则，日后只改一边。
 import fs from "node:fs";
 import path from "node:path";

@@ -12,7 +12,6 @@ import say from "./verbs/say.mjs";
 import reply from "./verbs/reply.mjs";
 import point from "./verbs/point.mjs";
 import topic from "./verbs/topic.mjs";
-import task from "./verbs/task.mjs";
 import project from "./verbs/project.mjs";
 import plan from "./verbs/plan.mjs";
 import submit from "./verbs/submit.mjs";
@@ -33,7 +32,7 @@ const HELP = [
   "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
 
-const commands = { init, say, reply, point, topic, task, project, check, plan, submit, review, sign, state, serve, panel };
+const commands = { init, say, reply, point, topic, project, check, plan, submit, review, sign, state, serve, panel };
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。
@@ -81,6 +80,9 @@ const MOVED = {
   doctor: 'deed check --ledger',
   gate: 'deed check --gates',
   ask: '待裁这个概念不用了：讨论里的要点用 deed point "…"，要人确认的用议题两次按钮（deed topic + 面板）',
+  // 条目不再是动词：加一条就是往 .deed/plan.md 里写一行，deed submit 一次记账；
+  // 撤回与放弃也写在清单里（取消勾选 = 撤回，划掉并写理由 = 放弃）。
+  task: "写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由",
 };
 const command = commands[verb];
 if (!command && MOVED[verb]) {
