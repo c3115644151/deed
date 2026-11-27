@@ -337,3 +337,32 @@ test("a refusal leaves no ledger line, and one line where the numbers are counte
   assert.match(refusedRow[0].at, /^\d{4}-\d{2}-\d{2}T/u, "带时间：看得出是哪一轮");
   assert.equal(log.filter((one) => one.verb === "init" && one.code === 0).length, 1, "退出码 0 的那次也在：统计只列客观量");
 });
+
+// T93：一期的目的是期审与签收的尺子。单段的期只有一次审，不该天天催「还没有」；
+// 多段的期才把它按尺子的名字印出来，缺席也只在真要用的地方说。
+test("the goal line shows up as a ruler only when a period has more than one segment", () => {
+  const cwd = workspace("goal-ruler");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  // 单段、没写目的：不催。
+  addTask(cwd, "只做一条", "跑得通");
+  const one = deed(cwd, "state").stdout;
+  // 旧动词 goal 的指路必须落在"清单第一行"上：help 与拒绝话是同一个说法。
+  const moved = deed(cwd, "goal", "写一句");
+  assert.equal(moved.status, 1);
+  assert.match(moved.stderr, /清单第一行/u, "goal 已并入清单，指路指到那一行");
+  assert.doesNotMatch(one, /目的 · 还没有/, "单段不催目的");
+  assert.doesNotMatch(one, /整期审的尺子/, "单段不把它当尺子");
+  // 单段、写了目的：照常印出来，但不改名字。
+  const plan = readPlan(cwd).replace("（还没写：一句话说清这一期要做成什么）", "只做一件事");
+  writePlan(cwd, plan);
+  assert.equal(deed(cwd, "submit").status, 0);
+  const single = deed(cwd, "state").stdout;
+  assert.match(single, /目的 · 只做一件事/u);
+  assert.doesNotMatch(single, /整期审的尺子/u);
+  // 多段：印成尺子。
+  const more = readPlan(cwd) + "\n## 段\n- [?] 下一段的活\n  标准：跑得通\n";
+  writePlan(cwd, more);
+  assert.equal(deed(cwd, "submit").status, 0);
+  const multi = deed(cwd, "state").stdout;
+  assert.match(multi, /整期审的尺子 · 只做一件事/u, "多段才按尺子的名字印");
+});

@@ -335,11 +335,14 @@ export function printState() {
     console.log(
       "会话 " + open.id + " · 开于 " + stamp0(open.openedAt) + " · " + userTurns(open).length + " 轮 · " + open.segments.length + " 段",
     );
-    // 一期要做成什么：签收拿它当尺子，所以它得在状态里看得见。
+    // 一期要做成什么，是期审与签收的尺子。单段的期只有一次审，那时它只是背景，
+    // 不必天天在状态里催一句「还没有」；多段的期每段之后还要对着它说通不通，
+    // 才把它按尺子的名字印出来。缺席只在它真的要用的地方说，其余时候不吭声。
     const aim = goalOf(open);
-    if (aim) console.log("  目的 · " + aim);
-    else if (open.segments.length > 1)
-      console.log('  目的 · 还没有（写在清单第一行「# 这一期要做成什么」下面，deed submit 记账）：签收拿它当尺子');
+    const multi = open.segments.length > 1;
+    if (aim) console.log("  " + (multi ? "整期审的尺子 · " : "目的 · ") + aim);
+    else if (multi)
+      console.log('  整期审的尺子 · 还没有（写在清单第一行「# 这一期要做成什么」下面，deed submit 记账）：多段的期审与签收拿它当尺子');
     // 手上有两段时（一段等判决、一段在收活）两段都要露脸：只印"当前那一段"，
     // 读者会以为后来的活没地方去。等判决的那一段排在前面说一句，收活的那一段照旧细印。
     const unclosed = open.segments.filter((one) => one.closedAt === null);
