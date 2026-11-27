@@ -11,3 +11,4 @@
 {"at":"2026-11-27T05:59:38.741Z","verb":"say","ok":true,"ms":70,"switches":["--from"],"v":"0.27.0"}
 {"at":"2026-11-27T06:05:49.229Z","verb":"init","code":0,"ms":2,"switches":["--print-agents"],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T06:06:08.703Z","verb":"debug","code":0,"ms":28,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T06:07:50.244Z","verb":"point","code":0,"ms":44,"switches":[],"why":null,"v":"0.27.0"}
