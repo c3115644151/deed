@@ -6,6 +6,7 @@ export const EVENT_KINDS = [
   // 我说的话（原文的另一半）：宿主把 assistant 消息交来，按 mid 认重复。
   "reply",
   "task.add",
+  "task.context",
   "task.done",
   "task.undo",
   "task.defer",
@@ -50,7 +51,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 30;
+export const EVENT_VERSION = 31;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -138,6 +139,21 @@ const need = (ev, field) => {
 
 // Validation is deliberately shallow: it rejects malformed events, not wrong
 // ones. Rules (can this segment be judged?) live in rules.mjs, never here.
+// 任务上下文的三个正式字段。老账本的行没有它们，照旧读；新的行写的时候按这个形状校验。
+// 问题：要消掉的现象（不随实现变）；依据：能点回原文的锚点；前提：标准成立所依赖的概念/命令/版本。
+const contextShape = (ev) => {
+  for (const key of ["problem", "source"]) {
+    // null 表示"这一条没写上下文"——老任务与只写标准的任务都是这个形状。
+    if (ev[key] === undefined || ev[key] === null) continue;
+    if (typeof ev[key] !== "string" || ev[key].trim() === "")
+      throw new Error("task 的 " + key + " 要是非空的一句话");
+  }
+  if (ev.premise !== undefined) {
+    if (!Array.isArray(ev.premise) || ev.premise.some((one) => typeof one !== "string" || one.trim() === ""))
+      throw new Error("task 的 premise 要是非空字符串的数组");
+  }
+};
+
 export function validateEvent(ev, at) {
   need(ev, "k");
   if (!EVENT_KINDS.includes(ev.k)) throw new UnknownKindError(ev.k, ev.w, ev.v);
@@ -190,6 +206,14 @@ export function validateEvent(ev, at) {
       need(ev, "criteria");
       if (ev.order !== undefined && (!Number.isInteger(ev.order) || ev.order < 1))
         throw new Error("task.add 的 order 要是不小于 1 的整数：清单上写 先后：1");
+      contextShape(ev);
+      break;
+    // 给已有任务补上下文：不改标题、标准、状态，只写它要消掉的现象、来源锚点与前提引用。
+    case "task.context":
+      need(ev, "id");
+      if (ev.problem === undefined && ev.source === undefined && ev.premise === undefined)
+        throw new Error("task.context 至少要写一个字段：问题：／依据：／前提：");
+      contextShape(ev);
       break;
     case "task.order":
       need(ev, "id");

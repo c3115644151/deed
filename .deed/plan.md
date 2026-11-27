@@ -4,6 +4,8 @@
 <!-- 这份文件就是这一期的清单：改它，然后 deed submit 一次记账。
      每条任务一行，开头是一个方框：方框里 ? = 新条目、空着 = 还没做、x = 已交付、~ = 不做了。
      方框后面跟着号和标题；改的时候只动方框与下面那几行，别改号和标题。
+     一条任务可带三行上下文：问题：要消掉的现象（不随实现变）；依据：能点回哪一轮/哪条要点的锚点；
+     前提：这条标准依赖的概念、命令、版本——概念一变，读的人据此知道要重新理解。
      勾上就得写一行「交付：」——跑了什么、结果几比几；不做了就得写一行「理由：」。
      注记两行：箭头加「延后：」这一次不做；箭头加「下一段：」送去下一段接着做，不是放弃。
      先后就是你排的行序：上下挪一下再 submit；一次只交一条。 -->
@@ -29,7 +31,13 @@
   标准：面板在「题全关 + 正文非空 + 至少一轮」时显示按钮，其余时候不显示；POST /topic/release 只收 127.0.0.1 且同源，落 {k:"topic.release", by:"user", via:"panel"}；cli/spec.mjs 里没有 topic release 这条，任何 --via 自称都不认；有用例覆盖闸与拒绝
 - [ ] T92 面板的 /events 在对方断开时不把进程带走
   标准：board/serve.mjs 的 /events 有 res.on("error") 与写失败处理；客户端连一次再断开之后进程仍活着（探针记 pid 前后一致）；有用例或可复跑的命令
-<!-- 已完成（34 条）：交过的，往下沉 -->
+<!-- 已完成（35 条）：交过的，往下沉 -->
+- [x] T151 任务条重构：自带问题、依据、前提三个上下文字段
+  问题：老任务只写标题与标准，做法一变标准就悬空，陌生 agent 照旧做法敲会卡住
+  依据：P14 的判断；用户要求任务能让陌生 agent 独立推进
+  前提：deed say、SPEC、事件含义第 31 版
+  标准：task.add 带 problem/source/premise；task.context 可补上下文不改标题标准状态；清单草稿解析与渲染三字段；审查材料与面板显示；core/stale.mjs 机械查过期（只查未做且段开着的任务），deed state 只读提示；老账本照读
+  交付：任务条重构落地：task.add 带问题/依据/前提，新增 task.context 事件（EVENT_VERSION 31、package 0.28.0）；清单解析与渲染三字段、审查材料与面板显示；core/stale.mjs 比对命令面查过期，deed state 只读提示（本期抓到 T88 的 say --topic）；老账本照读；期望：node --test => ℹ pass 247
 - [x] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
   标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
   交付：deed ask answer A1 --decision "…" --by user 落账并关题；deed ask drop A1 --why "…" 关题；ask resolve 与 ask withdraw 两条旧路 exit 1 并指到新名（ask resolve 实测报「已经改成 ask answer A1」）；ask 的开关表里没有 why（给 raise 传 --why 会被拒）；裁定里的「边界：」「弃：」照旧从账本算出来（边界仍 2 条）；事件含义第 26 版：ask.raise 只有 v<26 的旧行才要 why；规则块、README 围栏、AGENTS 尾段三处同一段话已同步；这一份字节上 node --test 217 条（216 过，1 条面板端口用例在并发下红，单跑 test/cli-state1 12/12）（agent）

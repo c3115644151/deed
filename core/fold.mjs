@@ -276,6 +276,11 @@ export function fold(events) {
           id: ev.id,
           title: ev.title,
           criteria: ev.criteria,
+          // 任务自带上下文：陌生 agent 不必猜当初为什么立这条。
+          // 问题：要消掉的现象；依据：能点回原文的锚点；前提：标准成立所依赖的概念/命令/版本。
+          problem: ev.problem ?? null,
+          source: ev.source ?? null,
+          premise: ev.premise ?? [],
           files: ev.files ?? [],
           segment: segment.id,
           createdAt: ev.at,
@@ -293,6 +298,16 @@ export function fold(events) {
           sizes: {},
           deferredWhy: null,
         });
+        break;
+      }
+      // 给已有任务补上下文：这是记录层面的事，不改标题、标准、状态，也不换字节。
+      // 老任务缺的就是这三条——补上之后陌生 agent 才有出处可读。
+      case "task.context": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        if (ev.problem !== undefined) task.problem = ev.problem;
+        if (ev.source !== undefined) task.source = ev.source;
+        if (ev.premise !== undefined) task.premise = ev.premise;
         break;
       }
       case "task.done": {

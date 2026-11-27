@@ -19,13 +19,23 @@ export const HEAD = "# 这一期要做成什么";
 //   - [x] T1 标题    已交付（必须写 交付：）
 //   - [~] T1 标题    不做了（必须写 理由：）
 // 注记只有一种开头：两个空格一个箭头，后面跟一个词——延后 或 下一段。
-const FIELD = /^\s*(?:→\s*)?(标准|交付|理由|延后|下一段|改到下一段)\s*[：:]\s*(.*)$/u;
+const FIELD = /^\s*(?:→\s*)?(标准|问题|依据|前提|交付|理由|延后|下一段|改到下一段)\s*[：:]\s*(.*)$/u;
 const CHECK = /^\s*-\s*\[([ xX~?])\]\s+(?:(T\d+)\s+)?(.*)$/u;
 const LEGACY_FRESH = /^\s*-\s*\?\s+(.*)$/u;
 const LEGACY_DROPPED = /^\s*~~\s*(T\d+)\s*(.*)$/u;
 const HEADING = /^(#{1,6})\s*(.*)$/u;
 
-const fieldOf = (word) => ({ 标准: "criteria", 交付: "claim", 理由: "why", 延后: "later", 下一段: "carry", 改到下一段: "carry" })[word];
+const fieldOf = (word) => ({
+  标准: "criteria",
+  问题: "problem",
+  依据: "source",
+  前提: "premise",
+  交付: "claim",
+  理由: "why",
+  延后: "later",
+  下一段: "carry",
+  改到下一段: "carry",
+})[word];
 
 // What the file says, in the order it says it. Nothing here decides whether the
 // batch is allowed; that is the command's business, and fold has the last word.
@@ -155,6 +165,8 @@ const LEGEND = [
   "<!-- 这份文件就是这一期的清单：改它，然后 deed submit 一次记账。",
   "     每条任务一行，开头是一个方框：方框里 ? = 新条目、空着 = 还没做、x = 已交付、~ = 不做了。",
   "     方框后面跟着号和标题；改的时候只动方框与下面那几行，别改号和标题。",
+  "     一条任务可带三行上下文：问题：要消掉的现象（不随实现变）；依据：能点回哪一轮/哪条要点的锚点；",
+  "     前提：这条标准依赖的概念、命令、版本——概念一变，读的人据此知道要重新理解。",
   "     勾上就得写一行「交付：」——跑了什么、结果几比几；不做了就得写一行「理由：」。",
   "     注记两行：箭头加「延后：」这一次不做；箭头加「下一段：」送去下一段接着做，不是放弃。",
   "     先后就是你排的行序：上下挪一下再 submit；一次只交一条。 -->",
@@ -181,6 +193,9 @@ export function draft(session) {
       out.push("<!-- " + group.label + "（" + group.tasks.length + " 条）" + GROUP_NOTE[group.key] + " -->");
       for (const task of group.tasks) {
         out.push(bullet(task));
+        if (task.problem) out.push("  问题：" + task.problem);
+        if (task.source) out.push("  依据：" + task.source);
+        if (task.premise && task.premise.length > 0) out.push("  前提：" + task.premise.join("、"));
         out.push("  标准：" + task.criteria);
         const last = task.evidence[task.evidence.length - 1];
         if (last) out.push("  交付：" + last.claim);

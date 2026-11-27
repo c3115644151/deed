@@ -11,6 +11,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { digest } from "../core/digest.mjs";
 import { fold, frozenFor } from "../core/fold.mjs";
+import { findStaleTasks } from "../core/stale.mjs";
 import { refused } from "./trace.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
@@ -296,6 +297,10 @@ const REVIEW_LABEL = {
 // 旧账本替人签过名：判决和签收以前默认写 by: "user"，于是 agent 交付、判决、签收
 // 一条龙之后，记录上写着是用户按的。现在名字由通道决定——命令写的行是 agent 做的，
 // 面板按的行是人按的（via:"panel"），没有参数可填，也没有推断。
+// 命令面的纯数据：动词 → 开关名（不带 --）。core/stale 只认这份数据，不认 SPEC 的形状。
+const commandSurface = () =>
+  Object.fromEntries(Object.entries(SPEC).map(([verb, spec]) => [verb, (spec.flags ?? []).slice()]));
+
 export function printState() {
   const { doc, events } = load();
   const config = doc.config;
@@ -364,6 +369,13 @@ export function printState() {
             "  ·  " + task.criteria,
         );
       }
+      // 标准过期：只比对命令面（SPEC 的动词与开关），不猜、不挡动作。
+      // 陌生 agent 看到这一行就知道"这条要先重新理解，别照着旧做法敲"。
+      const surface = commandSurface();
+      const stale = surface ? findStaleTasks(open.tasks, open.segments, surface) : [];
+      for (const one of stale)
+        console.log("    " + one.id + " 的标准提到已经没有的写法：" + one.ref + "（" + one.why + "）——先重新理解这条，别照旧做法敲");
+
       const review = reviewOf(open, shown);
       if (review) {
         console.log("    审查 " + review.id + " · " + review.by + " · " + review.verdict + " · " + stamp0(review.at));
