@@ -234,3 +234,40 @@
 {"at":"2026-11-27T13:19:29.335Z","verb":"submit","code":0,"ms":166,"switches":[],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T13:28:13.032Z","verb":"submit","code":0,"ms":168,"switches":[],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T13:28:32.715Z","verb":"point","code":0,"ms":63,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:30:14.708Z","verb":"state","code":0,"ms":75,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:30:34.645Z","verb":"state","code":0,"ms":85,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:30:53.815Z","verb":"review","code":0,"ms":103,"switches":["--segment"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:32:07.845Z","verb":"review","code":0,"ms":42,"switches":["--due"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:32:08.400Z","verb":"review","code":0,"ms":54,"switches":["--due"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:32:40.043Z","verb":"serve","code":0,"ms":102,"switches":["--port"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:32:40.232Z","verb":"state","code":0,"ms":614,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:35:20.915Z","verb":"reply","code":0,"ms":89,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:36:43.156Z","verb":"ask","code":1,"ms":2,"switches":[],"why":"ask 已经改成 待裁这个概念不用了：讨论里的要点用 deed point \"…\"，要人确认的用议题两次按钮（deed topic + 面板）（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:43.353Z","verb":"tick","code":1,"ms":2,"switches":[],"why":"tick 已经改成 deed say \"…\"（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:43.494Z","verb":"goal","code":1,"ms":2,"switches":[],"why":"goal 已经改成 把目的写在清单第一行（# 这一期要做成什么 下面那一句），deed submit 记账（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:43.634Z","verb":"verify","code":1,"ms":2,"switches":[],"why":"没有这个动作：verify（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:43.784Z","verb":"doctor","code":1,"ms":2,"switches":[],"why":"doctor 已经改成 deed check --ledger（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:43.930Z","verb":"gate","code":1,"ms":1,"switches":[],"why":"gate 已经改成 deed check --gates（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:44.071Z","verb":"task","code":1,"ms":2,"switches":[],"why":"task 已经改成 写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:44.216Z","verb":"seal","code":1,"ms":2,"switches":[],"why":"seal 已经改成 deed review --segment S01.1 --skip --why \"…\"（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:44.355Z","verb":"shelve","code":1,"ms":1,"switches":[],"why":"shelve 已经改成 deed sign --shelve --why \"…\"（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:44.505Z","verb":"judge","code":1,"ms":2,"switches":[],"why":"没有这个动作：judge（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:36:47.558Z","verb":"ask","code":1,"ms":1,"switches":[],"why":"ask 已经改成 待裁这个概念不用了：讨论里的要点用 deed point \"…\"，要人确认的用议题两次按钮（deed topic + 面板）（deed help 看全部）","v":"0.30.0"}
+{"at":"2026-11-27T13:37:19.486Z","verb":"state","code":0,"ms":63,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:39:04.964Z","verb":"check","code":0,"ms":45,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:42:59.021Z","verb":"review","code":0,"ms":72,"switches":["--segment","--verdict","--rework","--why","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding","--finding"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:43:03.797Z","verb":"state","code":0,"ms":71,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:43:11.112Z","verb":"check","code":0,"ms":63,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:43:19.082Z","verb":"check","code":0,"ms":7815,"switches":["--ledger"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:43:19.302Z","verb":"check","code":1,"ms":34,"switches":["--gates"],"why":"这个工作区没有门：先在 .deed/config.json 的 gates 里写上命令（例如 { \"gates\": { \"commit\": [\"npm test\"] } }），再用 deed init --force --why \"加门\" 把它记进账本","v":"0.30.0"}
+{"at":"2026-11-27T13:43:50.174Z","verb":"say","code":1,"ms":2,"switches":[],"why":"这一轮说了什么要写成一句话：deed say \"…\"（没有位置参数时读 stdin）","v":"0.30.0"}
+{"at":"2026-11-27T13:43:50.373Z","verb":"debug","code":0,"ms":18,"switches":["--days"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:48:52.773Z","verb":"review","code":0,"ms":53,"switches":["--due"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:48:53.449Z","verb":"say","code":0,"ms":112,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:51:04.050Z","verb":"state","code":0,"ms":85,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:52:14.338Z","verb":"state","code":0,"ms":97,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:52:35.107Z","verb":"reply","code":0,"ms":113,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:53:21.756Z","verb":"review","code":0,"ms":39,"switches":["--due"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T14:08:34.668Z","verb":"state","code":0,"ms":162,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T14:08:35.099Z","verb":"plan","code":1,"ms":85,"switches":[],"why":"清单已经在 .deed/plan.md：直接改它，改完 deed submit（记账之后这份会按账本重画一遍）","v":"0.30.0"}
+{"at":"2026-11-27T14:08:56.864Z","verb":"plan","code":1,"ms":40,"switches":[],"why":"清单已经在 .deed/plan.md：直接改它，改完 deed submit（记账之后这份会按账本重画一遍）","v":"0.30.0"}

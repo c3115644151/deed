@@ -73,7 +73,12 @@ export function parse(text) {
       if (where === "segment") {
         section += 1;
         // 节头写的是哪一段：写了 S02.21 就落那一段；空着的节 submit 领一个新号。
-        sections.push({ index: section, title: heading[2].replace(/^段\s*/u, "").trim() });
+        // 括号里那句是给人看的说明（草稿自己就写着「下一段（…）」，说这一段还收不收活）：
+        // 它是注记，不是段名。把括号剥掉，空标题的节才真的是「领一个新号」。
+        sections.push({
+          index: section,
+          title: heading[2].replace(/^段\s*/u, "").replace(/（[^）]*）\s*$/u, "").trim(),
+        });
         started = true;
       }
       continue;
@@ -205,10 +210,10 @@ export function draft(session) {
   }
   // 新条目落在哪一段：正在等结论/等判决的段不再收新东西，那时 ? 落到下一段。
   const last = open.at(-1) ?? null;
-  if (!last) out.push("## 下一段（这一段的活都结束了：写在这里的 ? 会开下一段）", "");
+  if (!last) out.push("## （这一段的活都结束了：写在这里的 ? 会开下一段）", "");
   else if (awaitingVerdict(session, last))
-    out.push("## 下一段（" + last.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）", "");
+    out.push("## （" + last.id + " 在等结论，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）", "");
   else if (awaitingJudgement(session, last))
-    out.push("## 下一段（" + last.id + " 审查通过了、等你判决，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）", "");
+    out.push("## （" + last.id + " 审查通过了、等你判决，它不再收新条目：写在这里的 ? 落到下一段，submit 时才领号）", "");
   return out.join("\n");
 }

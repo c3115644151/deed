@@ -108,7 +108,7 @@ export const addTask = (cwd, title, criteria, opts = {}) => {
   const fresh = freshPlan(cwd);
   if (fresh.status !== 0) return fresh;
   let lines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const placeholder = lines.findIndex((one) => one.startsWith("## 下一段"));
+  const placeholder = lines.findIndex((one) => /^## （/u.test(one));
   if (placeholder >= 0) lines = lines.slice(0, placeholder);
   while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
   lines.push("", "- ? " + title, "  标准：" + criteria);

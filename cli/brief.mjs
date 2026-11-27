@@ -4,12 +4,11 @@ import { tasksIn } from "../core/rules.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 
-// 审查清单是唯一落到账本外、又要交给别人的文件：它要先算好文件名与
-// sha256（plan），再在账本收下这条事实时才写盘（write）。中间失败，
-// 磁盘上什么也不留。
+// 审查清单是唯一落到账本外、又要交给别人的文件：先算好文件名（plan），
+// 再在账本收下这条事实时才写盘（write）。中间失败，磁盘上什么也不留。
 
-// 角色包：清单说"审什么"，这一份说"怎么审"。它和清单一起交出去，也一起
-// 记下 sha256——换掉其中任何一份，结论就落不下来。
+// 角色包：清单说"审什么"，这一份说"怎么审"。两份一起交出去，账本里记着
+// 它们各自的路径与生成时刻——换掉其中任何一份，落结论时会看出来。
 function guideText(subject, target, briefName, scratch, nth = 1) {
   const verdict = "deed review --segment " + target;
   return [
@@ -80,7 +79,7 @@ function guideText(subject, target, briefName, scratch, nth = 1) {
     "每条结论与发现都要配复现路径：命令加实际输出，或 文件:行。没有复现路径的发现，",
     "读的人只能重做一遍才知道你说得对不对。",
     "",
-    "这份角色包和清单一起记进了账本（review.brief + 两份 sha256）：改其中任何一份，结论都落不下来。",
+    "这份角色包和清单一起记进了账本（review.brief）：改了其中任何一份，落结论时会看出来。",
     "",
   ].join("\n");
 }
@@ -188,7 +187,7 @@ export function planBrief(root, open, segment, at) {
     "3. 每条标准给一个判定，落结论时逐条写：--result T1=met --result T2=unmet；pass 要求这一段每条都有判定。",
     "4. 结论落盘：deed review --segment " + segment.id + " --verdict pass|fail --finding \"<不合格的那几条>\"",
     "",
-    "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
+    "这份文件已经记进账本（review.brief）：改了它再落结论会被拒。",
     "",
   ].join("\n");
   const base = (n) => path.join(p.review, segment.id + "-" + fileStamp(at) + (n === 1 ? "" : "-" + n));
@@ -297,7 +296,7 @@ export function planWhole(root, session, at) {
     "2. 看各段之间说不说得通：同一件事两种做法、两套说法、后一段推翻前一段的前提。",
     "3. 结论：deed review --all --verdict pass|fail；不合格点名段号 --rework S02.7。",
     "",
-    "这份文件已经记进账本（review.brief + sha256）：改了它再落结论会被拒。",
+    "这份文件已经记进账本（review.brief）：改了它再落结论会被拒。",
     "",
   ].join("\n");
   const base = (n) => path.join(p.review, session.id + "-period-" + fileStamp(at) + (n === 1 ? "" : "-" + n));

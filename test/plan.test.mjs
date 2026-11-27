@@ -109,17 +109,17 @@ test("the draft shows where a new entry will land when the open segment is waiti
     ...base,
     briefs: [{ scope: "segment", segment: "S01.1", answeredBy: null }],
   });
-  assert.match(waiting, /## 下一段（S01\.1 在等结论，它不再收新条目：写在这里的 \? 落到下一段，submit 时才领号）/);
+  assert.match(waiting, /## （S01\.1 在等结论，它不再收新条目：写在这里的 \? 落到下一段，submit 时才领号）/u, "占位节的名字是空的，括号里只是说明");
   assert.deepEqual(parse(waiting).problems, [], "多出来的那一节不该让清单读不懂");
 
   const settled = draft({
     ...base,
     briefs: [{ scope: "segment", segment: "S01.1", answeredBy: "R1" }],
   });
-  assert.doesNotMatch(settled, /## 下一段/, "这一段收得了活，就没有下一段可指");
+  assert.doesNotMatch(settled, /## （/u, "这一段收得了活，就没有下一段可指");
 
   const shut = draft({ ...base, segments: [{ id: "S01.1", closedAt: "2026-11-24T00:00:00.000Z" }], briefs: [] });
-  assert.match(shut, /## 下一段（这一段的活都结束了：写在这里的 \? 会开下一段）/);
+  assert.match(shut, /## （这一段的活都结束了：写在这里的 \? 会开下一段）/u);
 });
 
 // 节头说"这是哪一段"：写了段号的对上那一段，没写的节 submit 领号。

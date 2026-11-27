@@ -346,15 +346,24 @@ export function printState() {
     // 手上有两段时（一段等判决、一段在收活）两段都要露脸：只印"当前那一段"，
     // 读者会以为后来的活没地方去。等判决的那一段排在前面说一句，收活的那一段照旧细印。
     const unclosed = open.segments.filter((one) => one.closedAt === null);
-    const taking = unclosed.filter((one) => one.verdict !== "pass").at(-1) ?? null;
-    for (const other of unclosed.filter((one) => one !== taking)) {
+    // 收活的是「排进来、没计划在后面」的那一段（core/rules.mjs 的 takingSegment）：
+    // 按 verdict 猜会把排好的下一段当成正在收活的那一段，读的人以为活该落在还没轮到的地方。
+    const taking = unclosed.filter((one) => one.plannedAt === null && one.verdict !== "pass").at(-1) ?? null;
+    const shown = taking ?? seg ?? open.segments[open.segments.length - 1];
+    // 一段只印一遍：shown 之外的段才走这一句概述（从前每段按 verdict 猜标签，
+    // 同一个等判决的段会既当概述又当正文，印两遍）。
+    for (const other of unclosed.filter((one) => one !== shown)) {
       const c = countIn(open, other);
-      const label = other.verdict === "pass" ? "审查通过、等你判决" : "还没轮到、只记条目";
+      const label =
+        other.plannedAt !== null
+          ? "还没轮到、只记条目"
+          : other.verdict === "pass"
+            ? "审查通过、等你判决"
+            : "清单发出去、等结论";
       console.log(
         "  段 " + other.id + " · " + label + " · " + c.total + " 条（未做 " + c.todo + " · 已交付 " + (c.done + c.accepted) + "）",
       );
     }
-    const shown = taking ?? seg ?? open.segments[open.segments.length - 1];
     if (!shown) {
       console.log("  还没有段：范围说完就写第一条任务");
     } else {

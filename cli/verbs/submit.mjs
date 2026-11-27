@@ -247,11 +247,27 @@ export default function submit(argv) {
                 fail("清单里写的 ## 段 " + title + " 账本里没有：新的一段写成空标题的 ## 段，submit 时领号");
               const home = one.segments.find((seg) => seg.id === title);
               if (home.closedAt !== null) fail("段 " + title + " 已经关闭：新条目进不去，另开一段写");
+              // 在审（或等判决）的那一段不收新条目：审查者手上那份清单还没答完，
+              // 清单又长出一条，他答的是哪一份就成了糊涂账。
+              if (frozenFor(one, title, EVENT_VERSION))
+                fail(
+                  title + " 的清单已经发出去（" +
+                    (home.verdict === "pass" ? "审查通过、等你判决" : "还没人回答") +
+                    "）：它不再收新条目——新的一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段",
+                );
               id = title;
             } else if (take && ![...bySection.values()].includes(take.id)) {
               // 空标题的第一节就是现在收活的那一段：草稿里它本来写着段号，
               // 手写一份没写号时按"手上那一段"理解，不然一条活都落不下去。
               // 前面已经认领过它的话，再一个空节就是新的一段。
+              // 手上这一段在审（或等判决）就不收新条目：那时候的活该开下一段，
+              // 否则审查者手上那份清单还没答完，它上面就又长出一条。
+              if (frozenFor(one, take.id, EVENT_VERSION))
+                fail(
+                  take.id + " 的清单已经发出去（" +
+                    (take.verdict === "pass" ? "审查通过、等你判决" : "还没人回答") +
+                    "）：它不再收新条目——新的一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段",
+                );
               id = take.id;
             } else {
               topNumber += 1;

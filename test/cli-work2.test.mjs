@@ -288,21 +288,20 @@ test("a delivery that says what it will show has to show it when the ledger is w
   assert.doesNotMatch(brief, /只是说法/);
 
   // 说得出现象却跑不出来：记账前就拒
-  addTask(cwd, "再写一句", "印 bye");
+  // 这一段已经在审：新的一条开下一段（在审的段不收新条目），这与真实用法一致。
+  freshPlan(cwd);
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/\s*$/u, "") + "\n\n## 段\n- ? 再写一句\n  标准：印 bye\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0, "新的一条开到下一段");
   freshPlan(cwd);
   const next = fs
     .readFileSync(file, "utf8")
-    .replace(/- \[ \] T2 (.*)\n/, "- [x] T2 $1\n  交付：说 bye 就印 bye；期望：node say.mjs => bye\n");
+    .replace(/- \[ \] (T\d+) (.*)\n/, "- [x] $1 $2\n  交付：说 bye 就印 bye；期望：node say.mjs => bye\n");
   fs.writeFileSync(file, next, "utf8");
   const bad = deed(cwd, "submit");
   assert.equal(bad.status, 1);
-  assert.match(bad.stderr, /T2 的期望没跑出来：命令「node say.mjs」要看到「bye」/);
+  assert.match(bad.stderr, /的期望没跑出来：命令「node say.mjs」要看到「bye」/);
+
 });
-
-
-
-
-
 
 // 放弃错了只有新开一条，账本里的错口径就永远挂着；撤回一条放弃是一条新事实，
 // 撤回来它就回到未做，同一批再勾上就是重新交付。
@@ -450,3 +449,53 @@ test("the plan can line up several segments, and only the first takes work", () 
   assert.equal(deliverTask(cwd, "T2", "轮到它了").status, 0);
 });
 
+// 草稿自己印的占位节要能用：照它写的「## 下一段（…）」底下加一条，submit 就该开一段，
+// 不能回「账本里没有这个段名」——那种话读的人只能猜是自己写错了。
+test("the draft's own next-section heading takes a new item", () => {
+  const cwd = workspace("draft-placeholder");
+  deed(cwd, "init", "--said", "开始");
+  assert.equal(deed(cwd, "plan").status, 0);
+  const file = path.join(cwd, ".deed", "plan.md");
+  const text = fs.readFileSync(file, "utf8");
+  assert.match(text, /^## （/mu, "新工作区的草稿带着这一节");
+  fs.writeFileSync(file, text.replace(/\s*$/u, "") + "\n" + "- ? 照草稿写的第一条\n  标准：在账本里\n", "utf8");
+  const out = deed(cwd, "submit");
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  const doc = fold(readEvents(cwd));
+  const one = doc.sessions[0];
+  assert.equal(one.segments.length, 1, "照草稿写的那一条落在新开的一段里");
+  assert.equal(one.tasks[0].segment, one.segments[0].id);
+});
+
+// 在审（或等判决）的那一段不再收新条目：审查者手上那份清单还没答完，它上面又多一条，
+// 他答的是哪一份就成了糊涂账。新的一条要另起一节，submit 时开下一段。
+test("a segment waiting for its verdict takes no new items", () => {
+  const cwd = workspace("frozen-takes-no-items");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  addTask(cwd, "先交的这一条", "跑得通");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单发出去了，这一段在审");
+
+  {
+    const file = path.join(cwd, ".deed", "plan.md");
+    const lines = fs.readFileSync(file, "utf8").replace(/\s*$/u, "").split("\n");
+    // 写进手上那一段：应当拒，并指出去写一个新的空标题节。
+    const plain = lines.slice();
+    plain.push("", "- ? 在审时加的一条", "  标准：不该落进来");
+    fs.writeFileSync(file, plain.join("\n") + "\n", "utf8");
+    const refused = deed(cwd, "submit");
+    assert.equal(refused.status, 1, "在审的段不收新条目");
+    assert.match(refused.stderr, /不再收新条目/u);
+    assert.match(refused.stderr, /空标题/u, "要说出路");
+    // 另起一节：这一段不重画，直接追加一节，submit 领一个新段。
+    const fresh = lines.slice();
+    fresh.push("", "## 段", "- ? 在审时加的一条", "  标准：落到下一段");
+    fs.writeFileSync(file, fresh.join("\n") + "\n", "utf8");
+    const landed = deed(cwd, "submit");
+    assert.equal(landed.status, 0, landed.stdout + landed.stderr);
+    const doc = fold(readEvents(cwd));
+    const one = doc.sessions[0];
+    const added = one.tasks.find((t) => t.title === "在审时加的一条");
+    assert.equal(added.segment, "S01.2", "新的一条落在下一段，不挤进在审的那一段");
+  }
+});
