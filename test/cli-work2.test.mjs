@@ -499,3 +499,35 @@ test("a segment waiting for its verdict takes no new items", () => {
     assert.equal(added.segment, "S01.2", "新的一条落在下一段，不挤进在审的那一段");
   }
 });
+
+// 标准不是想改就改：只有它引用的命令与开关今天已经不在命令面上（照它敲只会撞上
+// 「不认这个开关」）时才收，且要写清为什么。其余时候照旧拒。
+test("a criteria that still names live commands is not rewritten through the plan", () => {
+  const cwd = workspace("criteria-stale-only");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "看一眼", "deed state 印得出下一步");
+  const file = path.join(cwd, ".deed", "plan.md");
+  // 手上的命令都还在：标准不能改。
+  const live = fs.readFileSync(file, "utf8").replace(/标准：.*\n/u, "标准：说成一句话就落一行\n  理由：想换个说法\n");
+  fs.writeFileSync(file, live, "utf8");
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1, "命令都还在，标准不能改");
+  assert.match(refused.stderr, /今天都还在/u);
+
+  // 标准写的是已经删掉的命令：可以改正，但要说清为什么。
+  addTask(cwd, "另一条", "deed ask answer A1 --decision 说定了");
+  const staleFile = fs.readFileSync(file, "utf8")
+    .replace(/标准：deed ask[^\n]*\n/u, "标准：说成一句话就落一行\n")
+    .replace(/- \[ \] (T\d+) 另一条\n\s*标准：说成一句话就落一行\n/u, "- [ ] $1 另一条\n  标准：说成一句话就落一行\n");
+  fs.writeFileSync(file, staleFile, "utf8");
+  const noWhy = deed(cwd, "submit");
+  assert.equal(noWhy.status, 1, "改了标准却没有理由");
+  assert.match(noWhy.stderr, /理由/u);
+
+  fs.writeFileSync(file, staleFile.replace("标准：说成一句话就落一行\n", "标准：说成一句话就落一行\n  理由：ask 已经删了\n"), "utf8");
+  const accepted = deed(cwd, "submit");
+  assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+  assert.match(accepted.stdout, /改正标准 · T2/u);
+  const doc = fold(readEvents(cwd));
+  assert.equal(doc.sessions[0].tasks.find((one) => one.id === "T2").criteria, "说成一句话就落一行");
+});

@@ -322,6 +322,14 @@ export function fold(events) {
         task.title = ev.title;
         break;
       }
+      // 标准改正：标准里写的命令已经不在命令面上时，把它改成今天说得通的那句话。
+      // 旧标准留在历史里；做没做完仍由状态回答，这一行不碰状态。
+      case "task.criteria": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        task.criteria = ev.criteria;
+        break;
+      }
       case "task.done": {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);

@@ -8,6 +8,7 @@ export const EVENT_KINDS = [
   "task.add",
   "task.context",
   "task.title",
+  "task.criteria",
   "task.done",
   "task.undo",
   "task.defer",
@@ -52,7 +53,7 @@ export const WHO = ["user"];
 // 或者改变已有字段的含义，就把这个数 +1（同时升 package.json 的 minor）。
 // 这样"账本比程序新"能被证明，而不是靠猜：读不动的行带着一个比自己更新的 v，
 // 就是账本新；v 不超前才可能是这一行被手写或被改过。
-export const EVENT_VERSION = 33;
+export const EVENT_VERSION = 34;
 
 // 事件含义里"从第几版起"的规矩只写在这一处：要判读旧行的人问 MEANING，
 // 不要再在业务分支里写裸数字——写散的数字没人能一次看全，改一版就漏一处。
@@ -215,6 +216,15 @@ export function validateEvent(ev, at) {
     case "task.title":
       need(ev, "id");
       need(ev, "title");
+      break;
+    // 标准改正：只在标准已经与今天的命令面对不上时（写的是已经删掉的动词或开关）才收，
+    // 并且要写清为什么。它改的是"怎么算做完"那句话，不是把没做的事说成做了。
+    case "task.criteria":
+      need(ev, "id");
+      need(ev, "criteria");
+      need(ev, "why");
+      if (typeof ev.criteria !== "string" || ev.criteria.trim() === "")
+        throw new Error("task.criteria 要把标准写成一句话");
       break;
     case "task.order":
       need(ev, "id");

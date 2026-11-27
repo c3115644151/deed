@@ -93,3 +93,12 @@ test("staleness is measured only for open undone tasks, against the given surfac
   assert.match(stale[0].ref, /say --topic/u);
   assert.deepEqual(findStaleTasks(tasks, segments, null), [], "没有命令面就不猜");
 });
+
+test("a criteria that names a command the surface no longer has can be corrected", () => {
+  const add = validateEvent({ ...base, k: "task.add", id: "T1", title: "一件事", criteria: "deed ask answer A1 --decision 说定了" });
+  const fix = validateEvent({ ...base, at: "2026-11-27T04:00:00.000Z", k: "task.criteria", id: "T1", criteria: "说成一句话就落一行", why: "ask 已经删了" });
+  const t = fold([turn, add, fix]).sessions[0].tasks[0];
+  assert.equal(t.criteria, "说成一句话就落一行");
+  assert.equal(t.status, "todo", "改标准不改状态");
+  assert.throws(() => validateEvent({ ...base, k: "task.criteria", id: "T1", criteria: "x" }), /为什么|why/u);
+});

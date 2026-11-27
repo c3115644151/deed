@@ -298,7 +298,7 @@ const REVIEW_LABEL = {
 // 一条龙之后，记录上写着是用户按的。现在名字由通道决定——命令写的行是 agent 做的，
 // 面板按的行是人按的（via:"panel"），没有参数可填，也没有推断。
 // 命令面的纯数据：动词 → 开关名（不带 --）。core/stale 只认这份数据，不认 SPEC 的形状。
-const commandSurface = () =>
+export const commandSurface = () =>
   Object.fromEntries(Object.entries(SPEC).map(([verb, spec]) => [verb, (spec.flags ?? []).slice()]));
 
 export function printState() {

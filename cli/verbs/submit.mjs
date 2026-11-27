@@ -7,7 +7,8 @@ import { weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { EVENT_VERSION } from "../../core/events.mjs";
 import { frozenFor } from "../../core/fold.mjs";
-import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
+import { findStaleTasks } from "../../core/stale.mjs";
+import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf, commandSurface } from "../session.mjs";
 
 
 // 数由工具采。node --test 两种输出（TAP 的 # tests 与默认的 ℹ tests）都认；
@@ -346,8 +347,22 @@ export default function submit(argv) {
             const home = one.segments.find((seg) => seg.id === task.segment);
             const wanted = home && home.closedAt === null ? (planOf.get(task.segment)?.assigned.get(item.id) ?? null) : null;
             if (wanted !== null && wanted !== (task.order ?? null)) specs.push({ k: "task.order", s: one.id, id: item.id, order: wanted });
-            if (item.criteria && item.criteria !== task.criteria)
-              fail(item.id + " 的标准和账本不一样：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做");
+            if (item.criteria && item.criteria !== task.criteria) {
+              // 标准能改的只有一种情形：它已经与今天的命令面对不上（写的是删掉的动词或开关）。
+              // 那时照它敲只会撞上「不认这个开关」，还不知道该怀疑标准本身——改成今天说得通的
+              // 那句话，并写清为什么。其余时候标准仍不改：做法变了就新开一条，把旧的说不做。
+              const gone = findStaleTasks([task], one.segments, commandSurface()).filter((one) => one.id === task.id);
+              if (gone.length === 0)
+                fail(
+                  item.id +
+                    " 的标准和账本不一样，但它引用的命令与开关今天都还在：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做",
+                );
+              if (!item.why)
+                fail(
+                  item.id + " 要改正标准（" + gone.map((one) => one.ref).join("、") + " 已经不在命令面上），但没有写一行 理由：——改一句话也得说清为什么",
+                );
+              specs.push({ k: "task.criteria", s: one.id, id: item.id, criteria: item.criteria, why: item.why });
+            }
             // 依据是能补的：写清出处，落一条 task.context，不动标题/标准/状态。
             // 这正是"事后给老任务补上下文"的正路——不必伪造工作区改动，也不改写历史。
             const context = {};
@@ -511,6 +526,7 @@ export default function submit(argv) {
           );
         if (ev.k === "task.context") console.log("补依据 · " + ev.id);
         if (ev.k === "task.title") console.log("改标题 · " + ev.id + " · " + ev.title);
+        if (ev.k === "task.criteria") console.log("改正标准 · " + ev.id + " · " + ev.why);
         if (ev.k === "task.done") console.log("交付 · " + ev.id + " · " + ev.evidence);
         if (ev.k === "task.undo") {
           const walked = after.tasks.find((t) => t.id === ev.id)?.revived?.some((one) => one.at === ev.at);
