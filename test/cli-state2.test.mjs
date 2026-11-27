@@ -337,3 +337,24 @@ test("a broken ledger turns the first check red and says where to look", () => {
   assert.match(run.stdout, /deed check --ledger/u);
   assert.match(run.stdout, /先处理那一行/u);
 });
+
+// 不合格点名的条目全被放弃之后：没有活可重交，但也没有清单可以判——
+// 下一步是先出一份新清单（接了钩子由系统出），不是直接落 pass。
+test("a fail whose named work was given up asks for a new brief, not a verdict", () => {
+  const cwd = workspace("fail-all-dropped");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  addTask(cwd, "一", "跑得通");
+  addTask(cwd, "二", "跑得通");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
+  assert.equal(deliverTask(cwd, "T2", "跑：跑得通").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1,T2", "--why", "没做到").status,
+    0,
+  );
+  dropTask(cwd, "T1", "改主意了");
+  dropTask(cwd, "T2", "改主意了");
+  const out = deed(cwd, "state").stdout;
+  assert.match(out, /下一步 · system · 出清单/u, "先出一份新清单：" + out.split("下一步")[1]?.slice(0, 120));
+  assert.match(out, /deed review --segment S01\.1/u);
+});

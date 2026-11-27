@@ -660,19 +660,24 @@ export function nextAction(doc, config) {
         text: `${segment.id} 的不合格（${review.by}）没有点名要重做的条目：没有可结清的东西，这一期到此为止——开新一期把要补的记进去`,
         command: 'deed say "开新一期，把要补的记进去"',
       };
-    // 点名的条目改主意不做了：没有活可以重交，放行落下来会把它记为放弃并留下理由。
+    // 点名的条目改主意不做了：没有活可以重交——但那也要有一份新清单去判"放弃算不算结清"，
+    // 旧的已作废，pass 落不下来。出清单这件事归系统（接了钩子的工作区在下一轮开头出），
+    // 没接钩子的人敲同一句命令。
     const gave = named.filter((one) => one.status === "dropped");
     if (gave.length > 0)
       return {
-        who: "reviewer",
-        what: "落结论",
-        text: `${segment.id} 的不合格（${review.by}）点名了 ${gave.map((one) => one.id).join("、")}，它们改主意不做了：没有活可以重交，放行会把放弃与理由记进账本`,
-        command: `deed review --segment ${segment.id} --verdict pass`,
+        who: "system",
+        what: "出清单",
+        text:
+          `${segment.id} 的不合格（${review.by}）点名了 ${gave.map((one) => one.id).join("、")}，它们改主意不做了：` +
+          "要一份新清单去判放弃算不算结清（接了钩子的工作区由系统在下一轮开头出，不再手敲）",
+        command: `deed review --segment ${segment.id}`,
       };
     return {
-      who: "reviewer",
-      what: "重审",
-      text: `${segment.id} 的不合格（${review.by}）还在案，被点名的已经重新交付：另出一份清单再审`,
+      who: "system",
+      what: "出清单",
+      text: `${segment.id} 的不合格（${review.by}）还在案，被点名的已经重新交付或放弃：` +
+        "旧清单已作废，要一份新的去判（接了钩子由系统在下一轮开头出，没钩子就敲这一句）",
       command: `deed review --segment ${segment.id}`,
     };
   }

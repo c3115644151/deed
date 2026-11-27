@@ -289,3 +289,25 @@
 {"at":"2026-11-27T14:42:54.716Z","verb":"say","code":0,"ms":98,"switches":["--from"],"why":null,"v":"0.31.0"}
 {"at":"2026-11-27T14:42:59.844Z","verb":"serve","code":0,"ms":64,"switches":["--port"],"why":null,"v":"0.31.0"}
 {"at":"2026-11-27T14:46:07.146Z","verb":"state","code":0,"ms":214,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:48:28.607Z","verb":"submit","code":0,"ms":165,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:49:03.942Z","verb":"submit","code":0,"ms":430,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:49:44.765Z","verb":"submit","code":0,"ms":19255,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:49:45.155Z","verb":"judge","code":1,"ms":2,"switches":["--overturn"],"why":"judge 已经改成 推翻结论在面板上按（判决、签收、议题出口也都只在面板上）；命令行没有这条路（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T14:49:45.350Z","verb":"submit","code":0,"ms":410,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:50:13.574Z","verb":"submit","code":0,"ms":27979,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:50:31.995Z","verb":"submit","code":1,"ms":18249,"switches":[],"why":"T133 的期望没跑出来：命令「node --test test/cli-review1.test.mjs」要看到「a segment the gate says not to review」，实际是「✔ delivery needs evidence, and the reviewer decides what counts (1645.365ms) / ✔ the last segment closed is not the end: the period judgeme","v":"0.31.0"}
+{"at":"2026-11-27T14:50:58.528Z","verb":"submit","code":0,"ms":390,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:51:12.998Z","verb":"verify","code":1,"ms":4,"switches":[],"why":"verify 已经改成 deed check --ledger（账本能否重放）；交付记录不比对字节，那是历史（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T14:51:13.158Z","verb":"submit","code":0,"ms":429,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:51:43.792Z","verb":"submit","code":1,"ms":13571,"switches":[],"why":"T114 的期望没跑出来：命令「node --test test/cli-work1.test.mjs」要看到「记账之后核对」，实际是「✔ an entry needs a standard of done, and the plan says so instead of recording it (393.5661ms) / ✔ a fail sends the named work back, so a pass cannot land until it is deliv","v":"0.31.0"}
+{"at":"2026-11-27T14:51:56.817Z","verb":"submit","code":0,"ms":245,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:52:36.441Z","verb":"submit","code":0,"ms":18460,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:52:36.875Z","verb":"check","code":0,"ms":58,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:52:36.980Z","verb":"submit","code":0,"ms":371,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:52:49.640Z","verb":"submit","code":0,"ms":174,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:53:03.026Z","verb":"state","code":0,"ms":66,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:53:20.857Z","verb":"review","code":0,"ms":45,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:53:35.356Z","verb":"state","code":0,"ms":71,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:55:31.549Z","verb":"state","code":0,"ms":81,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:57:10.085Z","verb":"point","code":0,"ms":181,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:57:19.074Z","verb":"serve","code":0,"ms":143,"switches":["--port"],"why":null,"v":"0.31.0"}
