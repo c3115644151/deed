@@ -330,10 +330,10 @@ test("a refusal leaves no ledger line, and one line where the numbers are counte
     .readdirSync(dir)
     .flatMap((one) => fs.readFileSync(path.join(dir, one), "utf8").trim().split("\n").filter(Boolean))
     .map((one) => JSON.parse(one));
-  const refusedRow = log.filter((one) => one.ok === false);
+  const refusedRow = log.filter((one) => one.code === 1);
   assert.equal(refusedRow.length, 1, "被记下的失败只有那一次");
   assert.equal(refusedRow[0].verb, "submit");
   assert.match(refusedRow[0].why, /还没有清单：先 deed plan/u, "记下的是那句拒绝，原话");
   assert.match(refusedRow[0].at, /^\d{4}-\d{2}-\d{2}T/u, "带时间：看得出是哪一轮");
-  assert.equal(log.filter((one) => one.verb === "init").length, 1, "成功的那次也在：统计要两边都有");
+  assert.equal(log.filter((one) => one.verb === "init" && one.code === 0).length, 1, "退出码 0 的那次也在：统计只列客观量");
 });

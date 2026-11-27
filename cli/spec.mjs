@@ -89,7 +89,7 @@ export const SPEC = {
     flags: ["days", "json"],
     booleans: ["json"],
     usage: [
-      "deed debug [--days 30] [--json]   命令面自己怎么被用：从没敲过的、敲了就失败的、没人用的开关",
+      "deed debug [--days 30] [--json]   打印命令调用量：退出码、耗时、开关次数、窗口内没出现的动词与开关",
       "                  读的是 .deed/debug/*.jsonl（一次调用一行，不进账本、不进版本库）",
     ],
   },

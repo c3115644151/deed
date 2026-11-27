@@ -1,11 +1,8 @@
-// trace: how the command surface actually gets used.
+// trace: how the command surface was actually invoked.
 //
-// 它不是账本。账本记的是工作区发生过的事实，一个被拒的动作在那里是零字节；
-// 而"这个面好不好用"只有数能回答：哪些动词从没被敲过（伪需求的候选）、
-// 哪些敲了就失败（提示或设计有缺陷）、哪些开关一次都没出现过（死开关）。
-//
-// 所以这里记的是**程序自己**的事，落在 .deed/debug/，按月分文件、只追加、
-// 不进版本库、不进方案快照。它没有任何一条会改变账本，也不会因为读不动账本而停摆。
+// 这里只记程序自己的量：时间、动词、退出码、耗时、开关名、程序打出的那句话。
+// 不写解释、不写建议、不写判断。账本记工作区发生过的事实；这里记命令被调用过的事实。
+// 落在 .deed/debug/，按月分文件、只追加、不进版本库、不进方案快照。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -15,7 +12,9 @@ const DIR = "debug";
 
 const fileOf = (root, at) => path.join(root, DEED, DIR, at.slice(0, 7) + ".jsonl");
 
-// 一次调用一行。写不进去就算了，: 观察用的东西不该挡住一条正常命令。
+// 一次调用一行，只记能复核的量：时间、动词、退出码、耗时、用过的开关名、程序自己打出的那句话。
+// 不写"成没成"这种解释——退出码是客观的，"ok" 是我在替读它的人下结论。
+// 写不进去就算了：观察用的东西不该挡住一条正常命令。
 export const trace = (root, entry) => {
   try {
     // 还没有 .deed 的地方（空目录、别人的仓库、只问一句 --print-agents）：
@@ -87,10 +86,12 @@ export function byVerb(rows) {
   for (const row of rows) {
     const key = row.verb ?? "";
     if (!seen.has(key))
-      seen.set(key, { verb: key, calls: 0, ok: 0, fail: 0, ms: [], whys: new Map(), switches: new Map(), last: null });
+      seen.set(key, { verb: key, calls: 0, ok: 0, fail: 0, codes: new Map(), ms: [], whys: new Map(), switches: new Map(), last: null });
     const one = seen.get(key);
     one.calls += 1;
-    if (row.ok) one.ok += 1;
+    const code = typeof row.code === "number" ? row.code : null;
+    one.codes.set(code, (one.codes.get(code) ?? 0) + 1);
+    if (code === 0) one.ok += 1;
     else one.fail += 1;
     if (typeof row.ms === "number") one.ms.push(row.ms);
     if (row.why) one.whys.set(row.why, (one.whys.get(row.why) ?? 0) + 1);
@@ -105,6 +106,7 @@ export function byVerb(rows) {
       calls: one.calls,
       ok: one.ok,
       fail: one.fail,
+      codes: [...one.codes.entries()].sort((a, b) => (a[0] ?? -1) - (b[0] ?? -1)).map(([code, n]) => ({ code, n })),
       rate: one.calls === 0 ? 0 : one.fail / one.calls,
       p50: pick(ms, 0.5),
       p95: pick(ms, 0.95),

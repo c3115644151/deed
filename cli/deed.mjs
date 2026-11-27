@@ -87,16 +87,16 @@ const MOVED = {
   // 撤回与放弃也写在清单里（取消勾选 = 撤回，划掉并写理由 = 放弃）。
   task: "写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由",
 };
-// 一处记账：动词、成没成、花了多久、用过的开关名（不含值）、被拒时的那一句。
+// 一处记一行：时间、动词、退出码、耗时、用过的开关名（不含值）、程序自己打出的那句话。
 // 只有这一个地方写：加一个动词不需要在别处补统计。
-const stamp = (ok) =>
+const stamp = (code) =>
   trace(ROOT, {
     at: new Date().toISOString(),
     verb: verb ?? "",
-    ok,
+    code,
     ms: Math.round(performance.now() - began),
     switches: rest.filter((one) => one.startsWith("--")).map((one) => one.split("=")[0]),
-    why: ok ? undefined : (takeRefusal() ?? null),
+    why: code === 0 ? null : (takeRefusal() ?? null),
     v: currentVersion(),
   });
 const command = commands[verb];
@@ -104,21 +104,21 @@ if (!command && MOVED[verb]) {
   const why = verb + " 已经改成 " + MOVED[verb] + "（deed help 看全部）";
   reject(why);
   refused(why);
-  stamp(false);
+  stamp(1);
   process.exit(1);
 }
 if (!command) {
   const why = "没有这个动作：" + verb + "（deed help 看全部）";
   reject(why);
   refused(why);
-  stamp(false);
+  stamp(1);
   process.exit(1);
 }
 try {
   guard(() => command(rest));
-  stamp(process.exitCode !== 1);
+  stamp(process.exitCode ?? 0);
 } catch (err) {
-  stamp(false);
+  stamp(process.exitCode ?? 1);
   throw err;
 }
 

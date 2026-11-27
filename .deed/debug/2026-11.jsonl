@@ -4,3 +4,10 @@
 {"at":"2026-11-27T00:03:18.353Z","verb":"submit","ok":true,"ms":51633,"switches":[],"v":"0.27.0"}
 {"at":"2026-11-27T00:03:29.939Z","verb":"debug","ok":true,"ms":5,"switches":[],"v":"0.27.0"}
 {"at":"2026-11-27T00:04:10.545Z","verb":"point","ok":true,"ms":57,"switches":[],"v":"0.27.0"}
+{"at":"2026-11-27T00:04:30.327Z","verb":"reply","ok":true,"ms":78,"switches":["--from"],"v":"0.27.0"}
+{"at":"2026-11-27T05:58:20.859Z","verb":"review","ok":true,"ms":110,"switches":["--due"],"v":"0.27.0"}
+{"at":"2026-11-27T05:58:22.002Z","verb":"say","ok":true,"ms":78,"switches":["--from"],"v":"0.27.0"}
+{"at":"2026-11-27T05:59:38.151Z","verb":"review","ok":true,"ms":45,"switches":["--due"],"v":"0.27.0"}
+{"at":"2026-11-27T05:59:38.741Z","verb":"say","ok":true,"ms":70,"switches":["--from"],"v":"0.27.0"}
+{"at":"2026-11-27T06:05:49.229Z","verb":"init","code":0,"ms":2,"switches":["--print-agents"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T06:06:08.703Z","verb":"debug","code":0,"ms":28,"switches":[],"why":null,"v":"0.27.0"}

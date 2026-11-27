@@ -15,7 +15,7 @@ const rows = (cwd) =>
     .flatMap((one) => fs.readFileSync(path.join(cwd, ".deed", "debug", one), "utf8").trim().split("\n").filter(Boolean))
     .map((one) => JSON.parse(one));
 
-// 一次调用一行：成没成、花了多久、用过哪些开关（只记名字，不记值）、被拒时的那一句。
+// 一次调用一行：退出码、花了多久、用过哪些开关（只记名字，不记值）、程序打出的那一句话。
 test("every call leaves one line, and a refusal leaves the reason on it", () => {
   const cwd = workspace("debug-trace");
   deed(cwd, "init", "--said", "开始");
@@ -26,10 +26,10 @@ test("every call leaves one line, and a refusal leaves the reason on it", () => 
 
   const lines = rows(cwd);
   const said = lines.find((one) => one.verb === "say");
-  assert.equal(said.ok, true);
+  assert.equal(said.code, 0, "退出码 0：客观量，不带我的解释");
   assert.equal(typeof said.ms, "number");
   const failed = lines.find((one) => one.verb === "submit");
-  assert.equal(failed.ok, false);
+  assert.equal(failed.code, 1, "非零退出码：客观量");
   assert.match(failed.why, /还没有清单/u, "被拒的那一句跟着这一行走");
   assert.deepEqual(said.switches, [], "没有开关就空着");
   assert.ok(failed.switches.includes("--run"), "开关只记名字");
@@ -50,27 +50,28 @@ test("the trace is not the ledger, and not part of the workspace", () => {
 });
 
 // 报告回答三个问题：从没敲过的、敲了就失败的、没人用过的开关。
-test("the report names what was never used, what keeps failing, and what switches nobody touches", () => {
+test("the report prints the measured quantities without interpreting them", () => {
   const cwd = workspace("debug-report");
   deed(cwd, "init", "--said", "开始");
   deed(cwd, "say", "一句话");
   deed(cwd, "submit"); // 拒一次
   const out = deed(cwd, "debug", "--days", "7");
   assert.equal(out.status, 0);
-  assert.match(out.stdout, /调试 · 最近 7 天/u);
-  assert.match(out.stdout, /从没敲过/u);
-  assert.match(out.stdout, /reply/u, "没敲过的动词被点出来");
-  assert.match(out.stdout, /敲了就失败最多的/u);
-  assert.match(out.stdout, /submit\s+\d+ 次 · 失败/u);
-  assert.match(out.stdout, /一次都没用过的开关/u);
+  assert.match(out.stdout, /观察 · 最近 7 天/u);
+  assert.match(out.stdout, /窗口内一次都没出现过的动词/u);
+  assert.match(out.stdout, /reply/u, "窗口里没出现的动词被列出");
+  assert.match(out.stdout, /退出码/u);
+  assert.match(out.stdout, /submit\s+\d+\s+1×1/u);
+  assert.match(out.stdout, /窗口内一次都没出现过的开关/u);
+  assert.doesNotMatch(out.stdout, /伪需求|缺陷|值得|提示设计|只当提示|别当结论/u, "报告不解释、不劝告、不下结论");
 
   const machine = JSON.parse(deed(cwd, "debug", "--json").stdout);
   assert.equal(machine.window.days, 30);
   assert.ok(Array.isArray(machine.verbs));
-  assert.ok(machine.verbs.some((one) => one.verb === "say" && one.ok === 1));
-  assert.ok(machine.never.includes("reply"));
-  assert.ok(machine.deadSwitches.some((one) => one.flag === "--run"));
-  assert.equal(machine.enough, false, "样本少的时候自己说出来");
+  assert.ok(machine.verbs.some((one) => one.verb === "say" && one.codes.some((c) => c.code === 0 && c.n === 1)));
+  assert.ok(machine.absentVerbs.includes("reply"));
+  assert.ok(machine.absentSwitches.some((one) => one.flag === "--run"));
+  assert.equal(machine.window.calls, 4, "窗口里精确报出四次调用，不替人判断够不够");
 });
 
 // 统计只认窗口：窗口外的调用不算进去，也不让一个过时的数字冒充现在。
