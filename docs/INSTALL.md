@@ -89,7 +89,7 @@ deed init --force --exempt "docs/**,*.md" --why "文档改动不必审"
 ```
 
 为什么必填：**审查设置的每一次改动都进账本**，下一个人能看到是谁、什么时候、为什么放宽了审查。
-`.deed/config.json` 只是账本的镜像；手改文件不改任何判断（规则只读账本），`deed verify` 会报「审查设置对不上」，
+`.deed/config.json` 只是账本的镜像；手改文件不改任何判断（规则只读账本），`deed check --ledger` 会报「审查设置对不上」，
 `deed init --force --why "…"` 是把它收进账本的唯一方式。
 
 ### 让 agent 知道规矩
@@ -121,7 +121,7 @@ cd /path/to/deed && git pull && npm test
 - **账本比 deed 新**（每条事件都记着事件含义的版本 `v` 与写它的版本 `w`，先比 `v`）：`doctor`／`state`／`verify`／面板都说「升级 deed 就能读」。**别删也别挪**，那一行是有效事实，不是坏账。
 - **deed 比账本新**：安全，事件类型只做加法，老事件照样折。
 
-账本是纯文本，崩了也不丢：`.deed/log/*.jsonl` 可以直接 `git diff` 看，`deed verify`／`doctor` 是唯一的核对手段。
+账本是纯文本，崩了也不丢：`.deed/log/*.jsonl` 可以直接 `git diff` 看，`deed check --ledger` 是唯一的核对手段。
 
 ## 卸
 
@@ -129,7 +129,7 @@ cd /path/to/deed && git pull && npm test
 npm unlink -g deed        # 或删掉 vendor 的那份目录
 ```
 
-`.deed/` 可以留着：它是这个工作区的历史。真要清掉，先 `deed verify` 确认没有未签收的任务，再整目录删。
+`.deed/` 可以留着：它是这个工作区的历史。真要清掉，先用 `deed check --ledger` 看一眼账本还在（未签收不影响删除），再整目录删。
 deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来：每条命令执行前探测一次，不在就用后台进程拉起，URL 打在那一行输出里；30 分钟没人连就自己退，`deed panel --stop` 立即停，`DEED_NO_PANEL=1` 一条都不起。它不写账本，也不占终端。审查设置里写的那个号被别的程序先占了，它退到系统给的空号，由拉它起来的那条命令说清「哪个号被占着、改开在哪」——那句话不由子进程说，它不接管道，说了也到不了你眼前。要端口固定、前台看日志，仍可 `deed serve --port 7317`。
 
 ## 常见故障
@@ -139,9 +139,9 @@ deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来
 | `deed: 未知事件：x`，且写着「账本比 deed 新」 | 账本是更新的 deed 写的。升级 deed，不要动那一行 |
 | `deed check --ledger` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
-| `deed verify` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。在清单里重新勾一次再 `deed submit`，或在审查里点名退回 |
-| `deed verify` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |
-| `deed verify` 报「审查设置对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
+| `deed check --ledger` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。在清单里重新勾一次再 `deed submit`，或在审查里点名退回 |
+| `deed check --ledger` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |
+| `deed check --ledger` 报「审查设置对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
 
 ## 它不碰的东西
 

@@ -226,7 +226,7 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
   const second = deed(cwd, "submit");
   assert.equal(second.status, 0, second.stderr);
   assert.match(second.stdout, /交付 · T1 · 写了 docs\/a.md/);
-  assert.match(second.stdout, /记账之后核对 · 1 条都指得到当时那份内容/u, "记账之后核一遍：这条记录指得到东西吗，指不到就说出来");
+  assert.match(second.stdout, /记账后核对 · 1 条都对得上当时那份内容/u, "记账之后核一遍：这条记录指得到东西吗，指不到就说出来");
   const done = readEvents(cwd).find((one) => one.k === "task.done" && one.id === "T1");
   assert.ok(done.files.some((one) => one.path === "docs/a.md"), "勾上就是交付：submit 按工作区自己称，记下动过的文件");
   assert.equal(done.evidence, "写了 docs/a.md", "交付记录就是清单上那一行");
@@ -311,4 +311,31 @@ test("finishing entries writes no order records until the rows are really reorde
   assert.equal(after.find((one) => one.id === "T4").order, 5, "T4 挪到后面");
   assert.equal(after.find((one) => one.id === "T5").order, 4, "T5 挪到前面");
   assert.equal(after.find((one) => one.id === "T1").order, 1, "做完的不动");
+});
+
+// 清单里四组（在做 / 等着 / 交过 / 不做了）之间空一行：挨着写就分不出哪几条是交过的。
+test("the plan puts a blank line between the groups", () => {
+  const cwd = workspace("plan-groups");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "第一条", "跑得通");
+  addTask(cwd, "第二条", "跑得通");
+  addTask(cwd, "第三条", "跑得通");
+  dropTask(cwd, "T3", "不做了");
+  const lines = readPlan(cwd).split("\n");
+  const heads = lines.map((one, i) => (/^<!-- (在做|等着|交过的|不做了的)/u.test(one) ? i : -1)).filter((i) => i >= 0);
+  assert.ok(heads.length >= 2, "至少两组才谈得上组间");
+  for (const i of heads.slice(1)) assert.equal(lines[i - 1], "", "每组前面空一行");
+});
+
+// 议题的成立与出口只在面板上按：命令行上写 release 不能降级成"新建一个叫 release 的议题"。
+test("topic release on the command line refuses and creates nothing", () => {
+  const cwd = workspace("topics-are-panel-only");
+  deed(cwd, "init", "--said", "开始");
+  deed(cwd, "point", "第一句");
+  for (const one of ["release", "establish"]) {
+    const run = deed(cwd, "topic", one, "I1", "--body", "正文", "--points", "P1");
+    assert.equal(run.status, 1, one + " 不在命令面上");
+    assert.match(run.stderr, /面板/u);
+  }
+  assert.equal(kinds(cwd).filter((one) => one === "topic.create").length, 0, "一个字都没落");
 });

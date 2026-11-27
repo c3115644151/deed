@@ -8,6 +8,7 @@ import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { EVENT_VERSION } from "../../core/events.mjs";
 import { frozenFor } from "../../core/fold.mjs";
 import { findStaleTasks } from "../../core/stale.mjs";
+import { checkLanded } from "../../lib/landed.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf, commandSurface } from "../session.mjs";
 
 
@@ -222,6 +223,9 @@ export default function submit(argv) {
       const scanned = changedPaths(ROOT);
       const by = "agent";
       const sizes = weigh(ROOT, scanned.changed);
+      // 记账之后核对发现的对不上的交付：对上了才安静，对不上要以非零退出码结束——
+      // 只印一行的话，读的人照样往下走，那条记录就永远是"看着成立"。
+      const brokenAfter = [];
       const { doc, evs } = transactMany(
         flags,
         (doc0) => {
@@ -524,28 +528,26 @@ export default function submit(argv) {
           // 它点到的路径此刻在不在、是不是 0 字节的空壳。只在记账那一刻成立还不够——
           // 读账本的人看到的是这条记录，他没法回到那一刻；这里当场把说不通的说出来。
           const landed = stamped.filter((ev) => ev.k === "task.done");
-          if (landed.length > 0) {
-            const broken = [];
-            for (const ev of landed) {
-              const paths = (ev.files ?? []).map((one) => one.path);
-              if (paths.length === 0) continue; // 靠 期望 自证的交付没有文件可指，不算错
-              for (const one of paths) {
-                const full = path.join(ROOT, one);
-                if (!fs.existsSync(full)) continue; // 删掉的路径本来就不在，它不是空交付
-                const size = fs.statSync(full).size;
-                if (size === 0) broken.push(one + " 是 0 字节");
-              }
-            }
-            if (broken.length > 0)
-              console.log("记账之后核对 · " + broken.length + " 条对不上：" + broken.slice(0, 5).join("、"));
-            else console.log("记账之后核对 · " + landed.length + " 条都指得到当时那份内容");
-          }
+          const checked = landed.filter((ev) => (ev.files ?? []).length > 0);
+          brokenAfter.push(...checkLanded(ROOT, landed));
+          if (checked.length > 0)
+            console.log(
+              brokenAfter.length > 0
+                ? "记账后核对 · " + brokenAfter.length + " 条对不上"
+                : "记账后核对 · " + checked.length + " 条都对得上当时那份内容",
+            );
         },
       );
       // 落过账就把清单按账本重写一遍：新条目领到的号要写回去，不然下一次 submit
       // 会把同一个 ? 再加一条。文件里说过的话都已经在账本上，重写不丢东西。
       const after = sessionById(doc, evs[0].s ?? targetSession(doc, flags).id);
       fs.writeFileSync(file, planDraft(after) + "\n", "utf8");
+      if (brokenAfter.length > 0) {
+        console.log("记账之后核对 · 对不上就不算数：");
+        for (const one of brokenAfter) console.log("  " + one);
+        console.log("  把它补上再交一次（deed submit 会按账本重画清单），或者在那条交付里说清它为什么空着");
+        process.exitCode = 1;
+      }
       for (const ev of evs) {
         if (ev.k === "goal.set") console.log("目的 · " + ev.s + " · " + ev.text);
         // 新条目落到哪一段由账本说得算，不是清单里写着哪一节算哪一段：说出来，别让人

@@ -15,7 +15,7 @@ import {
   tasksIn,
 } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
-import { planBrief, planWhole, writeBrief } from "../brief.mjs";
+import { planBrief, planWhole, removeScratch, writeBrief } from "../brief.mjs";
 import { draft as planDraft } from "../plan.mjs";
 import { settledSince } from "../../core/fold.mjs";
 import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
@@ -145,10 +145,7 @@ export default function review(argv) {
         findings,
         ...(flags.verdict === "fail" ? { rework, why: flags.why } : {}),
       })).doc;
-      fs.rmSync(path.join(ROOT, ".deed", "tmp", String(handed.brief).split(/[\\/]/).pop().replace(/\.md$/u, "")), {
-        recursive: true,
-        force: true,
-      });
+      removeScratch(handed.brief);
       if (flags.verdict === "pass") {
         console.log("期审通过 · " + session.id + " · 这一期做成的样子成立，下一步是签收");
         for (const one2 of findings) console.log("  发现 · " + one2);
@@ -359,10 +356,7 @@ export default function review(argv) {
           : {}),
       })).doc;
       // 审查者的临时区随结论落地销毁：里面的调试文件不是这一段的活，留着只会被人当成这一段的真相。
-      fs.rmSync(path.join(ROOT, ".deed", "tmp", String(handed.brief).split(/[\\/]/).pop().replace(/\.md$/u, "")), {
-        recursive: true,
-        force: true,
-      });
+      removeScratch(handed.brief);
       // 结论一落，这一段的样子就变了（打回的条目回到未做）：清单是账本画出来的，
       // 文件里还勾着的那几条会让下一个读的人以为它们还交着。落完结论就重画一遍。
       const draftFile = path.join(ROOT, ".deed", "plan.md");

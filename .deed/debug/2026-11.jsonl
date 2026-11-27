@@ -358,3 +358,20 @@
 {"at":"2026-11-27T22:55:50.651Z","verb":"say","code":0,"ms":107,"switches":["--from"],"why":null,"v":"0.31.0"}
 {"at":"2026-11-27T23:01:06.637Z","verb":"review","code":0,"ms":38,"switches":["--due"],"why":null,"v":"0.31.0"}
 {"at":"2026-11-27T23:01:07.229Z","verb":"say","code":0,"ms":92,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T23:18:54.639Z","verb":"point","code":0,"ms":54,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:18:54.887Z","verb":"review","code":0,"ms":52,"switches":["--due"],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:18:55.173Z","verb":"state","code":0,"ms":88,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:25:06.300Z","verb":"review","code":0,"ms":58,"switches":["--due"],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:25:07.114Z","verb":"say","code":0,"ms":101,"switches":["--from"],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:36:32.001Z","verb":"submit","code":0,"ms":191,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:43:57.010Z","verb":"check","code":0,"ms":10497,"switches":["--ledger"],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:46:52.927Z","verb":"submit","code":1,"ms":7,"switches":[],"why":"清单有 6 处看不懂，一个字都没落：","v":"0.32.0"}
+{"at":"2026-11-27T23:48:48.183Z","verb":"submit","code":1,"ms":24917,"switches":[],"why":"T114 的期望没跑出来：命令「node --test test/cli-work2.test.mjs」要看到「20/20（含「the landed check reports a file that changed, emptied, or vanished」直接驱动那条核对）」，实际是「✔ a plan with a line nobody can read lands nothing, and a task cannot vanish (963.6103ms) / ✔ ","v":"0.32.0"}
+{"at":"2026-11-27T23:49:57.892Z","verb":"submit","code":1,"ms":21897,"switches":[],"why":"T114 的期望没跑出来：命令「node --test test/cli-work2.test.mjs」要看到「20/20（含「the landed check reports a file that changed, emptied, or vanished」直接驱动那条核对）」，实际是「✔ a plan with a line nobody can read lands nothing, and a task cannot vanish (888.2746ms) / ✔ ","v":"0.32.0"}
+{"at":"2026-11-27T23:51:48.188Z","verb":"submit","code":1,"ms":85892,"switches":[],"why":"T143 的期望没跑出来：命令「node --test test/docs.test.mjs」要看到「5/5；node cli/deed.mjs check --ledger => 账本干净 ·」，实际是「✔ the README carries exactly the block init --print-agents prints (2.412ms) / ✔ the block names the commands an agent needs, and no verb ","v":"0.32.0"}
+{"at":"2026-11-27T23:53:39.656Z","verb":"submit","code":1,"ms":86308,"switches":[],"why":"这一批勾了 5 条交付（T114、T118、T124、T135、T143）：一次只交一条——先交此刻在做的那一条（deed state 说是 T114），写完 交付： 提交一次，再做下一条。账本一个字都没动","v":"0.32.0"}
+{"at":"2026-11-27T23:54:15.445Z","verb":"submit","code":0,"ms":22245,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:55:07.442Z","verb":"submit","code":0,"ms":34041,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:55:35.971Z","verb":"submit","code":0,"ms":16436,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:55:52.325Z","verb":"submit","code":0,"ms":16154,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:55:52.886Z","verb":"submit","code":0,"ms":389,"switches":[],"why":null,"v":"0.32.0"}

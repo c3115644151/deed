@@ -593,3 +593,40 @@ test("a segment takes twenty entries and then asks for a new one", () => {
   const doc = fold(readEvents(cwd));
   assert.equal(doc.sessions[0].segments.length, 2, "第二十一条开了新的一段");
 });
+
+// 交付记下的路径在记账那一刻就是 0 字节的空壳：说出来，并且不以 0 退出。
+test("a delivery that points at an empty file lands but says so and exits nonzero", () => {
+  const cwd = workspace("empty-delivery");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), "# x\n\n## 段\n- ? 让它成立\n  标准：跑得通\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0, "先落一条");
+  const first = readEvents(cwd).length;
+  fs.writeFileSync(path.join(cwd, "hollow.mjs"), "", "utf8");
+  const now = readPlan(cwd).replace("- [ ] T1 让它成立", "- [x] T1 让它成立");
+  fs.writeFileSync(
+    path.join(cwd, ".deed", "plan.md"),
+    now.replace(/\s*$/u, "") + "\n  交付：写了 hollow.mjs\n",
+    "utf8",
+  );
+  const landed = deed(cwd, "submit");
+  assert.equal(landed.status, 1, "对不上就不算数");
+  assert.match(landed.stdout, /0 字节/u);
+  assert.match(landed.stdout, /记账后核对/u);
+  const rows = readEvents(cwd);
+  assert.ok(rows.slice(first).some((one) => one.k === "task.done"), "记还是记上了：它说的是这条记录指不到东西");
+});
+
+// 那条核对能直接被驱动：记下 a.mjs 是 10 字节，盘上已经换成另一份；空壳；已经不在。
+test("the landed check reports a file that changed, emptied, or vanished", async () => {
+  const { checkLanded } = await import("../lib/landed.mjs");
+  const cwd = workspace("landed-check");
+  fs.writeFileSync(path.join(cwd, "a.md"), "0123456789", "utf8");
+  const row = (bytes) => ({ k: "task.done", files: [{ path: "a.md" }], bytes });
+  assert.deepEqual(checkLanded(cwd, [row({ "a.md": 10 })]), [], "盘上就是称过的那一份");
+  assert.match(checkLanded(cwd, [row({ "a.md": 4 })])[0], /换成另一份/u);
+  fs.writeFileSync(path.join(cwd, "a.md"), "", "utf8");
+  assert.match(checkLanded(cwd, [row({ "a.md": 0 })])[0], /0 字节/u);
+  fs.rmSync(path.join(cwd, "a.md"));
+  assert.match(checkLanded(cwd, [row({ "a.md": 10 })])[0], /不在盘上/u);
+  assert.deepEqual(checkLanded(cwd, [{ k: "task.done", files: [], bytes: {} }]), [], "靠 期望 自证的交付没有文件可指");
+});

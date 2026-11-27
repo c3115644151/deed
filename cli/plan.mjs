@@ -193,7 +193,10 @@ export function draft(session) {
     // 只有"排好的下一段"才印这句：它前面还有一段没收活。这是 takingSegment 的那一条。
     const taking = session.segments.find((one) => one.closedAt == null && one.plannedAt == null) ?? null;
     if (taking && taking.id !== segment.id) out.push("<!-- 还没轮到：现在收活的是 " + taking.id + "，轮到了这一段才收交付 -->");
-    for (const group of groupsOf(tasks)) {
+    // 组与组之间空一行：四组挨着写，读的人看不出哪几条是交过、哪几条是退回来的。
+    const groups = groupsOf(tasks);
+    for (const [n, group] of groups.entries()) {
+      if (n > 0) out.push("");
       out.push("<!-- " + group.label + "（" + group.tasks.length + " 条）" + GROUP_NOTE[group.key] + " -->");
       for (const task of group.tasks) {
         out.push(bullet(task));

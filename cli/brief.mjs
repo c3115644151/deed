@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { tasksIn } from "../core/rules.mjs";
 import { settledSince } from "../core/fold.mjs";
@@ -7,6 +8,17 @@ import { fileStamp, stamp0 } from "../lib/format.mjs";
 
 // 审查清单是唯一落到账本外、又要交给别人的文件：先算好文件名（plan），
 // 再在账本收下这条事实时才写盘（write）。中间失败，磁盘上什么也不留。
+
+// 审查者的临时区开在仓库外：仓库里的目录一旦被当成临时区，把整个工作区复制进去
+// 就成了自己套自己，而且一次 git add -A 就会把它带进提交。它也不进账本、不归仓库管。
+export function scratchPath(name) {
+  return path.join(os.tmpdir(), "deed-scratch", String(name).replace(/\.md$/u, ""));
+}
+
+// 结论落地时按同一条规则把它删掉：名字来自那份清单的文件名，不另存一份，也就不会对不上。
+export function removeScratch(briefFile) {
+  fs.rmSync(scratchPath(path.basename(String(briefFile))), { recursive: true, force: true });
+}
 
 // 角色包：清单说"审什么"，这一份说"怎么审"。两份一起交出去，账本里记着
 // 它们各自的路径与生成时刻——换掉其中任何一份，落结论时会看出来。
@@ -75,6 +87,7 @@ function guideText(subject, target, briefName, scratch, nth = 1) {
     "- 仓库里的东西一个字节都别动：这一段已经冻结在审，你改了这一段的东西，这份清单就不再是现在这一段，",
     "  结论也落不下来（重放会按当时的字节逐条点名）。要改，是作者的事：他得先撤回这份清单。",
     "- 别改账本（`.deed/`）：谁说了什么、谁判的，是别人读你的依据。",
+    "- 不能提交：审查不是改这一期，提交会把你的过程材料留进项目历史，也让后面的人以为那是作者的活。",
     "- 别替作者修：发现写清楚就够了，改是他下一次交付的事。",
     "",
     "每条结论与发现都要配复现路径：命令加实际输出，或 文件:行。没有复现路径的发现，",
@@ -181,9 +194,6 @@ export function planBrief(root, open, segment, at) {
   const tasks = tasksIn(open, segment);
   // 每次出清单都列这一段的全部条目：上一次判过什么，写在上一次的清单里，
   // 不靠这一次去猜（拿内容指纹去认"没变过"，在天天改文件的仓库里一次也没成立过）。
-  // 审查者的临时区：清单发出去时开，结论落地时删。它不属于工作区，也不进账本。
-  const scratch = path.join(p.tmp, segment.id + "-" + fileStamp(at));
-  fs.mkdirSync(scratch, { recursive: true });
   const settled = new Map();
   for (const task of tasks) {
     const last = settledSince(open, task);
@@ -229,6 +239,10 @@ export function planBrief(root, open, segment, at) {
     n += 1;
     file = base(n) + ".md";
   }
+  // 审查者的临时区：清单发出去时开，结论落地时删。它不属于工作区，也不进账本——
+  // 开在仓库外（名字由这份清单的文件名定），把整个工作区复制进去也不会自己套自己。
+  const scratch = scratchPath(path.basename(file));
+  fs.mkdirSync(scratch, { recursive: true });
   const nth = open.briefs.filter((one) => one.scope === "segment" && one.segment === segment.id).length + 1;
   const guide = guideText("段 " + segment.id, segment.id, path.basename(file), scratch, nth);
   return {
@@ -276,8 +290,6 @@ function periodGuideText(session, briefName, scratch) {
 // 期审清单：列的是这一期的目的、各段结局、还挂着的东西。
 export function planWhole(root, session, at) {
   const p = ensureDirs(root);
-  const scratch = path.join(p.tmp, "period-" + session.id + "-" + fileStamp(at));
-  fs.mkdirSync(scratch, { recursive: true });
   const verdicts = new Map(
     session.reviews.filter((one) => one.voidedAt === null && one.scope !== "session").map((one) => [one.segment, one]),
   );
@@ -337,6 +349,8 @@ export function planWhole(root, session, at) {
     n += 1;
     file = base(n) + ".md";
   }
+  const scratch = scratchPath(path.basename(file));
+  fs.mkdirSync(scratch, { recursive: true });
   const guide = periodGuideText(session, path.basename(file), scratch);
   return {
     file,

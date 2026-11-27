@@ -53,6 +53,10 @@ export default function topic(argv) {
         );
       return;
     }
+    // 「release」「establish」是人的动作，只在面板上按：它们出现在第一个词的位置上时，
+    // 不能降级成"新建一个叫 release 的议题"——那句话会静默建出一个谁也没要的议题。
+    if (head === "release" || head === "establish")
+      fail("议题的成立与出口在面板上按：命令行没有这条路（deed topic \"标题\" --points … 才是新建议题）");
     const title = flags.title ?? (head && !/^I\d+$/u.test(head) ? head : words.join(" ").trim());
     if (!title) fail('议题要有标题：deed topic "标题" --points P1,P2 --body "统合后的正文"');
     if (!flags.body) fail('议题要把要点统合成正文：--body "…"');

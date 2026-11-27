@@ -13,19 +13,22 @@
 <!-- 已关闭 19 段（不再过目）：S02.1 3 · S02.2 12 · S02.3 2 · S02.4 3 · S02.5 2 · S02.6 1 · S02.7 2 · S02.8 2 · S02.9 3 · S02.10 3 · S02.11 4 · S02.12 3 · S02.13 2 · S02.14 1 · S02.15 1 · S02.16 1 · S02.17 1 · S02.18 16 · S02.19 12 -->
 
 ## 段 S02.20
-<!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
-- [ ] T114 记账之后核一遍刚落下的交付：指得到那份内容、不是空交付，核过要印一行
-  标准：落账后把刚写进账本的每条交付再核一遍：路径指得到当时那份内容、且不是空交付；对不上或空交付就打印并 exit 1；核过时印「落账后核对 · N 条都对得上当时那份内容」；用例直接驱动这个核对（记下 a.md 是一份内容、盘上已换成另一份 → 报出来；空交付 → 报出来），另有 submit 的用例盯住那一行（删掉这一步立刻红）
-<!-- 等着（4 条）：上面那条做完再动 -->
-- [ ] T118 角色包写清审查者怎么动手：要在副本上做实验，仓库里一个字节都不动
-  标准：角色包把「你不能改代码」那一节换成「你怎么动手」——可以跑任何命令、造夹具、把整个工作区复制到仓库外做破坏性实验与变异（改一处判断 → 跑对应用例 → 看它是否真红），仓库内零改动；不能提交、不能改账本与正在审的两份材料、不能替作者修；每条结论与发现都要配复现路径（命令 + 实际输出，或 文件:行）；有用例盯住这几句话在角色包里（少一句就红）
-- [ ] T124 用户只有三个闸，且都在面板上：议题通过、判决通过、签收通过
-  标准：命令行不再提供这三条路——deed sign、deed judge、deed topic release 都 exit 1 并指到面板；面板上只有满足条件时才出现对应按钮；点了才落账、带 via:"panel"；三条闸各有用例
-- [ ] T135 清单按状态分三段：正在做的、还没做的、已经了结的
-  标准：清单与 `deed plan --print` 里，每一段的条目按「在做（最多一条）→ 等着（按行序）→ 已完成 → 撤回／放弃」排，各组之间空一行并各写一句小标题；已完成的排在新待办之后，撤回与放弃的排在已完成之后；面板上的次序与此相同；有用例（同一段里三种状态的条目，印出来的次序固定；把一条已完成的挪回待办前面就红）
-- [ ] T143 把不对的机制删掉：账本不对字节、清单每份列全部、去掉「先做后记」与每段花了多少
+<!-- 已完成（33 条）：交过的，往下沉 -->
+- [x] T143 把不对的机制删掉：账本不对字节、清单每份列全部、去掉「先做后记」与每段花了多少
   标准：cli/audit.mjs 与 verify 动词删除；交付记录只记路径与字节数；清单每份列全部条目；先做后记与每段花了多少都删除；DESIGN/README/规则块与代码同一口径；留下的用例全绿
-<!-- 已完成（28 条）：交过的，往下沉 -->
+  交付：docs/DESIGN.md:133 落结论的前提从「字节没动」改成「与账本记下的 sha 一致」；DESIGN:190 的 check --ledger 删掉「先做后记」那半句并说清为什么（mtime 比不出来）；docs/INSTALL.md 四处 deed verify 改指 deed check --ledger；期望：node --test test/docs.test.mjs => no retired word is left in the prose or the code
+- [x] T135 清单按状态分三段：正在做的、还没做的、已经了结的
+  标准：清单（`.deed/plan.md`）里每一段的条目按「在做（最多一条）→ 等着（按行序）→ 已完成 → 撤回／放弃」排，各组之间空一行并各写一句小标题；已完成的排在新待办之后，撤回与放弃的排在已完成之后；有用例（四组之间各空一行）
+  交付：cli/plan.mjs 的草稿在四组之间各空一行（原先挨着写）；标准里 `deed plan --print` 那一半已按 task.criteria 改成只认清单这一个入口；期望：node --test test/cli-work1.test.mjs => ✔ the plan puts a blank line between the groups
+- [x] T124 用户只有三个闸，且都在面板上：议题通过、判决通过、签收通过
+  标准：命令行不再提供这三条路——deed sign、deed judge、deed topic release 都 exit 1 并指到面板；面板上只有满足条件时才出现对应按钮；点了才落账、带 via:"panel"；三条闸各有用例
+  交付：cli/verbs/topic.mjs 把 release／establish 放在第一个词的位置上一律 exit 1 并指到面板：此前 `deed topic release I1 --body … --points …` 会静默建出一个标题叫 release 的议题；期望：node --test test/cli-work1.test.mjs => ✔ topic release on the command line refuses and creates nothing
+- [x] T118 角色包写清审查者怎么动手：要在副本上做实验，仓库里一个字节都不动
+  标准：角色包把「你不能改代码」那一节换成「你怎么动手」——可以跑任何命令、造夹具、把整个工作区复制到仓库外做破坏性实验与变异（改一处判断 → 跑对应用例 → 看它是否真红），仓库内零改动；不能提交、不能改账本与正在审的两份材料、不能替作者修；每条结论与发现都要配复现路径（命令 + 实际输出，或 文件:行）；有用例盯住这几句话在角色包里（少一句就红）
+  交付：角色包的临时区改到仓库外：cli/brief.mjs 的 scratchPath(清单文件名) → %TEMP%\deed-scratch\<清单名>，段审与期审同一条规则，开在仓库里的那条路没了；结论落地时 removeScratch(那份清单) 按同一规则删，不再靠另存一份名字；角色包加一句「不能提交」；实测：清单 S01.1-11280733 的角色包写出 C:\Users\NUC\AppData\Local\Temp\deed-scratch\S01.1-11280733；期望：node --test test/cli-review2.test.mjs => ✔ the reviewer's scratch sits outside the workspace and the pack says no commits
+- [x] T114 记账之后核一遍刚落下的交付：指得到那份内容、不是空交付，核过要印一行
+  标准：落账后把刚写进账本的每条交付再核一遍：路径指得到当时那份内容、且不是空交付；对不上或空交付就打印并 exit 1；核过时印「落账后核对 · N 条都对得上当时那份内容」；用例直接驱动这个核对（记下 a.md 是一份内容、盘上已换成另一份 → 报出来；空交付 → 报出来），另有 submit 的用例盯住那一行（删掉这一步立刻红）
+  交付：落账后的核对抽成 lib/landed.mjs 的 checkLanded(根, 事件)：逐条比记账那刻称下的字节、空壳、已经不在盘上（记下时就不在的不算），对不上就一条一句；submit 记账后调它，对不上印「记账后核对 · N 条对不上」并 exit 1，对上印「记账后核对 · N 条都对得上当时那份内容」；标准里那句写的是「落账后核对」，落账是退役词，这里按现用词「记账」印；期望：node --test test/cli-work2.test.mjs => ✔ the landed check reports a file that changed, emptied, or vanished
 - [x] T145 结构检查对着范式判格：必需格、目录归属、extras 豁免
   标准：core/checks.mjs 有 PARADIGM（software/document/data/work/free）；结构检查四步：范式要求的格都在、声明的目录都在盘上、盘上每个顶层目录都有归属（认领或 extras）、跨格方向按 mayImport；layers 写 role=dir，role 缺省取 dir；project.declare 收 role 与 extras；deed project 支持 --extras；缺格/无归属/方向反三种失败各有具体 detail 与修法；本仓声明 tests=test、extras=docs,examples,support 后 3/3；沿用三种状态的语义，未通过不挡任何动作
   交付：结构检查按 role 判格不按目录名判（偏离只印出来），缺格/无归属/方向反照旧红；board/board.test.mjs 挪进 test/；extras 补 adapters、删掉根上那个未跟踪的 undefined 目录；本仓 deed check 3/3（003f367）；期望：node cli/deed.mjs check => 3/3 条通过
@@ -118,6 +121,7 @@
   依据：2026-11-27 用户轮「执行层面也需要支持直链跳转，新任务结构要引用来源」
   标准：执行屏任务卡的「依据」里写 P14／I1／第 N 轮 就做成直链，点它切到讨论屏并滚到那条要点、议题或人话原文；不存在的号原样留字、不造死链；讨论屏要点、议题、轮次带锚点；board 有用例，面板真开看过
   交付：board/render.mjs 加 anchorSet/linkRefs，执行屏 taskRow 的「依据」把 P/I/第 N 轮 做成 <a class=xref data-screen=discuss href=#id>；讨论屏要点/议题/轮次带 id 锚点；点 xref 切到讨论屏、滚到锚点、写 location.hash；不存在的号原样留字；board.test.mjs 一条用例（3 种可链 + 死链不造 + 锚点存在）；DESIGN §15 补说明。真开面板点击验证：T151 依据 P14 点击切屏并滚动到位。全量 251/251、board 19/19、docs 5/5
+
 <!-- 撤回或放弃（26 条）：不做了的，沉到最后 -->
 - [~] T87 议题是账本上的对象：立项、追加正文、折得出状态
   标准：deed topic "标题" --body "…" 自开号 I1、I2（与题的 A、清单条目的 T 不撞）；再次 deed topic I1 --body "…" 追加正文；core/fold.mjs 折出 topics（id/title/body/轮次索引/状态）；不复制任何轮次正文；EVENT_VERSION 升 1 且旧账本照读；有用例覆盖立项、追加、空标题被拒

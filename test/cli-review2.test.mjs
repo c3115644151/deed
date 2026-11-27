@@ -552,3 +552,28 @@ test("a second brief only expands what has to be judged again", () => {
   assert.doesNotMatch(brief, /### T1 · 第一条/u, "没动过的那条不再展开");
   assert.match(brief, /- T1 · 第一条 · 上次 met[^\n]*判定沿用/u);
 });
+
+// 审查者的临时区开在仓库外：仓库里的目录一旦被当成临时区，把整个工作区复制进去
+// 就成了自己套自己；角色包里也明说不能提交。
+test("the reviewer's scratch sits outside the workspace and the pack says no commits", () => {
+  const cwd = workspace("scratch-outside");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "改重放", "总账能重放");
+  deliverTask(cwd, "T1", "跑了 16 条", { file: "core/fold.mjs" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const guide = fs
+    .readdirSync(path.join(cwd, ".deed", "review"))
+    .filter((one) => one.endsWith("-reviewer.md"))
+    .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8"))
+    .pop();
+  const line = guide.split("\n").find((one) => one.includes("deed-scratch"));
+  assert.ok(line, "角色包写出了临时区在哪");
+  const scratch = line.trim();
+  assert.ok(!path.resolve(scratch).startsWith(path.resolve(cwd) + path.sep), "临时区在仓库外：" + scratch);
+  assert.match(guide, /不能提交/u);
+
+  // 结论一落，临时区连同里面的一切一起没了。
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet",
+    "--rework", "T1", "--why", "没做到").status, 0);
+  assert.equal(fs.existsSync(scratch), false, "结论落地时临时区被删掉");
+});
