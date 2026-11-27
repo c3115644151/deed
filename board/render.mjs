@@ -158,6 +158,40 @@ function screenHead(index, name, note, meter) {
   );
 }
 
+// 讨论屏里哪些锚点是真的：活着的要点、全部议题、每一轮人话。
+// 被收编的要点不在活跃清单上，不给它造死链。
+function anchorSet(session) {
+  const ids = new Set();
+  for (const p of session?.points ?? []) if (!p.absorbedBy) ids.add(p.id);
+  for (const t of session?.topics ?? []) ids.add(t.id);
+  return { ids, turns: turnNumbers(session ?? { turns: [] }) };
+}
+
+// 依据里写 P14 / I1 / 第 N 轮，就做成直链；不存在的号原样留字，不造死链。
+// 只认账本里真有的锚点——引用说不存在的东西，该看得出来它没接上。
+function linkRefs(text, anchors) {
+  const src = String(text ?? "");
+  const re = /(\b[PI]\d+\b|第\s*\d+\s*轮)/gu;
+  let out = "", last = 0, m;
+  while ((m = re.exec(src)) !== null) {
+    out += esc(src.slice(last, m.index));
+    const tok = m[0];
+    const isId = /^[PI]\d+$/u.test(tok);
+    let href = null;
+    if (isId) {
+      if (anchors.ids.has(tok)) href = tok;
+    } else {
+      const n = Number(/(\d+)/u.exec(tok)[1]);
+      if (n >= 1 && n <= anchors.turns.size) href = "turn-" + n;
+    }
+    out += href
+      ? '<a class="xref" href="#' + href + '" data-screen="discuss">' + esc(tok) + "</a>"
+      : esc(tok);
+    last = m.index + tok.length;
+  }
+  return out + esc(src.slice(last));
+}
+
 // 议题卡上的「第 N 轮」指向讨论屏那一条原文（#turn-N）。N 是记要点时
 // 算出来的轮号（point.round），不是从正文里猜的；老账本没记轮号的只显示文字。
 function pointLinks(topic, points, size) {
@@ -186,7 +220,7 @@ function discussScreen(session, zone, on) {
     const WORD = { draft: "确认成立", established: "确认出口", released: "已锁定" };
     const gate = t.state === "draft" ? "topic-establish" : t.state === "established" ? "topic-release" : null;
     return (
-      '<li class="qa" data-state="' + esc(t.state) + '">' +
+      '<li class="qa" id="' + esc(t.id) + '" data-state="' + esc(t.state) + '">' +
       '<div class="qhead"><span class="aid">' + esc(t.id) + "</span>" +
       '<span class="qstate">' + WORD[t.state] + "</span>" +
       '<span class="qmeta">' + t.points.length + " 条要点</span></div>" +
@@ -235,7 +269,7 @@ function discussScreen(session, zone, on) {
     '<h3 class="colh">灵感清单 · 要点</h3>' +
     (livePoints.length
       ? '<ul class="qlist">' + [...livePoints].reverse().map((p) =>
-          '<li class="clue"><span class="aid">' + esc(p.id) + "</span> " + esc(p.text) + "</li>",
+          '<li class="clue" id="' + esc(p.id) + '"><span class="aid">' + esc(p.id) + "</span> " + esc(p.text) + "</li>",
         ).join("") + "</ul>"
       : '<p class="quiet">没有还散着的要点</p>') +
     '<h3 class="colh">核心议题</h3>' +
@@ -244,7 +278,7 @@ function discussScreen(session, zone, on) {
     "</div></section>"
   );
 }
-function taskRow(task, zone) {
+function taskRow(task, zone, anchors) {
   const pins = task.evidence.length === 0 ? 0 : pinsOf(task.evidence[task.evidence.length - 1]).length;
   const proofs = task.evidence
     .map(
@@ -287,7 +321,7 @@ function taskRow(task, zone) {
     '<span class="tfiles">' + esc(files) + "</span>" +
     "</summary>" +
     '<div class="tbody">' +
-    (task.source ? '<p class="k">依据</p><p class="crit">' + esc(task.source) + "</p>" : "") +
+    (task.source ? '<p class="k">依据</p><p class="crit">' + linkRefs(task.source, anchors) + "</p>" : "") +
     '<p class="k">做完的标准</p><p class="crit">' + esc(task.criteria) + "</p>" +
     '<p class="k">交付记录</p>' +
     (proofs ? '<ul class="proofs">' + proofs + "</ul>" : '<p class="quiet">还没有交付</p>') +
@@ -326,7 +360,7 @@ function pathsOf(session, segment) {
   return [...new Set(files)].sort();
 }
 
-function segmentBlock(session, segment, index, config, zone) {
+function segmentBlock(session, segment, index, config, zone, anchors) {
   const count = countIn(session, segment);
   const state = reviewState(config, session, segment);
   const review = reviewOf(session, segment);
@@ -369,7 +403,7 @@ function segmentBlock(session, segment, index, config, zone) {
       groupsOf(tasks)
         .map((group) =>
           '<p class="tgroup" data-group="' + group.key + '">' + group.label + " · " + group.tasks.length + " 条</p>" +
-          group.tasks.map((task) => taskRow(task, zone)).join(""),
+          group.tasks.map((task) => taskRow(task, zone, anchors)).join(""),
         )
         .join("") +
       "</div>" +
@@ -382,12 +416,13 @@ function executeScreen(session, config, zone, on) {
   const open = session ? openSegment(session) : null;
   const tasks = session ? session.tasks : [];
   const todo = tasks.filter((task) => task.status === "todo").length;
+  const anchors = anchorSet(session);
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="execute" id="screen-execute">' +
     screenHead("02", "执行", open ? "这一段开着 · " + open.id : "没有开着的段", (tasks.length - todo) + " / " + tasks.length + " 已交付") +
     '<div class="segs">' +
     (segments.length
-      ? [...segments].reverse().map((segment, index) => segmentBlock(session, segment, segments.length - index, config, zone)).join("")
+      ? [...segments].reverse().map((segment, index) => segmentBlock(session, segment, segments.length - index, config, zone, anchors)).join("")
       : '<p class="quiet">清单是空的：还没有一条任务</p>') +
     "</div></section>"
   );
@@ -720,6 +755,10 @@ html[data-theme="light"] body {
 .turn:target { box-shadow: inset 0 0 0 1px var(--warn); }
 .tlink { color: var(--warn); text-decoration: none; border-bottom: 1px dotted var(--warn); }
 .tlink:hover { border-bottom-style: solid; }
+/* 任务依据里的直链：点它切到讨论屏并滚过去；落点闪一下边框好找。 */
+.xref { color: var(--signal); text-decoration: none; border-bottom: 1px dotted var(--signal); }
+.xref:hover { border-bottom-style: solid; }
+.turn:target, .clue:target, .qa:target { box-shadow: inset 0 0 0 1px var(--warn); }
 .turn {
   display: grid; grid-template-columns: 64px 40px minmax(0,1fr); gap: 3px 12px;
   padding: 11px 0 11px 13px; border-left: 1px solid var(--line2); border-bottom: 1px solid var(--line);
@@ -962,6 +1001,24 @@ document.addEventListener("click", (event) => {
     document.querySelectorAll(".screen").forEach((one) => {
       one.classList.toggle("on", one.getAttribute("data-screen") === name);
     });
+    return;
+  }
+  // 依据里的直链：目标在另一屏（讨论屏），先切过去再滚到锚点。
+  // 光靠 href="#id" 不够——目标屏还 display:none 时浏览器滚不动。
+  const xref = event.target.closest(".xref");
+  if (xref) {
+    event.preventDefault();
+    const screen = xref.getAttribute("data-screen");
+    if (screen) {
+      const tab = document.querySelector('.tab[data-screen="' + screen + '"]');
+      if (tab) tab.click();
+    }
+    const id = String(xref.getAttribute("href") ?? "").replace(/^#/, "");
+    const target = id ? document.getElementById(id) : null;
+    if (target) {
+      history.replaceState(null, "", "#" + id);
+      setTimeout(() => target.scrollIntoView({ block: "center" }), 0);
+    }
     return;
   }
   const copy = event.target.closest("[data-copy]");

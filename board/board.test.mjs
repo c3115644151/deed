@@ -465,3 +465,22 @@ test("topic cards link their point rounds back to the original turns", () => {
   assert.match(html, /<a class="tlink" href="#turn-1">第 1 轮<\/a>/u, "议题卡有指向第一轮的锚点");
   assert.match(html, /<li class="turn user" id="turn-1"/u, "讨论屏那一条原文有对应的锚点");
 });
+
+
+// 执行屏任务卡的「依据」引用 P/I/轮次要能直链到讨论屏；不存在的号不造死链。
+test("a task's source references link straight to the discuss screen", () => {
+  const doc = fold([
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "讨论的第一轮" },
+    { v: 28, at: T(2), k: "point.add", s: null, id: "P14", text: "一条判断" },
+    { v: 30, at: T(3), k: "topic.create", s: null, id: "I1", title: "一个议题", body: "正文", points: [], by: "agent" },
+    { v: 32, at: T(4), k: "task.add", s: null, id: "T1", title: "一件事", criteria: "c",
+      source: "来自 P14、I1 与第 1 轮；P99 还没记" },
+  ]);
+  const html = renderBoard(doc, config, { zone, events: 4 });
+  assert.match(html, /<a class="xref" href="#P14" data-screen="discuss">P14<\/a>/u, "要点可链");
+  assert.match(html, /<a class="xref" href="#I1" data-screen="discuss">I1<\/a>/u, "议题可链");
+  assert.match(html, /<a class="xref" href="#turn-1" data-screen="discuss">第 1 轮<\/a>/u, "轮次可链");
+  assert.match(html, /<li class="clue" id="P14"/u, "讨论屏要点有锚点");
+  assert.match(html, /<li class="qa" id="I1"/u, "讨论屏议题有锚点");
+  assert.ok(!html.includes('href="#P99"'), "没记的要点不造死链");
+});
