@@ -375,3 +375,9 @@
 {"at":"2026-11-27T23:55:35.971Z","verb":"submit","code":0,"ms":16436,"switches":[],"why":null,"v":"0.32.0"}
 {"at":"2026-11-27T23:55:52.325Z","verb":"submit","code":0,"ms":16154,"switches":[],"why":null,"v":"0.32.0"}
 {"at":"2026-11-27T23:55:52.886Z","verb":"submit","code":0,"ms":389,"switches":[],"why":null,"v":"0.32.0"}
+{"at":"2026-11-27T23:58:27.322Z","verb":"state","code":0,"ms":94,"switches":[],"why":null,"v":"0.32.1"}
+{"at":"2026-11-27T23:58:41.915Z","verb":"review","code":0,"ms":43,"switches":["--due"],"why":null,"v":"0.32.1"}
+{"at":"2026-11-27T23:58:42.224Z","verb":"review","code":0,"ms":110,"switches":["--segment"],"why":null,"v":"0.32.1"}
+{"at":"2026-11-27T23:59:17.030Z","verb":"review","code":0,"ms":108,"switches":["--segment","--withdraw","--why"],"why":null,"v":"0.32.1"}
+{"at":"2026-11-27T23:59:17.296Z","verb":"review","code":0,"ms":43,"switches":["--due"],"why":null,"v":"0.32.1"}
+{"at":"2026-11-27T23:59:30.730Z","verb":"point","code":0,"ms":66,"switches":[],"why":null,"v":"0.32.1"}
