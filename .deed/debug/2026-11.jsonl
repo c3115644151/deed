@@ -45,3 +45,24 @@
 {"at":"2026-11-27T07:12:48.545Z","verb":"reply","code":0,"ms":74,"switches":["--from"],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T07:13:19.681Z","verb":"serve","code":0,"ms":52,"switches":["--port"],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T07:13:53.711Z","verb":"point","code":0,"ms":66,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T07:14:18.708Z","verb":"reply","code":0,"ms":84,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:12:13.189Z","verb":"review","code":0,"ms":31,"switches":["--due"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:12:13.951Z","verb":"say","code":0,"ms":68,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:12:43.555Z","verb":"state","code":0,"ms":127,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:12:43.787Z","verb":"review","code":0,"ms":37,"switches":["--due"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:12:59.606Z","verb":"state","code":0,"ms":60,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:13:40.461Z","verb":"reply","code":0,"ms":119,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:14:57.698Z","verb":"review","code":0,"ms":35,"switches":["--due"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:14:58.187Z","verb":"say","code":0,"ms":77,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:18:47.627Z","verb":"submit","code":0,"ms":7782,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:19:20.977Z","verb":"submit","code":1,"ms":7794,"switches":[],"why":"T92 勾上了，但这一批没有量到任何改动、也没有文件可指：先真的动过一个文件再勾（勾上只记账，改动由 submit 量）T92 --evidence \"…\"","v":"0.27.0"}
+{"at":"2026-11-27T08:19:47.411Z","verb":"submit","code":0,"ms":7694,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:19:51.044Z","verb":"serve","code":0,"ms":88,"switches":["--port"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:20:07.689Z","verb":"submit","code":1,"ms":11,"switches":[],"why":"清单有 4 处看不懂，一个字都没落：","v":"0.27.0"}
+{"at":"2026-11-27T08:20:29.681Z","verb":"submit","code":1,"ms":7,"switches":[],"why":"清单有 5 处看不懂，一个字都没落：","v":"0.27.0"}
+{"at":"2026-11-27T08:21:04.146Z","verb":"submit","code":1,"ms":7,"switches":[],"why":"清单有 5 处看不懂，一个字都没落：","v":"0.27.0"}
+{"at":"2026-11-27T08:23:19.092Z","verb":"submit","code":0,"ms":94230,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:25:48.385Z","verb":"reply","code":0,"ms":88,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:26:28.206Z","verb":"reply","code":0,"ms":84,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:26:29.152Z","verb":"submit","code":0,"ms":175,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:28:01.871Z","verb":"point","code":0,"ms":51,"switches":[],"why":null,"v":"0.27.0"}
