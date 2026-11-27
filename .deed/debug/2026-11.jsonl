@@ -222,3 +222,8 @@
 {"at":"2026-11-27T12:46:10.951Z","verb":"say","code":0,"ms":86,"switches":["--from"],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T12:55:32.769Z","verb":"submit","code":0,"ms":210,"switches":[],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T12:55:58.167Z","verb":"point","code":0,"ms":68,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:56:17.859Z","verb":"reply","code":0,"ms":82,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:57:03.111Z","verb":"review","code":0,"ms":41,"switches":["--due"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:57:03.580Z","verb":"say","code":0,"ms":96,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T13:00:31.974Z","verb":"review","code":1,"ms":54,"switches":["--segment"],"why":"段 S02.19 已经封存，结论不能再落","v":"0.30.0"}
+{"at":"2026-11-27T13:01:01.918Z","verb":"point","code":0,"ms":69,"switches":[],"why":null,"v":"0.30.0"}
