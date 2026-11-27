@@ -67,3 +67,10 @@
 {"at":"2026-11-27T08:26:29.152Z","verb":"submit","code":0,"ms":175,"switches":[],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T08:28:01.871Z","verb":"point","code":0,"ms":51,"switches":[],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T08:28:04.858Z","verb":"serve","code":0,"ms":56,"switches":["--port"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:28:23.639Z","verb":"state","code":0,"ms":53,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:28:37.061Z","verb":"state","code":0,"ms":50,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:28:58.031Z","verb":"state","code":0,"ms":89,"switches":[],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:29:19.125Z","verb":"reply","code":0,"ms":104,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:32:35.107Z","verb":"review","code":0,"ms":36,"switches":["--due"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:32:35.627Z","verb":"say","code":0,"ms":79,"switches":["--from"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T08:33:56.760Z","verb":"point","code":0,"ms":58,"switches":[],"why":null,"v":"0.27.0"}
