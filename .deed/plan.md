@@ -13,13 +13,10 @@
 
 ## 段 S02.20
 <!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
-- [ ] T88 让议题卡里的轮次号能点回那一轮原话
-  依据：2026-11-24 用户轮「讨论机制按议题来…轮次只做索引、能点回原话」
-  标准：deed say "…" --topic I1 只把这一轮的编号追加进该议题，不复制文本；不存在的议题号 exit 1 且一个字不落账；面板议题卡上的号是指向 #turn-N 的锚点、点得到那一轮；cli 与 board 各有用例
-<!-- 等着（7 条）：上面那条做完再动 -->
 - [ ] T91 清单条目要写明来自哪条议题，没确认的议题不能用
   依据：2026-11-24 用户轮「讨论机制按议题来…冲突拆成题」
   标准：plan 行可带一行 来自：I1；submit 核对议题存在且已放出，否则整批拒并点名第几行；task.add 落 topic；没放出的议题一条都出不来；state 在「有已放出的议题、清单还没条目」时把下一步指向写清单；有用例
+<!-- 等着（6 条）：上面那条做完再动 -->
 - [ ] T93 只有真要出整期审时，state 才提目的
   依据：2026-11-24 用户轮「讨论机制按议题来」后的状态呈现讨论
   标准：单段会话的 state 不印「目的 · 还没有」；多段且要整期审时印成「整期审的尺子 · …」；deed --help 与 DESIGN 里 goal 的说法同步（T81 删掉 goal 动词之后，那句话只指清单第一行）；有用例
@@ -38,11 +35,11 @@
 - [ ] T92 面板 /events 的客户端断开后，服务继续运行
   依据：2026-11-24 用户轮「讨论机制按议题来」后的面板稳定性讨论
   标准：board/serve.mjs 的 /events 有 res.on("error") 与写失败处理；客户端连一次再断开之后进程仍活着（探针记 pid 前后一致）；有用例或可复跑的命令
-<!-- 已完成（35 条）：交过的，往下沉 -->
-- [x] T151 任务只保留标题、标准、依据三样，标准过时会提示
-  依据：P14 的判断；用户要求任务能让陌生 agent 独立推进
-  标准：task.add 带 problem/source/premise；task.context 可补上下文不改标题标准状态；清单草稿解析与渲染三字段；审查材料与面板显示；core/stale.mjs 机械查过期（只查未做且段开着的任务），deed state 只读提示；老账本照读
-  交付：任务条重构落地：task.add 带问题/依据/前提，新增 task.context 事件（EVENT_VERSION 31、package 0.28.0）；清单解析与渲染三字段、审查材料与面板显示；core/stale.mjs 比对命令面查过期，deed state 只读提示（本期抓到 T88 的 say --topic）；老账本照读；期望：node --test => ℹ pass 247
+<!-- 已完成（36 条）：交过的，往下沉 -->
+- [x] T88 让议题卡里的轮次号能点回那一轮原话
+  依据：2026-11-24 用户轮「讨论机制按议题来…轮次只做索引、能点回原话」
+  标准：deed say "…" --topic I1 只把这一轮的编号追加进该议题，不复制文本；不存在的议题号 exit 1 且一个字不落账；面板议题卡上的号是指向 #turn-N 的锚点、点得到那一轮；cli 与 board 各有用例
+  交付：要点折叠记下 round=第几条 user 轮（core/fold.mjs:point.add，回复不数、老账本照读）；core/rules.mjs 加 turnNumbers(session)；board/render.mjs 讨论屏每条原文 id=turn-N、议题卡把收编要点的 round 做成 #turn-N 链接（pointLinks），CSS 高亮 :target；test/fold.test.mjs「a point remembers which user round it came from」与 board/board.test.mjs「topic cards link their point rounds back to the original turns」两条。node --test 全量绿；DESIGN §2 补锚点说明
 - [x] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
   标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
   交付：deed ask answer A1 --decision "…" --by user 落账并关题；deed ask drop A1 --why "…" 关题；ask resolve 与 ask withdraw 两条旧路 exit 1 并指到新名（ask resolve 实测报「已经改成 ask answer A1」）；ask 的开关表里没有 why（给 raise 传 --why 会被拒）；裁定里的「边界：」「弃：」照旧从账本算出来（边界仍 2 条）；事件含义第 26 版：ask.raise 只有 v<26 的旧行才要 why；规则块、README 围栏、AGENTS 尾段三处同一段话已同步；这一份字节上 node --test 217 条（216 过，1 条面板端口用例在并发下红，单跑 test/cli-state1 12/12）（agent）
@@ -145,6 +142,10 @@
 - [x] T150 观察层：命令面自己怎么被用——从没敲过的、敲了就失败的、没人用的开关
   标准：每次调用在 .deed/debug/*.jsonl 留一行（动词、成没成、耗时、开关名、被拒的那一句），不进账本也不进方案快照；deed debug [--days N] [--json] 印三节：从没敲过、敲了就失败最多、一次没用过的开关；样本不足时报告自己说出来；有用例覆盖一行一调用、开关只记名不记值、窗口只认窗口内的、报告与 --json 的字段
   交付：观察层落地：cli/trace.mjs 一处写（dispatcher 收尾：动词、ok、ms、开关名、被拒的那一句），cli/verbs/debug.mjs 一处读（从没敲过 / 敲了就失败最多 / 没人用过的开关 / 拒绝的话按次数 / 最慢的 p95），--json 给机器；trace 不建 .deed、不进快照、不进账本；顺带删掉 init 里早该没有的 --who；期望：node --test => ℹ pass 239
+- [x] T151 任务只保留标题、标准、依据三样，标准过时会提示
+  依据：P14 的判断；用户要求任务能让陌生 agent 独立推进
+  标准：task.add 带 problem/source/premise；task.context 可补上下文不改标题标准状态；清单草稿解析与渲染三字段；审查材料与面板显示；core/stale.mjs 机械查过期（只查未做且段开着的任务），deed state 只读提示；老账本照读
+  交付：任务条重构落地：task.add 带问题/依据/前提，新增 task.context 事件（EVENT_VERSION 31、package 0.28.0）；清单解析与渲染三字段、审查材料与面板显示；core/stale.mjs 比对命令面查过期，deed state 只读提示（本期抓到 T88 的 say --topic）；老账本照读；期望：node --test => ℹ pass 247
 <!-- 撤回或放弃（14 条）：不做了的，沉到最后 -->
 - [~] T79 T79 一轮只记一句话：deed say 取代 tick
   标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）

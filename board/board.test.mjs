@@ -452,3 +452,16 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+// T88：议题卡把收编要点显示的轮号链回讨论屏原文（#turn-N）。
+test("topic cards link their point rounds back to the original turns", () => {
+  const doc = fold([
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "先说的那句" },
+    { v: 30, at: T(2), k: "point.add", s: null, id: "P1", text: "一句判断" },
+    { v: 30, at: T(3), k: "topic.create", s: null, id: "I1", title: "一个议题", body: "正文", points: ["P1"], by: "agent" },
+  ]);
+  const html = renderBoard(doc, config, { zone, events: 4 });
+  assert.match(html, /<a class="tlink" href="#turn-1">第 1 轮<\/a>/u, "议题卡有指向第一轮的锚点");
+  assert.match(html, /<li class="turn user" id="turn-1"/u, "讨论屏那一条原文有对应的锚点");
+});

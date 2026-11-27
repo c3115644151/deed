@@ -410,6 +410,17 @@ export const debt = (session) => ({
 // 这里挡的是那之前的旧行——它们照原样读得出来，计数时不算。
 export const userTurns = (session) => session.turns.filter((one) => one.who === "user");
 
+// 议题卡上的"第 N 轮"指的是人开口的那一轮（user turn），按发生顺序数。
+// 面板用它把号翻回那句话的锚点；账本里一条轮次原文都不用复制进议题。
+// 同一会话的 turns 与 replies 共用时间轴，这里只数 user，与我说的那半分开。
+export const turnNumbers = (session) => {
+  const numbers = new Map();
+  let n = 0;
+  for (const one of [...(session.turns ?? [])].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)))
+    if (one.who === "user") numbers.set(one.at, ++n);
+  return numbers;
+};
+
 export const pressure = (session) => {
   const segment = openSegment(session);
   if (!segment) return null;

@@ -19,6 +19,7 @@ import {
   reviewState,
   signBlockers,
   takingSegment,
+  turnNumbers,
   userTurns,
 } from "../core/rules.mjs";
 
@@ -157,6 +158,21 @@ function screenHead(index, name, note, meter) {
   );
 }
 
+// 议题卡上的「第 N 轮」指向讨论屏那一条原文（#turn-N）。N 是记要点时
+// 算出来的轮号（point.round），不是从正文里猜的；老账本没记轮号的只显示文字。
+function pointLinks(topic, points, size) {
+  const seen = new Set();
+  const links = [];
+  for (const id of topic.points ?? []) {
+    const p = points.find((one) => one.id === id);
+    const n = p?.round;
+    if (!Number.isInteger(n) || n < 1 || n > size || seen.has(n)) continue;
+    seen.add(n);
+    links.push('<a class="tlink" href="#turn-' + n + '">第 ' + n + ' 轮</a>');
+  }
+  return links.length ? '<p class="qlinks">来自 · ' + links.join(" · ") + "</p>" : "";
+}
+
 function discussScreen(session, zone, on) {
   const turns = session ? session.turns : [];
   // 原文是两半：人说的（轮次）与我说的话（回复）。以前只画了前一半，
@@ -165,6 +181,7 @@ function discussScreen(session, zone, on) {
   const points = session ? (session.points ?? []) : [];
   const topics = session ? (session.topics ?? []) : [];
   const livePoints = points.filter((one) => !one.absorbedBy);
+  const numbers = turnNumbers(session ?? { turns: [] });
   const topicRows = [...topics].reverse().map((t) => {
     const WORD = { draft: "确认成立", established: "确认出口", released: "已锁定" };
     const gate = t.state === "draft" ? "topic-establish" : t.state === "established" ? "topic-release" : null;
@@ -175,6 +192,7 @@ function discussScreen(session, zone, on) {
       '<span class="qmeta">' + t.points.length + " 条要点</span></div>" +
       '<p class="atext">' + esc(t.title) + "</p>" +
       (t.body ? '<p class="qdone">' + esc(t.body) + "</p>" : '<p class="quiet">还没有正文</p>') +
+      pointLinks(t, points, numbers.size) +
       (gate
         ? '<form class="gate small" data-gate="' + gate + '" data-topic="' + esc(t.id) + '">' +
           '<button class="gpress" type="submit">' + WORD[t.state] + " " + esc(t.id) + "</button></form>"
@@ -184,10 +202,10 @@ function discussScreen(session, zone, on) {
   }).join("");
   // 一条时间线：轮次与回复按当时发生的顺序并排，谁说的写在左边。
   // 回复原文可能很长（我的一句话就是几百字），所以默认折起，点开看全文。
-  const line = (who, at, text) => {
+  const line = (who, at, text, anchor) => {
     const long = text.length > 240;
     return (
-      '<li class="turn ' + who + '">' +
+      '<li class="turn ' + who + '"' + (anchor ? ' id="' + esc(anchor) + '"' : "") + '>' +
       '<span class="tclock">' + when(at, zone) + "</span>" +
       '<span class="twho">' + (who === "user" ? "你" : "我") + "</span>" +
       (long
@@ -198,10 +216,11 @@ function discussScreen(session, zone, on) {
     );
   };
   const timeline = [
-    ...turns.map((one) => ({ at: one.at, who: one.who === "user" ? "user" : "agent", text: one.said })),
-    ...replies.map((one) => ({ at: one.at, who: "agent", text: one.text })),
+    ...turns.map((one) => ({ at: one.at, who: one.who === "user" ? "user" : "agent", text: one.said,
+      anchor: one.who === "user" ? "turn-" + numbers.get(one.at) : null })),
+    ...replies.map((one) => ({ at: one.at, who: "agent", text: one.text, anchor: null })),
   ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
-  const row = (one) => line(one.who, one.at, one.text);
+  const row = (one) => line(one.who, one.at, one.text, one.anchor);
   const live = topics.filter((one) => one.state !== "released").length;
   return (
     '<section class="screen' + (on ? " on" : "") + '" data-screen="discuss" id="screen-discuss">' +
@@ -697,6 +716,10 @@ html[data-theme="light"] body {
 
 /* ----------------------------------------------------------------- turns */
 .turns { list-style: none; margin: 0; padding: 0; }
+/* 议题卡上「第 N 轮」点过来时，把那一条原文标出来；页面自己滚到锚点。 */
+.turn:target { box-shadow: inset 0 0 0 1px var(--warn); }
+.tlink { color: var(--warn); text-decoration: none; border-bottom: 1px dotted var(--warn); }
+.tlink:hover { border-bottom-style: solid; }
 .turn {
   display: grid; grid-template-columns: 64px 40px minmax(0,1fr); gap: 3px 12px;
   padding: 11px 0 11px 13px; border-left: 1px solid var(--line2); border-bottom: 1px solid var(--line);

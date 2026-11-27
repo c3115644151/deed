@@ -453,3 +453,15 @@ test("the segment a taken-back carry emptied disappears with it", () => {
   assert.equal(session.tasks.find((one) => one.id === "T2").segment, "S01.1");
   assert.deepEqual(session.segments.map((one) => one.id), ["S01.1", "S01.2"], "清单排过的那一段留着：它不是空的格子");
 });
+
+// T88：要点记下它来自第几轮人话，议题卡据此能链回原文。
+test("a point remembers which user round it came from", () => {
+  const doc = fold([
+    turn(1, "第一轮"),
+    { v: 28, at: T(2), k: "reply", s: null, text: "我回了一句" },
+    turn(3, "第三轮"),
+    { v: 28, at: T(4), k: "point.add", s: null, id: "P1", text: "一句判断" },
+  ]);
+  const p = doc.sessions[0].points.find((one) => one.id === "P1");
+  assert.equal(p.round, 2, "回复不算轮；这条要点来自第二轮人话");
+});

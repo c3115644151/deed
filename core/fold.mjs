@@ -526,9 +526,12 @@ export function fold(events) {
           if (topic.state === "released") noway(`议题 ${topic.id} 已经锁定出口：新要点挂在它上面要开新议题`);
         }
         const absorbedBy = topic && topic.state === "established" ? topic.id : null;
+        // 记下这条要点是「第几轮人话」：面板据此把议题卡上的号链回原文。
+        // 只数到这条要点记下那一刻为止的 user 轮，晚来的轮次不倒填；老账本没有这个字段照读。
+        const round = session.turns.filter((one) => one.who === "user" && one.at <= ev.at).length || null;
         session.points.push({
           id: ev.id, text: ev.text, at: ev.at,
-          topic: topic ? topic.id : null, absorbedBy,
+          topic: topic ? topic.id : null, absorbedBy, round,
         });
         if (topic) topic.points.push(ev.id);
         break;
