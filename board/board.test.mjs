@@ -145,6 +145,53 @@ test("serving is read-only and says so", async () => {
   }
 });
 
+// 面板闲着才自己退：有人开着页面（SSE 连着）时不能把他正看的页面收掉。
+// 这两条用短 idle 跑——真等 30 分钟测不起。exit:false 让测试进程不被带走。
+test("an open SSE connection keeps the panel from exiting as idle", async () => {
+  const root = workspace("idle-stream");
+  const prev = process.env.DEED_PANEL_IDLE_MIN;
+  process.env.DEED_PANEL_IDLE_MIN = "0.002"; // 0.12 秒空闲线，检查间隔被压到 1 秒
+  const server = start(root, 0, null, { exit: false });
+  await new Promise((resolve) => server.once("listening", resolve));
+  const port = server.address().port;
+  let closedByUs = false;
+  server.on("close", () => { closedByUs = true; });
+  const stream = await new Promise((resolve) => {
+    http.get({ host: "127.0.0.1", port, path: "/events" }, (res) => {
+      res.once("data", () => resolve(res));
+    });
+  });
+  try {
+    await new Promise((r) => setTimeout(r, 2200));
+    assert.equal(closedByUs, false, "SSE 还连着，面板不该按闲置收摊");
+    assert.equal(server.listening, true);
+  } finally {
+    stream.destroy();
+    if (prev === undefined) delete process.env.DEED_PANEL_IDLE_MIN;
+    else process.env.DEED_PANEL_IDLE_MIN = prev;
+    await new Promise((r) => { if (server.listening) server.close(r); else r(); });
+  }
+});
+
+test("with no stream the panel closes on idle, and exit:false keeps the host alive", async () => {
+  const root = workspace("idle-plain");
+  const prev = process.env.DEED_PANEL_IDLE_MIN;
+  process.env.DEED_PANEL_IDLE_MIN = "0.002";
+  const server = start(root, 0, null, { exit: false });
+  await new Promise((resolve) => server.once("listening", resolve));
+  let closed = false;
+  server.on("close", () => { closed = true; });
+  try {
+    await new Promise((r) => setTimeout(r, 2200));
+    assert.equal(closed, true, "没人连着就该按闲置收摊");
+    assert.equal(server.listening, false);
+  } finally {
+    if (prev === undefined) delete process.env.DEED_PANEL_IDLE_MIN;
+    else process.env.DEED_PANEL_IDLE_MIN = prev;
+    if (server.listening) await new Promise((r) => server.close(r));
+  }
+});
+
 // 挡着的时候不画按钮：条件不满足的闸只在边上说明为什么，不给人一个按不下去的位置。
 test("a gate that cannot be pressed is not drawn", () => {
   const html = render();

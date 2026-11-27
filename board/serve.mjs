@@ -71,7 +71,7 @@ export function identity(root, port) {
   return { deed: true, root: path.resolve(root), pid: process.pid, port, build: buildCached() };
 }
 
-export function handler(root, onRequest = () => {}, onRetire = null) {
+export function handler(root, onRequest = () => {}, onRetire = null, onStream = null) {
   return (req, res) => {
     onRequest();
     const url = new URL(req.url, "http://localhost");
@@ -196,6 +196,8 @@ export function handler(root, onRequest = () => {}, onRetire = null) {
       return;
     }
     if (url.pathname === "/events") {
+      if (onStream) onStream(1);
+      let closed = false;
       res.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-store",
@@ -240,6 +242,9 @@ export function handler(root, onRequest = () => {}, onRetire = null) {
       const waiting = setInterval(attach, 1000);
       const ping = setInterval(() => res.write(": ping\n\n"), 25000);
       const close = () => {
+        if (closed) return;
+        closed = true;
+        if (onStream) onStream(-1);
         clearInterval(ping);
         clearInterval(waiting);
         if (timer) clearTimeout(timer);
@@ -256,6 +261,10 @@ export function handler(root, onRequest = () => {}, onRetire = null) {
 
 export function start(root, port, onFatal = null, options = {}) {
   let lastRequest = Date.now();
+  // 开着页面看的人：SSE 连着就不算闲。它按连接数算，不按请求算——
+  // 一条一直连着的 SSE 每 25 秒才写一个 ping，那些 ping 不该被当成请求来续命，
+  // 但连接本身在，就是"有人在看"这件事实。
+  let streams = 0;
   const server = http.createServer(
     handler(
       root,
@@ -269,6 +278,10 @@ export function start(root, port, onFatal = null, options = {}) {
           if (options.exit === false) return;
           process.exit(0);
         });
+      },
+      (delta) => {
+        streams += delta;
+        if (streams > 0) lastRequest = Date.now();
       },
     ),
   );
@@ -313,11 +326,17 @@ export function start(root, port, onFatal = null, options = {}) {
   }, 2000);
 
   const idle = Number(process.env.DEED_PANEL_IDLE_MIN ?? 30) * 60 * 1000;
+  // 检查间隔随 idle 缩短：生产是 60 秒一次，测试把 idle 调短时也能很快看到结果，
+  // 不必为了一个退出分支等上一分钟。
+  const tick = Math.min(60 * 1000, Math.max(1000, idle / 2));
   const clock = setInterval(() => {
-    if (Date.now() - lastRequest < idle) return;
+    if (streams > 0 || Date.now() - lastRequest < idle) return;
     clearInterval(clock);
-    server.close(() => process.exit(0));
-  }, 60 * 1000);
+    server.close(() => {
+      if (options.exit === false) return;
+      process.exit(0);
+    });
+  }, tick);
   server.on("close", () => {
     clearInterval(clock);
     clearInterval(auto);
