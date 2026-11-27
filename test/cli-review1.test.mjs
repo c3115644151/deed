@@ -109,7 +109,7 @@ test("handing the brief out is a fact, and a verdict answers that document", () 
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.brief").length, 1);
   assert.match(deed(cwd, "state").stdout, /落结论/, "下一步是结论，不是又一份清单");
   // 结论回答的是交出去的那份，现场不会再写一份。
-  deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录", "--finding", "没有并发记录");
+  deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没有并发记录", "--finding", "没有并发记录");
   const logged = readEvents(cwd).find((one) => one.k === "review.log");
   assert.equal(logged.verdict, "fail");
   assert.equal(logged.segment, "S01.1");
@@ -230,7 +230,7 @@ test("a named entry that was given up settles, and the verdict says so", () => {
   addTask(cwd, "改重放", "同账本同文档");
   deliverTask(cwd, "T1", "node --test", { file: "fold.mjs" });
   deed(cwd, "review", "--segment", "S01.1");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没有并发记录").status, 0);
   assert.equal(dropTask(cwd, "T1", "这一期不做了：重放改到下一期").status, 0);
   const step = deed(cwd, "state");
   assert.match(step.stdout, /它们改主意不做了/, "放弃已结清，下一步该是落结论");

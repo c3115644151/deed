@@ -38,7 +38,7 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   addTask(cwd, "改重放", "同账本同文档", "--files", "core/fold.mjs");
   deliverTask(cwd, "T1", "node --test");
   deed(cwd, "review", "--segment", "S01.1");
-  const failed = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "没有并发记录");
+  const failed = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没有并发记录");
   assert.equal(failed.status, 0, failed.stderr);
   const back = deed(cwd, "state");
   assert.match(back.stdout, /deed submit/, "点名的那条回到未做，下一步是在清单里再勾一次");
@@ -63,7 +63,7 @@ test("a fail names every task it sends back", () => {
   deliverTask(cwd, "T1", "写完了");
   deliverTask(cwd, "T2", "写完了");
   deed(cwd, "review", "--segment", "S01.1");
-  const back = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1,T2", "--why", "两处都要补");
+  const back = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--result", "T2=unmet", "--rework", "T1,T2", "--why", "两处都要补");
   assert.equal(back.status, 0, back.stdout + back.stderr);
   const state = deed(cwd, "state");
   assert.match(state.stdout, /○ T1/);
@@ -185,7 +185,7 @@ test("a fail that names nobody is refused, and a pass cannot carry a rework", ()
   const nameless = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--why", "不行");
   assert.equal(nameless.status, 1, "不点名的结论没人能接");
   assert.match(nameless.stderr, /--rework/);
-  const unclear = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1");
+  const unclear = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1");
   assert.equal(unclear.status, 1, "点名要说为什么");
   assert.match(unclear.stderr, /--why/);
   const mixed = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met", "--rework", "T1");

@@ -17,6 +17,7 @@ import {
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, writeBrief } from "../brief.mjs";
 import { draft as planDraft } from "../plan.mjs";
+import { settledSince } from "../../core/fold.mjs";
 import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
 
 
@@ -282,10 +283,18 @@ export default function review(argv) {
       const bulk = flags["result-all"];
       if (bulk !== undefined && !["met", "unmet", "unknown"].includes(String(bulk)))
         fail("--result-all 只认 met／unmet／unknown：" + bulk);
-      if (bulk !== undefined && list(flags.result).length > 0)
-        fail("--result-all 已经是「每一条都这样」：不必再逐条写同样的判定");
+      // --result-all 给全体一个判定，逐条的写在后面改口——不合格通常只有一两条要退，
+      // 其余全是 met；只写「全体 met + 那一条 unmet」比写六十行逐条判定诚实得多。
+      const given = list(flags.result);
+      const overridden = new Map(
+        given.map((raw) => [String(raw).split("=")[0].trim(), raw]),
+      );
       const rawResults =
-        bulk !== undefined ? tasksIn(one, seg).map((task) => task.id + "=" + String(bulk)) : list(flags.result);
+        bulk !== undefined
+          ? tasksIn(one, seg)
+              .map((task) => overridden.get(task.id) ?? task.id + "=" + String(bulk))
+              .concat([...overridden.keys()].filter((id) => !tasksIn(one, seg).some((task) => task.id === id)).map((id) => overridden.get(id)))
+          : given;
       const results = rawResults.map((raw) => {
         const matched = /^([A-Za-z0-9]+)=([a-z]+)(?::(.+))?$/u.exec(String(raw).trim());
         if (!matched)
@@ -298,15 +307,6 @@ export default function review(argv) {
         if (task.segment !== seg.id) fail(id + " 不在段 " + seg.id + " 里（它在 " + task.segment + "），结论只能判这一段的条目");
         return { id, verdict, note: note ?? null };
       });
-      if (flags.verdict === "pass") {
-        const judged = new Set(results.map((one2) => one2.id));
-        const bare = tasksIn(one, seg)
-          .filter((task) => task.status !== "dropped" && task.status !== "deferred")
-          .filter((task) => !judged.has(task.id))
-          .map((task) => task.id);
-        if (bare.length > 0)
-          fail("pass 要每条都判过：" + bare.join("、") + " 还没有判定（--result " + bare[0] + "=met 这样逐条写）");
-      }
       // 一条结论要么放行，要么说清哪几条要重做。不合格而不点名，接到结论的人
       // 只能回来猜——那是把判断留给没看过活的人。
       const rework = split(flags.rework).filter(Boolean);
@@ -315,6 +315,23 @@ export default function review(argv) {
         if (!flags.why) fail("不合格要说清为什么：--why \"一句话总结\"（具体问题写在 --finding 里）");
       } else if (rework.length > 0) {
         fail("--rework 只跟 --verdict fail 一起用：pass 的意思是这一段过了，没有要退回的条目");
+      }
+      // 通过或不通过都要逐条有判定：没退回的那些在这一次里是 met，下一次重审沿用它，
+      // 不必把整段再判一遍。自上次判定以来没动过的条目（清单里"判定沿用"那一节）
+      // 可以不写——它那一判还是对它下的。
+      {
+        const judged = new Set(results.map((one2) => one2.id));
+        const bare = tasksIn(one, seg)
+          .filter((task) => task.status !== "dropped" && task.status !== "deferred")
+          .filter((task) => !judged.has(task.id))
+          .filter((task) => settledSince(one, task) === null)
+          .map((task) => task.id);
+        if (bare.length > 0)
+          fail(
+            (flags.verdict === "pass" ? "pass " : "不合格") +
+              "要每条都判过：" + bare.join("、") + " 还没有判定（--result " + bare[0] + "=met 这样逐条写；" +
+              "清单里「判定沿用」那一节可以不写）",
+          );
       }
       // 上一份不合格点名的条目里，被放弃的那些没有交付可结清：结论不是"改好了"，
       // 而是"这件事改主意不做了"。在落结论的地方说出来，下一个读账本的人才知道。

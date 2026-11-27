@@ -349,7 +349,7 @@ test("a fail whose named work was given up asks for a new brief, not a verdict",
   assert.equal(deliverTask(cwd, "T2", "跑：跑得通").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
   assert.equal(
-    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1,T2", "--why", "没做到").status,
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--result", "T2=unmet", "--rework", "T1,T2", "--why", "没做到").status,
     0,
   );
   dropTask(cwd, "T1", "改主意了");

@@ -46,7 +46,7 @@ test("a failed review hands the named work back, and nobody is asked to sign off
   deliverTask(cwd, "T1", "交了", { file: "proof.txt" });
   const brief = deed(cwd, "review", "--segment", "S01.1");
   assert.equal(brief.status, 0);
-  const log = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "交付记录只说了半句", "--finding", "依据只说了半句");
+  const log = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "交付记录只说了半句", "--finding", "依据只说了半句");
   assert.equal(log.status, 0, log.stderr);
   const state = deed(cwd, "state");
   assert.match(state.stdout, /deed submit/, "被点名的那条回到未做，下一步是在清单里再勾一次");
@@ -95,7 +95,7 @@ test("new work waits for the verdict in the next segment, and a brief only ages 
   assert.equal(undoDelivery(cwd, "T2", "上一版作废，按新的一版重交").status, 0);
   assert.equal(deliverTask(cwd, "T2", "又做了一遍", { file: "proof.txt" }).status, 0, "撤回之后这一段回到执行态");
   assert.equal(deed(cwd, "review", "--segment", "S01.2").status, 0, "撤回之后要重出一份清单");
-  const older = deed(cwd, "review", "--segment", "S01.2", "--verdict", "fail", "--rework", "T2", "--why", "再看法");
+  const older = deed(cwd, "review", "--segment", "S01.2", "--verdict", "fail", "--result", "T2=unmet", "--rework", "T2", "--why", "再看法");
   assert.equal(older.status, 0, older.stdout + older.stderr);
 });
 
@@ -228,10 +228,7 @@ test("a review may carry more than one finding, and all of them land", () => {
     "review",
     "--segment",
     "S01.1",
-    "--verdict",
-    "fail",
-    "--rework",
-    "T1",
+    "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1",
     "--why",
     "两条都得改",
     "--finding",
@@ -259,7 +256,7 @@ test("a pass names the segment it sealed, and the next step is the signature", (
   assert.equal(state.status, 0);
   assert.match(state.stdout, /判决/, "审查通过之后轮到人判，不是签收");
   assert.doesNotMatch(state.stdout, /deed judge --pass/);
-  const again = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "再看");
+  const again = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "再看");
   assert.equal(again.status, 1, "结论落过、在等判决的段不能再落一份");
   assert.match(again.stderr, /等你判决/);
 });
@@ -428,7 +425,7 @@ test("a period verdict that names a segment reopens it, and its items stay deliv
   assert.equal(deed(cwd, "review", "--segment", "S01.2", "--verdict", "pass", "--result-all", "met").status, 0);
 
   judged(cwd, "review", "--all");
-  const failed = judged(cwd, "review", "--all", "--verdict", "fail", "--rework", "S01.1", "--why", "这一段的结论没对上这一期");
+  const failed = judged(cwd, "review", "--all", "--verdict", "fail", "--result", "S01.1=unmet", "--rework", "S01.1", "--why", "这一段的结论没对上这一期");
   assert.equal(failed.status, 0, failed.stderr);
   const state = deed(cwd, "state");
   assert.match(state.stdout, /S01\.1[^\n]*开于/, "被点名的段重新打开");
@@ -521,4 +518,37 @@ test("review passing hands the segment back, and only the user's judgement close
   const row = readEvents(cwd).filter((one) => one.k === "verdict.pass").pop();
   assert.deepEqual([row.by, row.via, row.segment], ["user", "panel", "S01.1"], "账本读得出是谁在哪按的");
   assert.equal(judgeHere(cwd, "S01.1").status, 1, "判过的段不再判");
+});
+
+// 已经判过、之后没动过的条目：重审清单里只留一行（编号 · 标题 · 上次判定），
+// 不再展开标准与交付——重判一遍等于把别人的工作重做。
+test("a second brief only expands what has to be judged again", () => {
+  const cwd = workspace("brief-second");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  addTask(cwd, "第一条", "跑得通");
+  addTask(cwd, "第二条", "跑得通");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
+  assert.equal(deliverTask(cwd, "T2", "跑：跑得通").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const bare = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T2=unmet", "--rework", "T2", "--why", "第二条没做到");
+  assert.equal(bare.status, 1, "不合格也要逐条判定，不然重审没有可沿用的东西");
+  assert.match(bare.stderr, /要每条都判过/u);
+  const wrong = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T2", "--why", "x",
+    "--result", "T1=met", "--result", "T2=met");
+  assert.equal(wrong.status, 1, "退回的那条不能判成 met");
+  assert.match(wrong.stderr, /要判成 unmet/u);
+  const ok = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T2", "--why", "第二条没做到",
+    "--result", "T1=met", "--result", "T2=unmet");
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(ok.status, 0, ok.stderr);
+  // 被点名的那条重新交付之后，再出一份清单：它要重判，T1 的判定沿用。
+  assert.equal(deliverTask(cwd, "T2", "又跑一遍").status, 0);
+  // 按命令印出来的那份读：文件名带 "-2" 的那种，字母序排在第一份前面，不能靠 at(-1) 猜。
+  const made = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(made.status, 0, made.stderr);
+  const brief = fs.readFileSync(path.join(cwd, made.stdout.match(/\.deed[\\/]review[\\/]\S+\.md/u)[0]), "utf8");
+  assert.match(brief, /要重判的/u);
+  assert.match(brief, /### T2 · 第二条/u, "被退回的那条要展开");
+  assert.doesNotMatch(brief, /### T1 · 第一条/u, "没动过的那条不再展开");
+  assert.match(brief, /- T1 · 第一条 · 上次 met[^\n]*判定沿用/u);
 });

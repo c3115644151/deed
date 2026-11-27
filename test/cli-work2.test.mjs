@@ -563,8 +563,33 @@ test("a verdict redraws the draft so a reworked entry is no longer ticked", () =
   assert.match(readPlan(cwd), /- \[x\] T1 /u, "交付之后勾上了");
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
   assert.equal(
-    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "没做到").status,
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status,
     0,
   );
   assert.match(readPlan(cwd), /- \[ \] T1 /u, "打回之后文件里也回到未做");
+});
+
+// 一段放 20 条就到顶：审查的单位是段，大到一次读不完，清单就没人真读。
+test("a segment takes twenty entries and then asks for a new one", () => {
+  const cwd = workspace("segment-cap");
+  deed(cwd, "init", "--said", "开始");
+  const body = ["# x", "", "## 段"];
+  for (let n = 1; n <= 20; n += 1) body.push("- ? 第 " + n + " 条", "  标准：跑得通");
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), body.join("\n") + "\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0, "二十条一次写进去");
+  // 第二十一条还写在那一节里：submit 该拒。
+  const withOver = fs.readFileSync(path.join(cwd, ".deed", "plan.md"), "utf8").replace(/\s*$/u, "") +
+    "\n- ? 第二十一条\n  标准：跑得通\n";
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), withOver, "utf8");
+  const capped = deed(cwd, "submit");
+  assert.equal(capped.status, 1, "满了就不收");
+  assert.match(capped.stderr, /一段最多 20 条/u);
+
+  // 把那一条从满的那一节里挪出来，放到新的一节：这一段就收得下了。
+  const more = withOver.replace(/\n- \? 第二十一条\n  标准：跑得通/u, "").replace(/\s*$/u, "") +
+    "\n\n## 段\n- ? 第二十一条\n  标准：跑得通\n";
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), more, "utf8");
+  assert.equal(deed(cwd, "submit").status, 0, "另起一节就收得下");
+  const doc = fold(readEvents(cwd));
+  assert.equal(doc.sessions[0].segments.length, 2, "第二十一条开了新的一段");
 });

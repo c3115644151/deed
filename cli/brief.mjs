@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { tasksIn } from "../core/rules.mjs";
+import { settledSince } from "../core/fold.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 
@@ -183,7 +184,14 @@ export function planBrief(root, open, segment, at) {
   // 审查者的临时区：清单发出去时开，结论落地时删。它不属于工作区，也不进账本。
   const scratch = path.join(p.tmp, segment.id + "-" + fileStamp(at));
   fs.mkdirSync(scratch, { recursive: true });
-  const bare = tasks.filter((task) => task.evidence.every((proof) => !proof.run && (proof.expects ?? []).length === 0)).length;
+  const settled = new Map();
+  for (const task of tasks) {
+    const last = settledSince(open, task);
+    if (last) settled.set(task.id, last);
+  }
+  const judged = tasks.filter((task) => settled.has(task.id));
+  const fresh = tasks.filter((task) => !settled.has(task.id));
+  const bare = fresh.filter((task) => task.evidence.every((proof) => !proof.run && (proof.expects ?? []).length === 0)).length;
   const text = [
     "# 审查清单 · " + segment.id,
     "",
@@ -197,7 +205,14 @@ export function planBrief(root, open, segment, at) {
     "",
     "## 要审的任务",
     "",
-    ...tasks.flatMap((task) => taskBlock(task, batchInfo(tasks))),
+    // 已经判过、之后一个字节都没动过的：不再展开——重判一遍是把别人的工作重做，
+    // 也把"谁判了什么"变成两处都能改的事。清单上留一行，看得见它属于这一段。
+    ...judged.flatMap((task) => [
+      "- " + task.id + " · " + task.title + " · 上次 " + settled.get(task.id).verdict +
+        "（" + stamp0(settled.get(task.id).at).slice(5).trim() + "）· 之后没动过，判定沿用",
+    ]),
+    ...(judged.length > 0 ? ["", "## 要重判的（新交的、改过的、上次没过的）", ""] : []),
+    ...fresh.flatMap((task) => taskBlock(task, batchInfo(tasks))),
     "## 怎么审",
     "",
     "对每条标准看交付够不够证明它达成；只看这一段，不替它补未来的事。逐条写判定（--result T1=met），"

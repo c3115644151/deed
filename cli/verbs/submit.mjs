@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
+import { SEGMENT_MAX, nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
 import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } from "../../lib/store.mjs";
 import { weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
@@ -275,6 +275,14 @@ export default function submit(argv) {
               id = one.id + "." + topNumber;
               specs.push({ k: "segment.plan", s: one.id, segment: id });
             }
+            // 一段装不下太多：段是被一起审的那一批，大到一次读不完，清单就没人真读。
+            // 到了上限，新的一条另起一节（空标题的 ## 段），submit 时自己开下一段。
+            const already = one.tasks.filter((task) => task.segment === id && task.status !== "dropped").length;
+            if (already >= SEGMENT_MAX)
+              fail(
+                id + " 已经有 " + already + " 条（一段最多 " + SEGMENT_MAX + " 条）：这一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段；" +
+                  "段是审查的单位，大到一次读不完，清单就没人真读了",
+              );
             bySection.set(item.section, id);
             return id;
           };

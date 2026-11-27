@@ -200,6 +200,26 @@ function editable(session, task) {
   return segment;
 }
 
+// 审查是一条条落的：review.log 里的 results 记着每条被判成什么。
+// 重审时"已经判过、之后没动过"的条目不该再判一遍——那是把别人的工作重做，
+// 也让同一条标准在两处留下两个可以改的说法。
+export const lastResultOf = (session, id) => {
+  const hits = session.reviews
+    .filter((one) => one.scope !== "session" && one.voidedAt === null)
+    .flatMap((one) => (one.results ?? []).filter((two) => two.id === id).map((two) => ({ ...two, at: one.at, by: one.by })));
+  return hits.at(-1) ?? null;
+};
+
+// 这条自上次判定以来动过吗：交付、撤回、放弃、改到下一段、改标题、改标准
+// 都会把 touchedAt 推到后面。动过就要重判；没动过的，判定照旧算数。
+export const settledSince = (session, task) => {
+  const last = lastResultOf(session, task.id);
+  if (!last) return null;
+  if (task.status !== "done" && task.status !== "accepted" && task.status !== "dropped") return null;
+  if (task.touchedAt && task.touchedAt > last.at) return null;
+  return last;
+};
+
 export function fold(events) {
   const doc = blank();
   for (const ev of events) {
@@ -320,6 +340,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         task.title = ev.title;
+        // 改标题也算这条被动了：重审时"自上次判定以来动过"要看得见它。
+        task.touchedAt = ev.at;
         break;
       }
       // 标准改正：标准里写的命令已经不在命令面上时，把它改成今天说得通的那句话。
@@ -328,6 +350,8 @@ export function fold(events) {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
         task.criteria = ev.criteria;
+        task.changedCriteria = (task.changedCriteria ?? 0) + 1;
+        task.touchedAt = ev.at;
         break;
       }
       case "task.done": {
@@ -742,13 +766,34 @@ export function fold(events) {
         }));
         // 按条判定说的是段：期审判的是这一期做成的样子，没有"每条标准"这回事。
         if (meaning >= MEANING.perItem && ev.verdict === "pass" && segment) {
+          // 通过：每条都要有判定（或者沿用一个没动过的那一判）。
           const judged = new Set(results.map((one) => one.id));
+          // 沿用的判定也算数：这一条自上次判定以来没动过，那一判还是对它下的。
           const bare = inScope
             .filter((one) => one.status !== "dropped" && one.status !== "deferred")
             .filter((one) => !judged.has(one.id))
+            .filter((one) => settledSince(session, one) === null)
             .map((one) => one.id);
           if (bare.length > 0)
             noway(`pass 要每条都判过：${bare.join("、")} 还没有判定（--result T1=met 这样逐条写）`);
+        }
+        // 不合格：退回的那几条要点名，其余每条也要有判定——它们在这一判里是"过"。
+        // 没有这份判定，下一次重审没有可沿用的东西，只能把整段重判一遍。
+        if (meaning >= MEANING.resultsOnFail && ev.verdict === "fail" && segment) {
+          const judged = new Map(results.map((one) => [one.id, one.verdict]));
+          const bare = inScope
+            .filter((one) => one.status !== "dropped" && one.status !== "deferred")
+            .filter((one) => !judged.has(one.id))
+            .filter((one) => settledSince(session, one) === null)
+            .map((one) => one.id);
+          if (bare.length > 0)
+            noway(
+              `不合格也要逐条给判定：${bare.join("、")} 还没有（--result T1=met --result T2=unmet 这样写；` +
+                "这一判没退回的那些写 met，重判时它们就沿用，不必再判一遍）",
+            );
+          const missing = (ev.rework ?? []).filter((one) => judged.get(one) !== "unmet");
+          if (missing.length > 0)
+            noway(`退回的条目要判成 unmet：${missing.join("、")} 的判定不是 unmet`);
         }
         const id = `R${session.reviews.length + 1}`;
         // Every live verdict is replaced explicitly, so two conclusions never

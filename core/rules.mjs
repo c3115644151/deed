@@ -165,6 +165,10 @@ export function needsReview(config, session, segment) {
   });
 }
 
+// 一段最多放这么多条：审查的单位是段，段大到一次读不完，清单就没人真读，
+// 判也就成了走过场。到了这个数，新的一条另起一节，submit 时自己开下一段。
+export const SEGMENT_MAX = 20;
+
 // The last delivery inside a segment. A conclusion older than this answered an
 // earlier version of the work, so it stops counting as a conclusion.
 export const lastDelivery = (session, segment) => {
