@@ -27,3 +27,4 @@
 {"at":"2026-11-27T07:00:09.140Z","verb":"reply","code":0,"ms":67,"switches":["--from"],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T07:04:46.152Z","verb":"panel","code":0,"ms":11,"switches":["--restart"],"why":null,"v":"0.27.0"}
 {"at":"2026-11-27T07:04:46.365Z","verb":"serve","code":0,"ms":48,"switches":["--port"],"why":null,"v":"0.27.0"}
+{"at":"2026-11-27T07:05:13.682Z","verb":"point","code":0,"ms":66,"switches":[],"why":null,"v":"0.27.0"}
