@@ -10,17 +10,6 @@ import { frozenFor } from "../../core/fold.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf } from "../session.mjs";
 
 
-// 前提在清单里是一行，顿号或逗号分隔；落到账本上是数组。
-const premiseOf = (text) =>
-  text === undefined || text === null
-    ? null
-    : text
-        .split(/[、,，]/u)
-        .map((one) => one.trim())
-        .filter((one) => one !== "")
-        .slice();
-const sameList = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((one, i) => one === b[i]);
-
 // 数由工具采。node --test 两种输出（TAP 的 # tests 与默认的 ℹ tests）都认；
 // 命令不报条数时留 null——「没有数」与「数对不上」是两件事。
 // 顺序只有一个来源：条目在它那一节里的位置。把行上下挪一下，位置就变了；
@@ -205,9 +194,7 @@ export default function submit(argv) {
               seq += 1;
               specs.push({
                 k: "task.add", s: one.id, id, title: item.title, criteria: item.criteria, files: [],
-                problem: item.problem ?? null,
                 source: item.source ?? null,
-                premise: premiseOf(item.premise) ?? [],
                 segment: sectionTarget(item),
                 order: placeOf(plan.items, item),
               });
@@ -221,9 +208,10 @@ export default function submit(argv) {
             const task = known.get(item.id);
             if (!task) fail("第 " + item.at + " 行的 " + item.id + " 账本里没有：新条目写成 - ? 标题，submit 时领号");
             mentioned.add(item.id);
-            if (item.title && item.title !== task.title)
-              fail(item.id + " 的标题和账本不一样：清单只做四件事（勾上、撤勾、~~、?），改标题不算其中");
-            // 位置是能改的（标题与标准不行）：把行挪个地方再 submit，就落一条 task.order。
+            // 标题是能改的：把黑话换成人话，落一条 task.title，旧说法留在账本历史里。
+            // 标准不能改：做法变了就新开一条，旧的说清为什么不做了。
+            if (item.title && item.title !== task.title) specs.push({ k: "task.title", s: one.id, id: item.id, title: item.title });
+            // 位置是能改的：把行挪个地方再 submit，就落一条 task.order。
             // 位置在段内算，不跨段——同段里谁先做是一件事，跨段是另一件事。
             // 已封存的段里的条目不再改：那一段的事实已经定下来了，事后重排只是噪音。
             const home = one.segments.find((seg) => seg.id === task.segment);
@@ -231,13 +219,10 @@ export default function submit(argv) {
             if (wanted !== null && wanted !== (task.order ?? null)) specs.push({ k: "task.order", s: one.id, id: item.id, order: wanted });
             if (item.criteria && item.criteria !== task.criteria)
               fail(item.id + " 的标准和账本不一样：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做");
-            // 上下文是能补的：问题、依据、前提变了，落一条 task.context，不动标题/标准/状态。
+            // 依据是能补的：写清出处，落一条 task.context，不动标题/标准/状态。
             // 这正是"事后给老任务补上下文"的正路——不必伪造工作区改动，也不改写历史。
             const context = {};
-            if (item.problem !== undefined && item.problem !== (task.problem ?? null)) context.problem = item.problem;
             if (item.source !== undefined && item.source !== (task.source ?? null)) context.source = item.source;
-            const premise = premiseOf(item.premise);
-            if (premise !== null && !sameList(premise, task.premise ?? [])) context.premise = premise;
             if (Object.keys(context).length > 0) specs.push({ k: "task.context", s: one.id, id: item.id, ...context });
             if (item.box === "~") {
               if (task.status === "dropped") continue;
@@ -379,7 +364,8 @@ export default function submit(argv) {
           console.log(
             "写进清单 · " + ev.id + " · " + (after.tasks.find((t) => t.id === ev.id)?.segment ?? "") + " · " + ev.title,
           );
-        if (ev.k === "task.context") console.log("补上下文 · " + ev.id);
+        if (ev.k === "task.context") console.log("补依据 · " + ev.id);
+        if (ev.k === "task.title") console.log("改标题 · " + ev.id + " · " + ev.title);
         if (ev.k === "task.done") console.log("交付 · " + ev.id + " · " + ev.evidence);
         if (ev.k === "task.undo") {
           const walked = after.tasks.find((t) => t.id === ev.id)?.revived?.some((one) => one.at === ev.at);

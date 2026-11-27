@@ -268,9 +268,7 @@ function taskRow(task, zone) {
     '<span class="tfiles">' + esc(files) + "</span>" +
     "</summary>" +
     '<div class="tbody">' +
-    (task.problem ? '<p class="k">要消掉的问题</p><p class="crit">' + esc(task.problem) + "</p>" : "") +
     (task.source ? '<p class="k">依据</p><p class="crit">' + esc(task.source) + "</p>" : "") +
-    (task.premise?.length ? '<p class="k">前提</p><p class="crit">' + esc(task.premise.join("、")) + "</p>" : "") +
     '<p class="k">做完的标准</p><p class="crit">' + esc(task.criteria) + "</p>" +
     '<p class="k">交付记录</p>' +
     (proofs ? '<ul class="proofs">' + proofs + "</ul>" : '<p class="quiet">还没有交付</p>') +

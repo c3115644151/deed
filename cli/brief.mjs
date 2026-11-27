@@ -128,9 +128,7 @@ function taskBlock(task, batches = new Map()) {
     "### " + task.id + " · " + task.title,
     "",
     "- 做完的标准：" + task.criteria,
-      ...(task.problem ? ["- 要消掉的问题：" + task.problem] : []),
       ...(task.source ? ["- 依据：" + task.source] : []),
-      ...(task.premise?.length ? ["- 前提：" + task.premise.join("、")] : []),
     "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
     "- 状态：" + task.status + (task.deferredWhy ? (task.status === "dropped" ? " · 理由：" : " · 为什么延后：") + task.deferredWhy : ""),
     ...task.evidence.map((proof) => {

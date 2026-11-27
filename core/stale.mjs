@@ -52,8 +52,8 @@ export function findStaleTasks(tasks, segments, surface) {
     // 已交付/已放弃的任务，标准写的是当时的做法，当时成立过——那不是过期，是历史。
     if (task.status !== "todo") continue;
     if (!open.has(task.segment)) continue;
-    // 问题与依据是稳定的，不做比对；标准与前提里写的做法才算引用。
-    const text = [task.criteria, ...(task.premise ?? [])].filter(Boolean).join(" ");
+    // 问题与依据是稳定的，不做比对；只有标准里写的做法才算引用。
+    const text = task.criteria ?? "";
     for (const ref of references(text)) {
       if (ref.kind === "命令") {
         if (!(ref.verb in surface))

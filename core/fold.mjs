@@ -276,11 +276,8 @@ export function fold(events) {
           id: ev.id,
           title: ev.title,
           criteria: ev.criteria,
-          // 任务自带上下文：陌生 agent 不必猜当初为什么立这条。
-          // 问题：要消掉的现象；依据：能点回原文的锚点；前提：标准成立所依赖的概念/命令/版本。
-          problem: ev.problem ?? null,
+          // 任务自带依据：能点回原文的锚点。标题自己说清要解决什么现象。
           source: ev.source ?? null,
-          premise: ev.premise ?? [],
           files: ev.files ?? [],
           segment: segment.id,
           createdAt: ev.at,
@@ -305,9 +302,14 @@ export function fold(events) {
       case "task.context": {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);
-        if (ev.problem !== undefined) task.problem = ev.problem;
         if (ev.source !== undefined) task.source = ev.source;
-        if (ev.premise !== undefined) task.premise = ev.premise;
+        break;
+      }
+      // 标题改正：换成人话，旧说法留在账本历史里（这一行本身）。
+      case "task.title": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        task.title = ev.title;
         break;
       }
       case "task.done": {
