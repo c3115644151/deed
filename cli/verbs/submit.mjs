@@ -14,18 +14,59 @@ import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, un
 // 命令不报条数时留 null——「没有数」与「数对不上」是两件事。
 // 顺序只有一个来源：条目在它那一节里的位置。把行上下挪一下，位置就变了；
 // 不另设「先后：」这样的数——两处说顺序，早晚会打架。
-// 位置只数"还没了结"的条目：做完的、撤回的都沉在清单下半截，它们挪动不该改
-// 别人手上那一份先后——否则每交一条，后面十条都要落一条新的先后记录。
+// 先后只比"还没了结的条目"之间的相对次序。做完的、撤回的都沉在清单下半截：
+// 它们一沉下去，后面每一条的"第几位"都会往前挪一格——按数字比，每交一条就要给
+// 后面十条各落一条新的先后记录（这个账本里 542 条 task.order 对 138 条任务，
+// 四倍于条目数，就是这么来的）。所以这里比的是次序本身：
+//   清单里还没了结的那些号排成一列 → 拿账本里那一列现成的数字按顺序发下去。
+// 次序没变，发下去的还是同一批数字，一条都不用落；真把两行上下调换，只有这两条
+// 换到的数字不同——各落一条，其余一条不动。
 const placeOf = (items, item) =>
   Math.max(
     1,
     items.filter(
-      (one) =>
-        one.section === item.section &&
-        one.at <= item.at &&
-        (one.box === " " || one.box === "?"),
+      (one) => one.section === item.section && one.at <= item.at && (one.box === " " || one.box === "?"),
     ).length,
   );
+// 新条目要一个数字：它在还没了结的条目里的位置；那个数字这一段已经有主时往后挪一格。
+// 两处用同一个数字只会让读的人以为"这两条一样先"，真的先手由写下的次序定，不靠并列。
+const freeSlot = (want, used) => {
+  let n = want;
+  while (used.has(n)) n += 1;
+  used.add(n);
+  return n;
+};
+const unfinishedIn = (items, section) =>
+  items.filter((one) => one.section === section && (one.box === " " || one.box === "?"));
+const orderPlan = (items, tasks, secIndex, segment) => {
+  // 清单这一节里还没了结的条目，按文件顺序：已知的号在前，新条目先占个空位。
+  const wanted = unfinishedIn(items, secIndex).map((item) => (item.box === "?" ? null : item.id));
+  // "还没了结"就是还没动手的那一条：交过的、判过的、放弃的都沉在清单下半截，
+  // 它们挪动不该改别人手上那一份先后。
+  const live = tasks.filter((one) => (segment === undefined || one.segment === segment.id) && one.status === "todo");
+  const pool = live.filter((one) => Number.isInteger(one.order)).map((one) => one.order).sort((a, b) => a - b);
+  const known = wanted.filter((id) => id !== null && live.some((one) => one.id === id));
+  // 账本里现在的次序：按 order 排，没有 order 的按号补在后面。
+  const current = [...live].filter((one) => known.includes(one.id))
+    .sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || a.id.localeCompare(b.id))
+    .map((one) => one.id);
+  const same = current.length === known.length && current.every((id, at) => id === known[at]);
+  const assigned = new Map();
+  if (same) {
+    // 次序没变：每条沿用账本里那个数字，新条目排在它前面那条之后。
+    for (const one of live) if (Number.isInteger(one.order)) assigned.set(one.id, one.order);
+    return { assigned, changed: new Map(), renumber: null };
+  }
+  // 次序变了：把现成的数字按新次序整批发下去（空出来的数字原样留着，只在真变了的那几条上记账）。
+  const changed = new Map();
+  known.forEach((id, at) => {
+    const want = pool[at] ?? at + 1;
+    const has = live.find((one) => one.id === id)?.order ?? null;
+    if (want !== has) changed.set(id, want);
+    assigned.set(id, want);
+  });
+  return { assigned, changed, renumber: null };
+};
 
 const summary = (text) => {
   const num = (name) => {
@@ -186,6 +227,19 @@ export default function submit(argv) {
             if (!title && !takes) continue;
             sectionTarget({ section: sec.index, sectionTitle: sec.title });
           }
+          // 先后按段算：同一段里谁在谁前面是段内的事，跨段不互相影响（已关闭的段不再改）。
+          // 数字由账本自己发：清单改动了次序，先算清楚这一节该发哪一批数字，再逐条比对。
+          const usedOrders = new Set(
+            one.tasks.filter((task) => task.status === "todo" && Number.isInteger(task.order))
+              .map((task) => task.order),
+          );
+          const planOf = new Map();
+          for (const id of new Set(bySection.values())) {
+            const seg = one.segments.find((seg) => seg.id === id);
+            // 清单这一节的序号也在里面：段与节不是一回事（段是账本上的，节是文件里的）。
+            const sec = plan.sections.find((one) => bySection.get(one.index) === id) ?? null;
+            planOf.set(id, orderPlan(plan.items, one.tasks, sec ? sec.index : -1, seg));
+          }
           let seq = Number(nextId(doc0, "T").slice(1));
           for (const item of plan.items) {
             if (item.box === "?") {
@@ -207,7 +261,7 @@ export default function submit(argv) {
                 source: item.source ?? null,
                 ...(item.topic === undefined ? {} : { topic: item.topic }),
                 segment: sectionTarget(item),
-                order: placeOf(plan.items, item),
+                order: freeSlot(placeOf(plan.items, item), usedOrders),
               });
               mentioned.add(id);
               continue;
@@ -226,7 +280,7 @@ export default function submit(argv) {
             // 位置在段内算，不跨段——同段里谁先做是一件事，跨段是另一件事。
             // 已封存的段里的条目不再改：那一段的事实已经定下来了，事后重排只是噪音。
             const home = one.segments.find((seg) => seg.id === task.segment);
-            const wanted = home && home.closedAt === null ? placeOf(plan.items, item) : null;
+            const wanted = home && home.closedAt === null ? (planOf.get(task.segment)?.assigned.get(item.id) ?? null) : null;
             if (wanted !== null && wanted !== (task.order ?? null)) specs.push({ k: "task.order", s: one.id, id: item.id, order: wanted });
             if (item.criteria && item.criteria !== task.criteria)
               fail(item.id + " 的标准和账本不一样：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做");

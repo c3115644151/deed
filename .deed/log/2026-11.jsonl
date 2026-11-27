@@ -2549,3 +2549,5 @@
 {"at":"2026-11-27T12:27:37.016Z","k":"task.order","s":"S02","id":"T147","order":6,"v":33,"w":"0.30.0"}
 {"at":"2026-11-27T12:27:37.016Z","k":"task.order","s":"S02","id":"T149","order":6,"v":33,"w":"0.30.0"}
 {"at":"2026-11-27T12:27:53.603Z","k":"point.add","s":"S02","id":"P21","text":"状态里的一句话只在它真要当尺子时出现：单段的期不催目的，多段的期才按「整期审的尺子」印——缺席只在会用它的地方说，其余时候不吭声","topic":null,"v":33,"w":"0.30.0"}
+{"at":"2026-11-27T12:42:57.403Z","k":"task.done","s":"S02","id":"T140","evidence":"cli/verbs/submit.mjs 删掉按绝对位置比先后（placeOf 只给新条目用），改成按段算 orderPlan——清单这一节还没了结的条目排成一列，账本里现成的数字按这个次序发下去，次序没变一条都不写，真调换两行只有那两条换到数字（空出来的数字留着，不重排做完的条目）；test/cli-work1.test.mjs 一条用例（依次做完三条 task.order 为 0、调换 T4/T5 各落一条且 T1 不动）；全量 257/257","by":"agent","files":[{"path":"cli/verbs/submit.mjs"},{"path":"test/cli-work1.test.mjs"}],"changed":["cli/verbs/submit.mjs","test/cli-work1.test.mjs"],"bytes":{"cli/verbs/submit.mjs":29083,"test/cli-work1.test.mjs":16596},"v":33,"w":"0.30.0"}
+{"at":"2026-11-27T12:43:17.058Z","k":"point.add","s":"S02","id":"P22","text":"先后只比相对次序：清单这一节还没了结的条目不变量、账本现成的数字按新次序发下去，次序没变一条都不写——实测这次 submit 只落 1 条 task.done，以前同样一次要落 58 条 task.order","topic":null,"v":33,"w":"0.30.0"}

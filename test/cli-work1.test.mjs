@@ -271,3 +271,44 @@ test("adding an entry does not swallow the changes waiting to be delivered", () 
   assert.ok(done.files.some((one) => one.path === "docs/a.md"), "基线没被上一条只加条目的 submit 吃掉");
   assert.deepEqual(Object.keys(done.bytes), ["docs/a.md"]);
 });
+
+// T140：完成一条不该让后面每条都落一条先后——先后只在相对次序真变了时才写。
+test("finishing entries writes no order records until the rows are really reordered", () => {
+  const cwd = workspace("order-noise");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  const rows = ["一", "二", "三", "四", "五"];
+  for (const name of rows) addTask(cwd, "做" + name, "跑得通");
+  const countOrders = () => readEvents(cwd).filter((one) => one.k === "task.order").length;
+  const orders = () => fold(readEvents(cwd)).sessions[0].tasks.map((one) => one.order);
+  assert.deepEqual(orders(), [1, 2, 3, 4, 5], "新条目各带一个位置，写在 task.add 上");
+  // 依次做完前三条：每做完一条，后面那些条目的位置都不该被重写。
+  for (let at = 0; at < 3; at += 1) {
+    deliverTask(cwd, "T" + (at + 1), "做完" + rows[at] + "：node --test 1/1");
+    assert.equal(countOrders(), 0, "做完第 " + (at + 1) + " 条没有连累后面");
+  }
+  assert.deepEqual(orders(), [1, 2, 3, 4, 5], "位置原样留着，不因为前面空出来就往前挪");
+  // 真把两条没做完的上下调换：只有这两条换到数字。
+  const lines = readPlan(cwd).split(/\r?\n/u);
+  const startOf = (id) => lines.findIndex((one) => one.startsWith("- [ ] " + id + " "));
+  const blockOf = (at) => {
+    let end = at + 1;
+    while (end < lines.length && !lines[end].startsWith("- [")) end += 1;
+    return lines.slice(at, end);
+  };
+  const a0 = startOf("T4");
+  const b0 = startOf("T5");
+  assert.ok(a0 >= 0 && b0 >= 0, "两条都还在待办里");
+  const a = blockOf(a0);
+  const b = blockOf(b0);
+  // 先把靠前的那块删掉再插：下标会变，从后往前改。
+  lines.splice(b0, b.length, ...a);
+  lines.splice(a0, a.length, ...b);
+  writePlan(cwd, lines.join("\n"));
+  const moved = deed(cwd, "submit");
+  assert.equal(moved.status, 0, moved.stderr);
+  assert.equal(countOrders(), 2, "调换两条，只有这两条各落一条");
+  const after = fold(readEvents(cwd)).sessions[0].tasks;
+  assert.equal(after.find((one) => one.id === "T4").order, 5, "T4 挪到后面");
+  assert.equal(after.find((one) => one.id === "T5").order, 4, "T5 挪到前面");
+  assert.equal(after.find((one) => one.id === "T1").order, 1, "做完的不动");
+});
