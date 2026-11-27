@@ -4,7 +4,7 @@
 // usage 是给人看的那几行，按 HELP 原来的样子抄下来——帮助不再另写一份，从这里出。
 export const SPEC = {
   init: {
-    flags: ["print-agents", "force", "said", "who", "review", "exempt", "port", "why"],
+    flags: ["print-agents", "force", "said", "review", "exempt", "port", "why"],
     booleans: ["print-agents", "force"],
     usage: [
       'deed init --print-agents         打印一段可粘贴的 AGENTS.md 规则，不改工作区',
@@ -85,6 +85,14 @@ export const SPEC = {
   state: { flags: [], usage: ["deed state"] },
   // 体检层：只读。它回答"这个工作区还是不是一个项目、差哪几条"，
   // 不产生行动，也不挡三种状态。
+  debug: {
+    flags: ["days", "json"],
+    booleans: ["json"],
+    usage: [
+      "deed debug [--days 30] [--json]   命令面自己怎么被用：从没敲过的、敲了就失败的、没人用的开关",
+      "                  读的是 .deed/debug/*.jsonl（一次调用一行，不进账本、不进版本库）",
+    ],
+  },
   check: {
     flags: ["ledger", "gates"],
     booleans: ["ledger", "gates"],
@@ -120,8 +128,8 @@ export const SPEC = {
 export const GROUPS = [
   { title: "讨论 · 把讨论说清", verbs: ["say", "reply", "point", "topic"] },
   { title: "执行 · 把说清的做出来", verbs: ["plan", "submit"] },
-  { title: "验收 · 判它过没过", verbs: ["review", "sign", "check"] },
-  { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "serve", "panel"] },
+  { title: "验收 · 判它过没过", verbs: ["review", "sign"] },
+  { title: "管理 · 装它、看它、声明它", verbs: ["init", "project", "state", "check", "debug", "serve", "panel"] },
 ];
 
 export const ORDER = GROUPS.flatMap((one) => one.verbs);

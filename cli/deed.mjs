@@ -6,6 +6,7 @@
 import { currentVersion } from "../lib/version.mjs";
 import { ensurePanel, panelOff } from "./panel.mjs";
 import { ROOT, guard, reject } from "./session.mjs";
+import { trace, takeRefusal, refused } from "./trace.mjs";
 import { GROUPS, HEAD, ORDER, SPEC } from "./spec.mjs";
 import init from "./verbs/init.mjs";
 import say from "./verbs/say.mjs";
@@ -19,6 +20,7 @@ import review from "./verbs/review.mjs";
 import sign from "./verbs/sign.mjs";
 import state from "./verbs/state.mjs";
 import check from "./verbs/check.mjs";
+import debug from "./verbs/debug.mjs";
 import serve from "./verbs/serve.mjs";
 import panel from "./verbs/panel.mjs";
 
@@ -32,7 +34,8 @@ const HELP = [
   "所有写操作都先重放后落盘：会被拒的动作一个字也不会进账本。",
 ].join("\n");
 
-const commands = { init, say, reply, point, topic, project, check, plan, submit, review, sign, state, serve, panel };
+const commands = { init, say, reply, point, topic, project, check, debug, plan, submit, review, sign, state, serve, panel };
+const began = performance.now();
 const [verb, ...rest] = process.argv.slice(2);
 // HELP 里有的动词不带参数（state、doctor），那一行没有尾空格；
 // 要求尾空格会把它们漏掉，再回落成整本帮助。
@@ -84,11 +87,38 @@ const MOVED = {
   // 撤回与放弃也写在清单里（取消勾选 = 撤回，划掉并写理由 = 放弃）。
   task: "写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由",
 };
+// 一处记账：动词、成没成、花了多久、用过的开关名（不含值）、被拒时的那一句。
+// 只有这一个地方写：加一个动词不需要在别处补统计。
+const stamp = (ok) =>
+  trace(ROOT, {
+    at: new Date().toISOString(),
+    verb: verb ?? "",
+    ok,
+    ms: Math.round(performance.now() - began),
+    switches: rest.filter((one) => one.startsWith("--")).map((one) => one.split("=")[0]),
+    why: ok ? undefined : (takeRefusal() ?? null),
+    v: currentVersion(),
+  });
 const command = commands[verb];
 if (!command && MOVED[verb]) {
-  reject(verb + " 已经改成 " + MOVED[verb] + "（deed help 看全部）");
+  const why = verb + " 已经改成 " + MOVED[verb] + "（deed help 看全部）";
+  reject(why);
+  refused(why);
+  stamp(false);
   process.exit(1);
 }
-if (!command) reject("没有这个动作：" + verb + "（deed help 看全部）");
-else guard(() => command(rest));
+if (!command) {
+  const why = "没有这个动作：" + verb + "（deed help 看全部）";
+  reject(why);
+  refused(why);
+  stamp(false);
+  process.exit(1);
+}
+try {
+  guard(() => command(rest));
+  stamp(process.exitCode !== 1);
+} catch (err) {
+  stamp(false);
+  throw err;
+}
 

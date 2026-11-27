@@ -11,6 +11,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { digest } from "../core/digest.mjs";
 import { fold, frozenFor } from "../core/fold.mjs";
+import { refused } from "./trace.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { projectState } from "../core/checks.mjs";
@@ -230,30 +231,10 @@ export const reject = (message) => {
   process.exitCode = 1;
 };
 
-// 被拒的动作一个字节也不进账本（那是原则），但"这个面好不好用"只有数能回答。
-// 所以另记一处：.deed/tmp/refusals.log 一行一次，只记时间、动词、被拒的第一句。
-// 它不在账本里，读它的人也不会以为那是发生过的事。
-const noteRefusal = (message) => {
-  try {
-    const home = path.join(ROOT, ".deed");
-    // 还没有 .deed 的地方（空目录、别人的仓库）：拒绝就是拒绝，不留任何记号。
-    if (!fs.existsSync(home)) return;
-    const dir = path.join(home, "tmp");
-    fs.mkdirSync(dir, { recursive: true });
-    const verb = process.argv[2] ?? "";
-    fs.appendFileSync(
-      path.join(dir, "refusals.log"),
-      JSON.stringify({ at: new Date().toISOString(), verb, why: String(message).split("\n")[0].slice(0, 200) }) + "\n",
-      "utf8",
-    );
-  } catch {
-    // 记不下来就算了：这是观察用的，不该挡住一条正常命令的报错。
-  }
-};
-
 export function fail(message) {
   reject(message);
-  noteRefusal(message);
+  // 被拒的那一句交给观察层：一次调用一行，由 dispatcher 落。账本上仍然一个字也不多。
+  refused(message);
   throw new Refused(message);
 }
 

@@ -52,6 +52,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 接完在宿主的规则文件里粘一段，让下一位 agent 知道规矩。`deed init --print-agents` 打印的就是下面这段，
 原样粘进 `AGENTS.md`（或 `CLAUDE.md`）：deed 不替你写那个文件，它属于管理这个仓库的人。
 没粘不报错，但 `deed check --ledger` 每次都会提一句「接入 · …」，面板顶上挂着同一句，直到有人写进去。
+- 命令面自己怎么被用：`deed debug` 只看事实（谁在敲、敲成没有、哪个开关没人碰），落在 `.deed/debug/`，不进账本也不进版本库；判"该不该删这个动词"仍是人的事。
 
 ```md
 ## 治理
@@ -77,6 +78,7 @@ deed init --review "core/**,cli/**" --exempt "docs/**,*.md"
 - 这个工作区是不是项目，说一句就算：`deed project --shape software --layers "core:,lib:core" --background "是什么、为谁、不做什么"`；没声明就是工作区模式，三种状态照常。`deed check` 看通过几条（只读，不挡任何动作）。
 - 查：`deed check --ledger`（账本能否重放）、`deed check --gates`（跑配置里的门）、面板（跟着命令自己起，`deed panel` 看它在不在）。
 
+命令面自己怎么被用，用 `deed debug` 看：谁在敲、敲成没有、哪个开关没人碰。它落在 `.deed/debug/`，不进账本也不进版本库；判"该不该删这个动词"仍是人的事。
 没有落进账本的动作不算发生过；状态是推出来的，不用手写。
 ```
 ```bash
