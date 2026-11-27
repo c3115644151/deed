@@ -5,6 +5,7 @@
      每条任务一行，开头是一个方框：方框里 ? = 新条目、空着 = 还没做、x = 已交付、~ = 不做了。
      方框后面跟着号和标题；改的时候只动方框与下面那几行，别改号和标题。
      一条任务可带一行 依据：能点回哪一轮立了它的原话；标题说的是要消掉什么现象。
+     从议题里拆出来的条目写一行 来自：I1——只认已经锁定出口的议题，没出口的写不进去。
      勾上就得写一行「交付：」——跑了什么、结果几比几；不做了就得写一行「理由：」。
      注记两行：箭头加「延后：」这一次不做；箭头加「下一段：」送去下一段接着做，不是放弃。
      先后就是你排的行序：上下挪一下再 submit；一次只交一条。 -->
@@ -13,13 +14,10 @@
 
 ## 段 S02.20
 <!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
-- [ ] T91 清单条目要写明来自哪条议题，没确认的议题不能用
-  依据：2026-11-24 用户轮「讨论机制按议题来…冲突拆成题」
-  标准：plan 行可带一行 来自：I1；submit 核对议题存在且已放出，否则整批拒并点名第几行；task.add 落 topic；没放出的议题一条都出不来；state 在「有已放出的议题、清单还没条目」时把下一步指向写清单；有用例
-<!-- 等着（6 条）：上面那条做完再动 -->
 - [ ] T93 只有真要出整期审时，state 才提目的
   依据：2026-11-24 用户轮「讨论机制按议题来」后的状态呈现讨论
   标准：单段会话的 state 不印「目的 · 还没有」；多段且要整期审时印成「整期审的尺子 · …」；deed --help 与 DESIGN 里 goal 的说法同步（T81 删掉 goal 动词之后，那句话只指清单第一行）；有用例
+<!-- 等着（6 条）：上面那条做完再动 -->
 - [ ] T140 先后只在任务相对次序变了时才记，完成一条不连累后面
   依据：2026-11-25 用户轮「做任务太慢，第一优先级是效率…机制化地优化」
   标准：真实账本里 task.order 542 条、138 条任务（约四倍）；改成 submit 只比较「还没了结的条目在清单里的相对次序」，次序没变就不落 task.order；依次完成五条以后账本新增的 task.order 为 0（用例盯住事件数），把两条行上下调换再 submit 才各落一条；旧账本照旧读
@@ -35,11 +33,11 @@
 - [ ] T92 面板 /events 的客户端断开后，服务继续运行
   依据：2026-11-24 用户轮「讨论机制按议题来」后的面板稳定性讨论
   标准：board/serve.mjs 的 /events 有 res.on("error") 与写失败处理；客户端连一次再断开之后进程仍活着（探针记 pid 前后一致）；有用例或可复跑的命令
-<!-- 已完成（37 条）：交过的，往下沉 -->
-- [x] T152 执行屏任务依据里的来源能点回讨论屏原文
-  依据：2026-11-27 用户轮「执行层面也需要支持直链跳转，新任务结构要引用来源」
-  标准：执行屏任务卡的「依据」里写 P14／I1／第 N 轮 就做成直链，点它切到讨论屏并滚到那条要点、议题或人话原文；不存在的号原样留字、不造死链；讨论屏要点、议题、轮次带锚点；board 有用例，面板真开看过
-  交付：board/render.mjs 加 anchorSet/linkRefs，执行屏 taskRow 的「依据」把 P/I/第 N 轮 做成 <a class=xref data-screen=discuss href=#id>；讨论屏要点/议题/轮次带 id 锚点；点 xref 切到讨论屏、滚到锚点、写 location.hash；不存在的号原样留字；board.test.mjs 一条用例（3 种可链 + 死链不造 + 锚点存在）；DESIGN §15 补说明。真开面板点击验证：T151 依据 P14 点击切屏并滚动到位。全量 251/251、board 19/19、docs 5/5
+- [ ] T153 给适配器的段审复用与整期审各补一条可复跑的用例
+  依据：P2 记的「没跑过：段审复用（sendMessage 第二条路）、期审（kind:period）」
+  来自：I1
+  标准：在 test/ 里加两条用例，用事件夹具驱动适配器的两条路——同一个审查者接着判下一段（复用，走 sendMessage）、整期审另开一个（kind:period）；断言账本里落下对应的 review.brief 且 kind 对得上；node --test 全量绿；两条用例各自删掉判断会红
+<!-- 已完成（38 条）：交过的，往下沉 -->
 - [x] T80 T80 题：删 --why，resolve/withdraw 变 answer/drop
   标准：deed ask "…" --reading 记下题；deed ask answer A1 --decision --by 与 deed ask drop A1 --why 取代 resolve/withdraw；ask 不收 --why；裁定里的「边界：」「弃：」照旧认；旧动词 exit 1；有用例覆盖
   交付：deed ask answer A1 --decision "…" --by user 落账并关题；deed ask drop A1 --why "…" 关题；ask resolve 与 ask withdraw 两条旧路 exit 1 并指到新名（ask resolve 实测报「已经改成 ask answer A1」）；ask 的开关表里没有 why（给 raise 传 --why 会被拒）；裁定里的「边界：」「弃：」照旧从账本算出来（边界仍 2 条）；事件含义第 26 版：ask.raise 只有 v<26 的旧行才要 why；规则块、README 围栏、AGENTS 尾段三处同一段话已同步；这一份字节上 node --test 217 条（216 过，1 条面板端口用例在并发下红，单跑 test/cli-state1 12/12）（agent）
@@ -56,6 +54,10 @@
   依据：2026-11-24 用户轮「讨论机制按议题来…轮次只做索引、能点回原话」
   标准：deed say "…" --topic I1 只把这一轮的编号追加进该议题，不复制文本；不存在的议题号 exit 1 且一个字不落账；面板议题卡上的号是指向 #turn-N 的锚点、点得到那一轮；cli 与 board 各有用例
   交付：要点折叠记下 round=第几条 user 轮（core/fold.mjs:point.add，回复不数、老账本照读）；core/rules.mjs 加 turnNumbers(session)；board/render.mjs 讨论屏每条原文 id=turn-N、议题卡把收编要点的 round 做成 #turn-N 链接（pointLinks），CSS 高亮 :target；test/fold.test.mjs「a point remembers which user round it came from」与 board/board.test.mjs「topic cards link their point rounds back to the original turns」两条。node --test 全量绿；DESIGN §2 补锚点说明
+- [x] T91 清单条目要写明来自哪条议题，没确认的议题不能用
+  依据：2026-11-24 用户轮「讨论机制按议题来…冲突拆成题」
+  标准：plan 行可带一行 来自：I1；submit 核对议题存在且已放出，否则整批拒并点名第几行；task.add 落 topic；没放出的议题一条都出不来；state 在「有已放出的议题、清单还没条目」时把下一步指向写清单；有用例
+  交付：cli/plan.mjs 的字段表加「来自」→ topic（草稿也印这一行）；core/events.mjs 的 task.add 校验 topic 写成 I\d+，EVENT_VERSION 32→33；core/fold.mjs 的 task.add 找出议题、没出口的拒并说清，条目带 topic，议题那头落 exportedAt 与 exported；cli/verbs/submit.mjs 记账前核对议题存在且已 released，没出口的整批拒并点名第几行；core/rules.mjs 出口那一步改指写「来自：I1」；test/discussion.test.mjs 三条（清单解析 来自、折叠拒没出口的、出口后议题记得住、CLI 整批拒并落账）；DESIGN §2 出口段补记法；package 0.30.0。全量 254/254
 - [x] T101 审查结论按条落下：判过的条目下一轮不再重判
   标准：review.log 带 results:[{id, verdict, note}]，一条条目一个判定（达成／未达成／无法判断）；pass 只在段里每条条目都有判定时才封段，缺哪条就拒并说出号；重审的清单只列「还没判过」与「自上次判定以来字节变过」的条目，其余条目的判定沿用；旧账本里没有 results 的结论照读（按整段 pass／fail）；有用例（判过 T1 之后改 T2，重审清单只列 T2，pass 之后 T1 的旧判定仍算数）
   交付：跑：node --test 215/215（test/cli.test.mjs 的 a verdict is per item…、test/fold.test.mjs 的 pass 覆盖一条）；review.log 带 results:[{id,verdict,note,files}]，fold 在 meaning>=19 时要求 pass 覆盖这一段每条、否则拒并点名；清单只列没判过的与字节变过的（cli/brief.mjs 的 still/again），已判的印成「判过了、这次不再判」；旧行没有 results 照读
@@ -150,6 +152,10 @@
   依据：P14 的判断；用户要求任务能让陌生 agent 独立推进
   标准：task.add 带 problem/source/premise；task.context 可补上下文不改标题标准状态；清单草稿解析与渲染三字段；审查材料与面板显示；core/stale.mjs 机械查过期（只查未做且段开着的任务），deed state 只读提示；老账本照读
   交付：任务条重构落地：task.add 带问题/依据/前提，新增 task.context 事件（EVENT_VERSION 31、package 0.28.0）；清单解析与渲染三字段、审查材料与面板显示；core/stale.mjs 比对命令面查过期，deed state 只读提示（本期抓到 T88 的 say --topic）；老账本照读；期望：node --test => ℹ pass 247
+- [x] T152 执行屏任务依据里的来源能点回讨论屏原文
+  依据：2026-11-27 用户轮「执行层面也需要支持直链跳转，新任务结构要引用来源」
+  标准：执行屏任务卡的「依据」里写 P14／I1／第 N 轮 就做成直链，点它切到讨论屏并滚到那条要点、议题或人话原文；不存在的号原样留字、不造死链；讨论屏要点、议题、轮次带锚点；board 有用例，面板真开看过
+  交付：board/render.mjs 加 anchorSet/linkRefs，执行屏 taskRow 的「依据」把 P/I/第 N 轮 做成 <a class=xref data-screen=discuss href=#id>；讨论屏要点/议题/轮次带 id 锚点；点 xref 切到讨论屏、滚到锚点、写 location.hash；不存在的号原样留字；board.test.mjs 一条用例（3 种可链 + 死链不造 + 锚点存在）；DESIGN §15 补说明。真开面板点击验证：T151 依据 P14 点击切屏并滚动到位。全量 251/251、board 19/19、docs 5/5
 <!-- 撤回或放弃（14 条）：不做了的，沉到最后 -->
 - [~] T79 T79 一轮只记一句话：deed say 取代 tick
   标准：deed say "…" 记下这一轮（--who 默认 agent，可写 user）；said 是位置参数，不再有 --said、--did；tick 这个名字从开关表与帮助里消失；state 与面板不读 did；有用例覆盖（旧动词被拒、say 落账、state 打印该轮）

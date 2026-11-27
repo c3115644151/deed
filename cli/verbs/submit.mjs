@@ -190,11 +190,22 @@ export default function submit(argv) {
           for (const item of plan.items) {
             if (item.box === "?") {
               if (!item.criteria) fail("第 " + item.at + " 行是新条目，但没有写一行 标准：——没有标准就不算一件事");
+              // 来自议题的条目：只认已经锁定出口的议题。没立过、没出口的写不进去——
+              // 否则"从哪来"就成了一句随手指的一句话，议题那边也永远不知道自己出口了什么。
+              if (item.topic !== undefined) {
+                const home = (one.topics ?? []).find((one) => one.id === item.topic);
+                if (!home) fail("第 " + item.at + " 行写的是来自：" + item.topic + "，账本里没有这个议题——先 deed topic 立它");
+                if (home.state !== "released")
+                  fail("第 " + item.at + " 行写的是来自：" + item.topic + "，这个议题还" +
+                    (home.state === "draft" ? "没成立" : "没锁定出口") +
+                    "：等你在面板上按过出口那一下，它才能拆成任务");
+              }
               const id = "T" + seq;
               seq += 1;
               specs.push({
                 k: "task.add", s: one.id, id, title: item.title, criteria: item.criteria, files: [],
                 source: item.source ?? null,
+                ...(item.topic === undefined ? {} : { topic: item.topic }),
                 segment: sectionTarget(item),
                 order: placeOf(plan.items, item),
               });

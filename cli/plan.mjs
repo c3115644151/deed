@@ -19,7 +19,7 @@ export const HEAD = "# 这一期要做成什么";
 //   - [x] T1 标题    已交付（必须写 交付：）
 //   - [~] T1 标题    不做了（必须写 理由：）
 // 注记只有一种开头：两个空格一个箭头，后面跟一个词——延后 或 下一段。
-const FIELD = /^\s*(?:→\s*)?(标准|依据|交付|理由|延后|下一段|改到下一段)\s*[：:]\s*(.*)$/u;
+const FIELD = /^\s*(?:→\s*)?(标准|依据|来自|交付|理由|延后|下一段|改到下一段)\s*[：:]\s*(.*)$/u;
 const CHECK = /^\s*-\s*\[([ xX~?])\]\s+(?:(T\d+)\s+)?(.*)$/u;
 const LEGACY_FRESH = /^\s*-\s*\?\s+(.*)$/u;
 const LEGACY_DROPPED = /^\s*~~\s*(T\d+)\s*(.*)$/u;
@@ -28,6 +28,7 @@ const HEADING = /^(#{1,6})\s*(.*)$/u;
 const fieldOf = (word) => ({
   标准: "criteria",
   依据: "source",
+  来自: "topic",
   交付: "claim",
   理由: "why",
   延后: "later",
@@ -164,6 +165,7 @@ const LEGEND = [
   "     每条任务一行，开头是一个方框：方框里 ? = 新条目、空着 = 还没做、x = 已交付、~ = 不做了。",
   "     方框后面跟着号和标题；改的时候只动方框与下面那几行，别改号和标题。",
   "     一条任务可带一行 依据：能点回哪一轮立了它的原话；标题说的是要消掉什么现象。",
+  "     从议题里拆出来的条目写一行 来自：I1——只认已经锁定出口的议题，没出口的写不进去。",
   "     勾上就得写一行「交付：」——跑了什么、结果几比几；不做了就得写一行「理由：」。",
   "     注记两行：箭头加「延后：」这一次不做；箭头加「下一段：」送去下一段接着做，不是放弃。",
   "     先后就是你排的行序：上下挪一下再 submit；一次只交一条。 -->",
@@ -191,6 +193,7 @@ export function draft(session) {
       for (const task of group.tasks) {
         out.push(bullet(task));
         if (task.source) out.push("  依据：" + task.source);
+        if (task.topic) out.push("  来自：" + task.topic);
         out.push("  标准：" + task.criteria);
         const last = task.evidence[task.evidence.length - 1];
         if (last) out.push("  交付：" + last.claim);

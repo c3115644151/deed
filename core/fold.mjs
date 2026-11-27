@@ -272,12 +272,22 @@ export function fold(events) {
         if (ev.segment !== undefined && !planned) noway(`账本里没有段 ${ev.segment}：条目不能落在没声明过的段上`);
         if (planned && planned.closedAt !== null) noway(`段 ${planned.id} 已经关闭：新条目进不去`);
         const segment = planned ?? segmentOf(session, ev.at, ev.v ?? 1);
+        // 从议题里拆出来的条目：账本记下议题号，议题那头记下出口了哪几条。
+        // 出口不是新事件，是「有一条条目来自它」这件事本身——事实只有一个主人。
+        const home = ev.topic === undefined || ev.topic === null ? null : session.topics.find((one) => one.id === ev.topic) ?? null;
+        if (ev.topic !== undefined && ev.topic !== null && !home) noway(`账本里没有议题 ${ev.topic}：条目不能来自没立过的议题`);
+        if (home) {
+          if (home.state !== "released") noway(`议题 ${home.id} 还没锁定出口：它还不能拆成任务`);
+          home.exportedAt = home.exportedAt ?? ev.at;
+          home.exported = [...(home.exported ?? []), ev.id];
+        }
         session.tasks.push({
           id: ev.id,
           title: ev.title,
           criteria: ev.criteria,
           // 任务自带依据：能点回原文的锚点。标题自己说清要解决什么现象。
           source: ev.source ?? null,
+          topic: home ? home.id : null,
           files: ev.files ?? [],
           segment: segment.id,
           createdAt: ev.at,
@@ -557,7 +567,8 @@ export function fold(events) {
           id: ev.id, title: ev.title, body: ev.body ?? "", at: ev.at, by: ev.by ?? null,
           state: source?.state ?? "draft", points: [...listed],
           establishedAt: source?.establishedAt ?? null, establishedBy: source?.establishedBy ?? null,
-          releasedAt: null, releasedBy: null,
+          releasedAt: source?.releasedAt ?? null, releasedBy: source?.releasedBy ?? null,
+          exportedAt: source?.exportedAt ?? null, exported: source?.exported ?? [],
         });
         // 已成立的议题：新收编进来的要点直接算它的历史来源，不再散在活跃清单。
         if (source?.state === "established")

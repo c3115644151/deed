@@ -484,3 +484,20 @@ test("a task's source references link straight to the discuss screen", () => {
   assert.match(html, /<li class="qa" id="I1"/u, "讨论屏议题有锚点");
   assert.ok(!html.includes('href="#P99"'), "没记的要点不造死链");
 });
+
+
+// 出口的条目在任务卡上写明它来自哪个议题，并且点得到那张议题卡。
+test("a task exported from a topic says so, and the topic is one click away", () => {
+  const doc = fold([
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "聊" },
+    { v: 33, at: T(2), k: "point.add", s: null, id: "P1", text: "一句" },
+    { v: 33, at: T(3), k: "topic.create", s: null, id: "I1", title: "一个议题", body: "正文", points: ["P1"], by: "agent" },
+    { v: 33, at: T(4), k: "topic.establish", s: null, id: "I1", body: "正文", points: ["P1"], by: "user", via: "panel" },
+    { v: 33, at: T(5), k: "topic.release", s: null, id: "I1", by: "user", via: "panel" },
+    { v: 33, at: T(6), k: "task.add", s: null, id: "T1", title: "出口的活", criteria: "c", topic: "I1" },
+  ]);
+  const html = renderBoard(doc, config, { zone, events: 7 });
+  assert.match(html, /<p class="k">来自议题<\/p>/u);
+  assert.match(html, /<a class="xref" href="#I1" data-screen="discuss">I1<\/a>/u, "议题号是直链");
+  assert.match(html, /已经出口：T1/u, "议题卡说出出口了哪几条");
+});

@@ -230,7 +230,9 @@ function discussScreen(session, zone, on) {
       (gate
         ? '<form class="gate small" data-gate="' + gate + '" data-topic="' + esc(t.id) + '">' +
           '<button class="gpress" type="submit">' + WORD[t.state] + " " + esc(t.id) + "</button></form>"
-        : '<p class="qdone quiet">可以出口为任务 · deed plan</p>') +
+        : '<p class="qdone quiet">' +
+          ((t.exported ?? []).length ? "已经出口：" + esc((t.exported ?? []).join("、")) : "可以出口为任务 · 在清单里写一行 来自：" + esc(t.id)) +
+          "</p>") +
       "</li>"
     );
   }).join("");
@@ -321,6 +323,13 @@ function taskRow(task, zone, anchors) {
     '<span class="tfiles">' + esc(files) + "</span>" +
     "</summary>" +
     '<div class="tbody">' +
+    (task.topic
+      ? '<p class="k">来自议题</p><p class="crit">' +
+        (anchors.ids.has(task.topic)
+          ? '<a class="xref" href="#' + esc(task.topic) + '" data-screen="discuss">' + esc(task.topic) + "</a>"
+          : esc(task.topic)) +
+        "</p>"
+      : "") +
     (task.source ? '<p class="k">依据</p><p class="crit">' + linkRefs(task.source, anchors) + "</p>" : "") +
     '<p class="k">做完的标准</p><p class="crit">' + esc(task.criteria) + "</p>" +
     '<p class="k">交付记录</p>' +

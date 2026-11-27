@@ -45,7 +45,12 @@ export default function topic(argv) {
       );
       console.log("  要点 " + t.points.length + " 条 · " + (t.body || "还没有正文"));
       if (t.state === "draft") console.log("  成立与出口都在面板上按：deed panel");
-      if (t.state === "released") console.log("  可以把这一题出口成清单里的任务：deed plan");
+      if (t.state === "released")
+        console.log(
+          (t.exported ?? []).length
+            ? "  已经出口的条目：" + t.exported.join("、")
+            : "  可以出口成清单里的任务：在清单里写一行 来自：" + t.id,
+        );
       return;
     }
     const title = flags.title ?? (head && !/^I\d+$/u.test(head) ? head : words.join(" ").trim());

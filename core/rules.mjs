@@ -483,7 +483,7 @@ export function nextAction(doc, config) {
     return {
       who: "agent",
       what: "出口议题",
-      text: `议题 ${released.id} · ${released.title} 已锁定出口：把它拆成清单里的任务（deed plan），拆完在正文里记下出口的任务号`,
+      text: `议题 ${released.id} · ${released.title} 已锁定出口：在清单里写它以哪些条目出口（deed plan），条目下写一行 来自：${released.id}`,
       command: "deed plan",
     };
   // 段里正在等结论时，清单不发出去这一段的活就走不动。

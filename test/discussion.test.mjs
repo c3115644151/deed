@@ -139,3 +139,71 @@ test("the discussion screen shows both halves of the raw text, in one timeline",
   assert.equal(s.replies.length, 1, "回复折在 session.replies 里，与 turns 并列");
   assert.equal(s.turns.length, 1, "回复不增加轮次");
 });
+
+
+// 出口：从议题拆出来的条目 —— 只有锁定出口的议题能拆，拆了议题那头记得住。
+test("只认锁定出口的议题：没出口的写不进清单，拆过之后议题知道自己出口了哪几条", async () => {
+  const { parse } = await import("../cli/plan.mjs");
+  const head = [turn(1, "聊"), point(2, "P1", "一句"), create(3, "I1", "题", ["P1"], "正文")];
+  const draftOnly = fold(head).sessions[0];
+  assert.equal(draftOnly.topics[0].state, "draft");
+  // 折：没出口的议题不能挂条目。
+  assert.throws(
+    () => fold([...head, { v: V, at: T(4), k: "task.add", s: null, id: "T1", title: "一条", criteria: "c", topic: "I1" }]),
+    /还没锁定出口/,
+  );
+  // 折：没有的议题也不能挂。
+  assert.throws(
+    () => fold([...head, { v: V, at: T(4), k: "task.add", s: null, id: "T1", title: "一条", criteria: "c", topic: "I9" }]),
+    /没有议题 I9/,
+  );
+  // 清单能读懂 来自： 这一行，并且不再把它当成看不懂的那一行。
+  const text = "# 这一期\n\n## 段 S01.1\n- [?] 从议题拆出来的一条\n  来自：I1\n  标准：能跑\n";
+  const read = parse(text);
+  assert.deepEqual(read.problems, []);
+  assert.equal(read.items[0].topic, "I1");
+});
+
+test("出口之后条目带着议题号，议题那头记下它出口了谁", () => {
+  const events = [turn(1, "聊"), point(2, "P1", "一句"), create(3, "I1", "题", ["P1"], "正文"),
+    establish(4, "I1"), release(5, "I1"),
+    { v: V, at: T(6), k: "task.add", s: null, id: "T1", title: "出口的一条", criteria: "c", topic: "I1" },
+    { v: V, at: T(7), k: "task.add", s: null, id: "T2", title: "又一条", criteria: "c", topic: "I1" }];
+  const s = fold(events).sessions[0];
+  assert.deepEqual(s.tasks.map((one) => one.topic), ["I1", "I1"]);
+  assert.equal(s.topics[0].exportedAt, T(6), "第一次出口的时刻");
+  assert.deepEqual(s.topics[0].exported, ["T1", "T2"], "议题记下出口了哪几条");
+  // 出口过之后下一步不再指着"去拆它"。
+  const next = nextAction(fold(events), null);
+  assert.notEqual(next.what, "出口议题");
+});
+
+// CLI 一路：清单里写 来自：I1，没出口的议题整批拒并点名第几行；出口之后落进账本。
+// 时间是"此刻往后"：init 自己会记一轮（就在现在），比它早的行会被排到它前面去。
+test("the CLI refuses a 来自 line for an unopened topic, and lands one after the gate", async () => {
+  const { workspace } = await import("../support/lib.mjs");
+  const { append, readEvents } = await import("../lib/store.mjs");
+  const { deed, writePlan, readPlan } = await import("./support/cli.mjs");
+  const soon = (n) => new Date(Date.now() + 60000 * n).toISOString();
+  const root = workspace("topic-export-cli");
+  const init = deed(root, "init", "--said", "开一期", "--review", "core/**");
+  assert.equal(init.status, 0, init.stderr);
+  append(root, { v: V, at: soon(1), k: "point.add", s: null, id: "P1", text: "一句" });
+  append(root, { v: V, at: soon(2), k: "topic.create", s: null, id: "I1", title: "题", points: ["P1"], body: "正文", by: "agent" });
+  // 还没成立、没出口：整批拒，点名行号，账本零新增。
+  const before = readEvents(root).length;
+  writePlan(root, "# 这一期\n\n## 段\n- [?] 从议题来的一条\n  来自：I1\n  标准：能跑\n");
+  const refused = deed(root, "submit");
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /第 4 行/);
+  assert.match(refused.stderr, /没成立|没锁定出口/);
+  assert.equal(readEvents(root).length, before, "拒了就是一个字都不落");
+  // 出口之后再交：条目带议题号落进账本。
+  append(root, { v: V, at: soon(3), k: "topic.establish", s: null, id: "I1", body: "成文", points: ["P1"], by: "user", via: "panel" });
+  append(root, { v: V, at: soon(4), k: "topic.release", s: null, id: "I1", by: "user", via: "panel" });
+  const ok = deed(root, "submit");
+  assert.equal(ok.status, 0, ok.stderr);
+  const landed = readEvents(root).filter((one) => one.k === "task.add");
+  assert.equal(landed.length, 1);
+  assert.equal(landed[0].topic, "I1", "账本记下它来自哪个议题");
+});
