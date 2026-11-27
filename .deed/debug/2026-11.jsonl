@@ -272,3 +272,4 @@
 {"at":"2026-11-27T14:08:35.099Z","verb":"plan","code":1,"ms":85,"switches":[],"why":"清单已经在 .deed/plan.md：直接改它，改完 deed submit（记账之后这份会按账本重画一遍）","v":"0.30.0"}
 {"at":"2026-11-27T14:08:56.864Z","verb":"plan","code":1,"ms":40,"switches":[],"why":"清单已经在 .deed/plan.md：直接改它，改完 deed submit（记账之后这份会按账本重画一遍）","v":"0.30.0"}
 {"at":"2026-11-27T14:11:06.051Z","verb":"state","code":0,"ms":81,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T14:20:04.769Z","verb":"review","code":0,"ms":43,"switches":["--due"],"why":null,"v":"0.31.0"}

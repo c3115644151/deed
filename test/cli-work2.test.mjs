@@ -127,7 +127,7 @@ test("a submit with nothing to point at refuses to write the delivery", () => {
   const before = readEvents(cwd).length;
   const refused = deed(cwd, "submit");
   assert.equal(refused.status, 1, "什么都没动就不算交付");
-  assert.match(refused.stderr, /没有量到任何改动、也没有文件可指/);
+  assert.match(refused.stderr, /没有量到任何改动/u);
   assert.equal(readEvents(cwd).length, before, "一个字都没落");
 });
 
@@ -530,4 +530,25 @@ test("a criteria that still names live commands is not rewritten through the pla
   assert.match(accepted.stdout, /改正标准 · T2/u);
   const doc = fold(readEvents(cwd));
   assert.equal(doc.sessions[0].tasks.find((one) => one.id === "T2").criteria, "说成一句话就落一行");
+});
+
+// 能力已经在的条目（没有字节可改）不能只剩「放弃」一条路：一条当场跑得出来的期望，
+// 就是它指着的东西——记账前真跑一遍，跑出来了才收。
+test("a delivery proves itself with a command instead of a change", () => {
+  const cwd = workspace("deliver-by-proof");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "看一眼", "印得出 hi");
+  const file = path.join(cwd, ".deed", "plan.md");
+  const bare = fs.readFileSync(file, "utf8").replace(/- \[ \] T1 (.+)\n/u, "- [x] T1 $1\n  交付：这条什么都指不到\n");
+  fs.writeFileSync(file, bare, "utf8");
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1, "什么都不指的交付照旧拒");
+  assert.match(refused.stderr, /期望：/u, "要说清另一条路怎么走");
+
+  const proved = bare.replace("这条什么都指不到", '这条什么都指不到；期望：node -e "console.log(12345)" => 12345');
+  fs.writeFileSync(file, proved, "utf8");
+  const accepted = deed(cwd, "submit");
+  assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+  const first = readEvents(cwd).find((one) => one.k === "task.done");
+  assert.deepEqual(first.expects, [{ command: 'node -e "console.log(12345)"', want: "12345" }]);
 });
