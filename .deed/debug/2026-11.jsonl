@@ -97,3 +97,4 @@
 {"at":"2026-11-27T09:02:42.331Z","verb":"reply","code":0,"ms":98,"switches":["--from"],"why":null,"v":"0.28.0"}
 {"at":"2026-11-27T09:03:07.539Z","verb":"submit","code":0,"ms":160,"switches":[],"why":null,"v":"0.28.0"}
 {"at":"2026-11-27T09:03:50.643Z","verb":"reply","code":0,"ms":79,"switches":["--from"],"why":null,"v":"0.28.0"}
+{"at":"2026-11-27T09:05:30.948Z","verb":"point","code":0,"ms":51,"switches":[],"why":null,"v":"0.28.0"}
