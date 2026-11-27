@@ -254,6 +254,14 @@ export function validateEvent(ev, at) {
         for (const key of ["tests", "pass", "fail"])
           if (one[key] !== null && !Number.isInteger(one[key]))
             throw new Error("task.done 的 run." + key + " 要是条数或 null");
+        // 数站在哪一份字节上：指纹与时刻。没有它们就没法判断下一次能不能复用，
+        // 也就分不出"同一份字节上的真跑"与"抄来的一句话"。
+        if (one.fingerprint !== undefined && typeof one.fingerprint !== "string")
+          throw new Error("task.done 的 run.fingerprint 要是那段字节的指纹");
+        if (one.at !== undefined && !/^\d{4}-\d{2}-\d{2}T/.test(String(one.at)))
+          throw new Error("task.done 的 run.at 要是 ISO 时刻");
+        if (one.reused !== undefined && typeof one.reused !== "boolean")
+          throw new Error("task.done 的 run.reused 要是 true/false");
       }
       if (ev.files !== undefined) {
         if (!Array.isArray(ev.files)) throw new Error("task.done 的 files 要是 [{ path }] 数组");

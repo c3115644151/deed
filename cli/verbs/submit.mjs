@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
-import { changedPaths, rel, writeSnapshot } from "../../lib/store.mjs";
+import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } from "../../lib/store.mjs";
 import { weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { EVENT_VERSION } from "../../core/events.mjs";
@@ -85,9 +85,49 @@ const cleanEnv = () => {
 };
 
 const runOnce = (command) => {
+  // 跑之前取指纹：命令自己可能写工作区（测试会造临时文件），跑完之后那份字节
+  // 已经不是"我要交的那份"了——记的是它跑之前站的那一版。
+  const fingerprint = workspaceFingerprint(ROOT);
+  const at = new Date().toISOString();
   const r = spawnSync(command, { shell: true, cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 24, env: cleanEnv() });
   const text = (r.stdout ?? "") + (r.stderr ?? "");
-  return { command, exit: r.status ?? -1, ...summary(text), tail: text.trim().split("\n").slice(-4).join(" / ") };
+  return { command, exit: r.status ?? -1, ...summary(text), fingerprint, at, tail: text.trim().split("\n").slice(-4).join(" / ") };
+};
+
+// 同一份字节上跑过的同一条命令，不必再跑：那次的结果连同它站的那一版指纹都在账本里。
+// 认它的只有一条——指纹一样。变了就照旧真跑，绝不拿旧数冒充新的。
+const runCachePath = () => path.join(ROOT, ".deed", "tmp", "runs.json");
+const readRunCache = () => {
+  try {
+    return JSON.parse(fs.readFileSync(runCachePath(), "utf8"));
+  } catch {
+    return {};
+  }
+};
+const writeRunCache = (fingerprint, entry) => {
+  try {
+    fs.mkdirSync(path.dirname(runCachePath()), { recursive: true });
+    const all = readRunCache();
+    all[fingerprint] = entry;
+    fs.writeFileSync(runCachePath(), JSON.stringify(all, null, 1) + "\n", "utf8");
+  } catch {
+    // 缓存写不进去不影响记账：它省的只是时间，不是事实。
+  }
+};
+const cachedRun = (command, fingerprint) => {
+  const one = readRunCache()[fingerprint];
+  if (!one || one.command !== command) return null;
+  return one;
+};
+const reusedRun = (events, command, fingerprint) => {
+  for (let at = events.length - 1; at >= 0; at -= 1) {
+    const one = events[at];
+    if (one.k !== "task.done" || !one.run) continue;
+    if (one.run.command !== command || !one.run.fingerprint) continue;
+    if (one.run.fingerprint !== fingerprint) continue;
+    return one.run;
+  }
+  return null;
 };
 
 // 交付记录里写着 196/196，而采到的是 195/196：那是抄来的数。
@@ -146,7 +186,15 @@ export default function submit(argv) {
         fail("清单有 " + plan.problems.length + " 处看不懂，一个字都没落：" + "\n" + "  " + plan.problems.join("\n" + "  "));
       // 先跑，再量：--run 与期望都会动工作区（测试会写临时文件），
       // 记下的字节要以跑完之后磁盘上的为准。
-      const observed = flags.run === undefined ? null : runOnce(String(flags.run));
+      const command = flags.run === undefined ? null : String(flags.run);
+      // 先问账本：同一条命令、同一份字节，上一次跑出来的结果还算数。
+      const { events: past } = load();
+      const stamp = command === null ? null : workspaceFingerprint(ROOT);
+      // 名字别跟下面的任务表撞：这里说的是"上一次那次跑"，不是"账本里已有的条目"。
+      const earlierRun = command === null ? null : reusedRun(past, command, stamp) ?? cachedRun(command, stamp);
+      const observed = command === null ? null : earlierRun ? earlierRun : runOnce(command);
+      // 真跑过的结果先落进缓存：这一次就算被拒，下一次同一份字节不必再跑一遍。
+      if (command !== null && !earlierRun) writeRunCache(observed.fingerprint, observed);
       if (observed) {
         if (observed.exit !== 0)
           fail("--run 的命令没有跑通（退出 " + observed.exit + "）：这份东西不成立，先别记账" +
@@ -365,7 +413,22 @@ export default function submit(argv) {
                 id: item.id,
                 evidence: item.claim,
                 by,
-                ...(observed ? { run: { command: observed.command, exit: observed.exit, tests: observed.tests, pass: observed.pass, fail: observed.fail } } : {}),
+                // run 记下这次数的出处：同一份字节上跑过一次就带着那次指纹与时刻，
+                // 复用的说明白它复用的是哪一次——复制来的数字和"同一份字节上的真跑"要分得开。
+                ...(observed
+                  ? {
+                      run: {
+                        command: observed.command,
+                        exit: observed.exit,
+                        tests: observed.tests,
+                        pass: observed.pass,
+                        fail: observed.fail,
+                        fingerprint: observed.fingerprint,
+                        at: observed.at,
+                        ...(observed.at === earlierRun?.at ? { reused: true } : {}),
+                      },
+                    }
+                  : {}),
                 ...((expectsOf.get(item.id) ?? []).length > 0 ? { expects: expectsOf.get(item.id) } : {}),
                 files: scanned.changed.map((one) => ({ path: one })),
                 changed: scanned.changed,
@@ -413,6 +476,7 @@ export default function submit(argv) {
           // 工作区里那些改动就被它吃掉了——下一条交付看起来什么都没动。
           if (stamped.some((ev) => ev.k === "task.done")) writeSnapshot(ROOT, scanned.now);
           // 记账之后只留一句：这一步真的跑过。没有这一行，谁也不知道它跑没跑。
+          if (earlierRun) console.log("复用上一次的跑 · " + earlierRun.command + " · 工作区自 " + earlierRun.at + " 起没变");
           const audited = stamped.filter((ev) => ev.k === "task.done").length;
           if (audited > 0) console.log("记账之后核对 · " + audited + " 条都落在账本里");
         },

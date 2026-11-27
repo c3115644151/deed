@@ -216,3 +216,9 @@
 {"at":"2026-11-27T12:41:35.723Z","verb":"state","code":0,"ms":147,"switches":[],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T12:42:57.454Z","verb":"submit","code":0,"ms":143,"switches":[],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T12:43:17.078Z","verb":"point","code":0,"ms":76,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:43:36.486Z","verb":"state","code":0,"ms":76,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:43:52.323Z","verb":"reply","code":0,"ms":90,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:46:10.402Z","verb":"review","code":0,"ms":44,"switches":["--due"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:46:10.951Z","verb":"say","code":0,"ms":86,"switches":["--from"],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:55:32.769Z","verb":"submit","code":0,"ms":210,"switches":[],"why":null,"v":"0.30.0"}
+{"at":"2026-11-27T12:55:58.167Z","verb":"point","code":0,"ms":68,"switches":[],"why":null,"v":"0.30.0"}
