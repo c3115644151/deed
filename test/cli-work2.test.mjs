@@ -552,3 +552,19 @@ test("a delivery proves itself with a command instead of a change", () => {
   const first = readEvents(cwd).find((one) => one.k === "task.done");
   assert.deepEqual(first.expects, [{ command: 'node -e "console.log(12345)"', want: "12345" }]);
 });
+
+// 清单是账本画出来的：结论一落，打回的条目在文件里也要回到未做。
+// 不然下一个读的人看到的是「已经交了」，而账本说它还要做。
+test("a verdict redraws the draft so a reworked entry is no longer ticked", () => {
+  const cwd = workspace("redraw-after-fail");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  addTask(cwd, "一件事", "跑得通");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
+  assert.match(readPlan(cwd), /- \[x\] T1 /u, "交付之后勾上了");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--rework", "T1", "--why", "没做到").status,
+    0,
+  );
+  assert.match(readPlan(cwd), /- \[ \] T1 /u, "打回之后文件里也回到未做");
+});

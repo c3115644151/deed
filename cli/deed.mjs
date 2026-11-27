@@ -81,6 +81,9 @@ const MOVED = {
   seal: 'deed review --segment S01.1 --skip --why "…"',
   shelve: 'deed sign --shelve --why "…"',
   doctor: 'deed check --ledger',
+  // 推翻结论是人的动作，只在面板上按（与判决、签收、议题出口同一类）。
+  judge: "推翻结论在面板上按（判决、签收、议题出口也都只在面板上）；命令行没有这条路",
+  verify: "deed check --ledger（账本能否重放）；交付记录不比对字节，那是历史",
   gate: 'deed check --gates',
   ask: '待裁这个概念不用了：讨论里的要点用 deed point "…"，要人确认的用议题两次按钮（deed topic + 面板）',
   // 条目不再是动词：加一条就是往 .deed/plan.md 里写一行，deed submit 一次记账；

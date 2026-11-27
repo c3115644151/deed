@@ -47,7 +47,7 @@ export const CHECKS = [
     id: "shape",
     title: "文件树符合范式",
     capability: "结构约束",
-    fix: '把目录改成范式里的名字（core/ app/ tests/），或用 deed project 如实声明偏离，再看 deed check 指到哪',
+    fix: '缺的格补上目录并用 deed project 声明它是哪一格（role）；盘上多出来的顶层目录认领成一格或写进 extras',
     judge: ({ project, tree }) => {
       if (!project) return { verdict: "na", detail: "没有声明成项目" };
       if (project.shape === "free" || project.shape === "none")
@@ -63,14 +63,10 @@ export const CHECKS = [
       if (absent.length > 0)
         return { verdict: "fail", detail: "这一类项目缺这" + absent.length + "格：" + absent.join("、") };
 
-      // ② 格的名字就是位置：范式规定的那几个格，目录必须同名。
-      // 允许"改个名字再声明"就等于让检查形式化——偏离要看得见，不能自己消掉。
+      // ② 格在不在，按 role 判（①已经判过），不按目录名判：一个仓库把可执行的哪一层叫 cli
+      // 还是叫 app，是它的历史，不是它缺了一类东西。这里只把偏离印出来，让读的人看得见——
+      // 允许改名不等于允许消掉一格：① 仍然要求每一格都在，④ 仍然要求每个目录都有归属。
       const renamed = layers.filter((one) => one.role !== one.dir && (PARADIGM[project.shape] ?? []).includes(one.role));
-      if (renamed.length > 0)
-        return {
-          verdict: "fail",
-          detail: "范式里的格不能换目录名：" + renamed.map((one) => one.role + " 用了 " + one.dir).join("；"),
-        };
 
       // ③ 声明的目录得在盘上（空目录不算：结构的意义是里面真放了东西）。
       const missing = layers.filter((one) => !tree.files.some((file) => file === one.dir || file.startsWith(one.dir + "/")));
@@ -110,7 +106,12 @@ export const CHECKS = [
       const hasTest = testsLayer && tree.files.some((file) => file.startsWith(testsLayer.dir + "/") && /\.(?:test|spec)\./u.test(file));
       if (!hasTest) return { verdict: "fail", detail: "tests 格里没有一个测试文件：这一格是空的" };
 
-      return { verdict: "pass", detail: layers.length + " 个目录，名字与格都对上，方向都对" };
+      return {
+        verdict: "pass",
+        detail:
+          layers.length + " 个目录，格都在、都有归属、方向都对" +
+          (renamed.length > 0 ? "（偏离：" + renamed.map((one) => one.role + " 用 " + one.dir).join("、") + "）" : ""),
+      };
     },
   },
   {

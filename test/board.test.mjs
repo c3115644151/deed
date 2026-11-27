@@ -9,7 +9,7 @@ import { renderBoard, when } from "../board/render.mjs";
 import { start } from "../board/serve.mjs";
 import { buildNow } from "../lib/panel.mjs";
 import { workspace } from "../support/lib.mjs";
-import { addTask, deliverTask } from "../test/support/cli.mjs";
+import { addTask, deliverTask } from "./support/cli.mjs";
 import { spawnSync } from "node:child_process";
 import { readEvents } from "../lib/store.mjs";
 

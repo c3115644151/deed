@@ -363,3 +363,29 @@ test("a gate command is run in order, and the first failure stops it", () => {
   assert.equal(gate.status, 1);
   assert.match(gate.stderr, /退出码 3/);
 });
+
+// 角色包是审查者唯一的规矩来源：它说"怎么动手"的那几句要有用例盯着。
+// 少一句就红——审查者没人可问，缺一条他就得自己猜边界。
+test("the reviewer pack says how to work: experiments outside, zero change inside", () => {
+  const cwd = workspace("guide-how-to-work");
+  deed(cwd, "init", "--said", "开始", "--review", "core/**");
+  addTask(cwd, "改一条判断", "同样的账本折出同样的文档");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const dir = path.join(cwd, ".deed", "review");
+  const pack = fs
+    .readdirSync(dir)
+    .filter((one) => one.endsWith("-reviewer.md"))
+    .map((one) => fs.readFileSync(path.join(dir, one), "utf8"))
+    .at(-1);
+  for (const line of [
+    "## 你怎么动手",
+    "可以跑任何命令",
+    "把整个工作区复制到临时区做破坏性实验",
+    "仓库里的东西一个字节都别动",
+    "别改账本",
+    "别替作者修",
+    "每条结论与发现都要配复现路径",
+  ])
+    assert.ok(pack.includes(line), "角色包里少了这一句：" + line);
+});

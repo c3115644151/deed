@@ -112,14 +112,14 @@ test("a segment the gate says not to review waits to be sealed, not to be review
     { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "ran", by: "agent", digest: "a".repeat(64), digestPath: "docs/a.md", changed: [], bytes: { "docs/a.md": 100 } },
   ]);
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), [
-    "S01.1 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
+    `S01.1 还没有封存（审查设置说这一段不用审：deed review --segment S01.1 --skip --why "凭什么不审" 记下凭什么）`,
   ]);
 });
 
 test("signing waits for the judgement and the period review", () => {
   const delivered = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md")]);
   assert.deepEqual(signBlockers(delivered, delivered.sessions[0], config), [
-    "S01.1 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
+    'S01.1 还没有封存（审查设置说这一段不用审：deed review --segment S01.1 --skip --why "凭什么不审" 记下凭什么）',
   ]);
   const clean = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1", "docs/a.md"), pass(4)]);
   assert.deepEqual(signBlockers(clean, clean.sessions[0], config), [PERIOD_OWED], "段判过了也还差期审");

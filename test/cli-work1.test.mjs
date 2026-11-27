@@ -226,7 +226,7 @@ test("a plan lands as one batch: a ? takes a number, a tick is a delivery", () =
   const second = deed(cwd, "submit");
   assert.equal(second.status, 0, second.stderr);
   assert.match(second.stdout, /交付 · T1 · 写了 docs\/a.md/);
-  assert.match(second.stdout, /记账之后核对 · 1 条都落在账本里/, "记账之后核一遍：确认那一行真落进去了，核的是有没有落，不是字节");
+  assert.match(second.stdout, /记账之后核对 · 1 条都指得到当时那份内容/u, "记账之后核一遍：这条记录指得到东西吗，指不到就说出来");
   const done = readEvents(cwd).find((one) => one.k === "task.done" && one.id === "T1");
   assert.ok(done.files.some((one) => one.path === "docs/a.md"), "勾上就是交付：submit 按工作区自己称，记下动过的文件");
   assert.equal(done.evidence, "写了 docs/a.md", "交付记录就是清单上那一行");

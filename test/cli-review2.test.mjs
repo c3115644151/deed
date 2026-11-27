@@ -477,8 +477,8 @@ test("the three human gates are not on the command line", () => {
   assert.equal(sign.status, 1);
   assert.match(sign.stderr, /面板/);
   const judge = deed(cwd, "judge", "--overturn", "R1", "--why", "不服");
-  assert.equal(judge.status, 1, "推翻那个动作连动词都不在了");
-  assert.match(judge.stderr, /没有这个动作/);
+  assert.equal(judge.status, 1, "推翻那个动作不在命令行上");
+  assert.match(judge.stderr, /面板/u, "要指到面板，别让人去别处找");
   const topic = deed(cwd, "topic", "release", "I1");
   assert.equal(topic.status, 1, "议题那一条连动词都还没有");
   assert.equal(readEvents(cwd).length, before, "三条路都不记账");

@@ -359,7 +359,7 @@ export function signBlockers(doc, session, config = null) {
       blockers.push(
         owed
           ? shut.id + " 还没有审查通过（审查者判的是这一段通不通过）"
-          : shut.id + " 还没有封存（审查设置说这一段不用审：deed review --skip 记下凭什么不审）",
+          : shut.id + ' 还没有封存（审查设置说这一段不用审：deed review --segment ' + shut.id + ' --skip --why "凭什么不审" 记下凭什么）',
       );
   }
   // Work owed outside the open segment is what a segment-level view cannot see;

@@ -273,3 +273,19 @@
 {"at":"2026-11-27T14:08:56.864Z","verb":"plan","code":1,"ms":40,"switches":[],"why":"清单已经在 .deed/plan.md：直接改它，改完 deed submit（记账之后这份会按账本重画一遍）","v":"0.30.0"}
 {"at":"2026-11-27T14:11:06.051Z","verb":"state","code":0,"ms":81,"switches":[],"why":null,"v":"0.30.0"}
 {"at":"2026-11-27T14:20:04.769Z","verb":"review","code":0,"ms":43,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:26:14.116Z","verb":"judge","code":1,"ms":2,"switches":["--overturn","--why"],"why":"没有这个动作：judge（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T14:26:14.314Z","verb":"topic","code":1,"ms":3,"switches":[],"why":"议题要把要点统合成正文：--body \"…\"","v":"0.31.0"}
+{"at":"2026-11-27T14:26:14.592Z","verb":"state","code":0,"ms":78,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:26:49.474Z","verb":"judge","code":1,"ms":2,"switches":["--overturn"],"why":"judge 已经改成 推翻结论在面板上按（判决、签收、议题出口也都只在面板上）；命令行没有这条路（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T14:26:49.669Z","verb":"verify","code":1,"ms":2,"switches":[],"why":"verify 已经改成 deed check --ledger（账本能否重放）；交付记录不比对字节，那是历史（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T14:30:59.691Z","verb":"check","code":0,"ms":76,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:31:43.408Z","verb":"project","code":0,"ms":147,"switches":["--shape","--layers","--extras","--background"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:31:43.691Z","verb":"check","code":0,"ms":63,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:31:48.069Z","verb":"serve","code":0,"ms":76,"switches":["--port"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:32:11.941Z","verb":"project","code":0,"ms":150,"switches":["--shape","--layers","--extras","--background"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:32:12.231Z","verb":"check","code":0,"ms":73,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:33:22.314Z","verb":"check","code":0,"ms":50,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:42:54.103Z","verb":"review","code":0,"ms":44,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:42:54.716Z","verb":"say","code":0,"ms":98,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:42:59.844Z","verb":"serve","code":0,"ms":64,"switches":["--port"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:46:07.146Z","verb":"state","code":0,"ms":214,"switches":[],"why":null,"v":"0.31.0"}

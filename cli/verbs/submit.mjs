@@ -512,8 +512,26 @@ export default function submit(argv) {
           if (stamped.some((ev) => ev.k === "task.done")) writeSnapshot(ROOT, scanned.now);
           // 记账之后只留一句：这一步真的跑过。没有这一行，谁也不知道它跑没跑。
           if (earlierRun) console.log("复用上一次的跑 · " + earlierRun.command + " · 工作区自 " + earlierRun.at + " 起没变");
-          const audited = stamped.filter((ev) => ev.k === "task.done").length;
-          if (audited > 0) console.log("记账之后核对 · " + audited + " 条都落在账本里");
+          // 记账之后再核一遍，不是核"记没记上"，是核"那句话指得到东西吗"：
+          // 它点到的路径此刻在不在、是不是 0 字节的空壳。只在记账那一刻成立还不够——
+          // 读账本的人看到的是这条记录，他没法回到那一刻；这里当场把说不通的说出来。
+          const landed = stamped.filter((ev) => ev.k === "task.done");
+          if (landed.length > 0) {
+            const broken = [];
+            for (const ev of landed) {
+              const paths = (ev.files ?? []).map((one) => one.path);
+              if (paths.length === 0) continue; // 靠 期望 自证的交付没有文件可指，不算错
+              for (const one of paths) {
+                const full = path.join(ROOT, one);
+                if (!fs.existsSync(full)) continue; // 删掉的路径本来就不在，它不是空交付
+                const size = fs.statSync(full).size;
+                if (size === 0) broken.push(one + " 是 0 字节");
+              }
+            }
+            if (broken.length > 0)
+              console.log("记账之后核对 · " + broken.length + " 条对不上：" + broken.slice(0, 5).join("、"));
+            else console.log("记账之后核对 · " + landed.length + " 条都指得到当时那份内容");
+          }
         },
       );
       // 落过账就把清单按账本重写一遍：新条目领到的号要写回去，不然下一次 submit

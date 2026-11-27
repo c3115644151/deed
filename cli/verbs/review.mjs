@@ -16,6 +16,7 @@ import {
 } from "../../core/rules.mjs";
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, writeBrief } from "../brief.mjs";
+import { draft as planDraft } from "../plan.mjs";
 import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
 
 
@@ -345,6 +346,11 @@ export default function review(argv) {
         recursive: true,
         force: true,
       });
+      // 结论一落，这一段的样子就变了（打回的条目回到未做）：清单是账本画出来的，
+      // 文件里还勾着的那几条会让下一个读的人以为它们还交着。落完结论就重画一遍。
+      const draftFile = path.join(ROOT, ".deed", "plan.md");
+      if (fs.existsSync(draftFile))
+        fs.writeFileSync(draftFile, planDraft(after.sessions.find((one2) => one2.id === one.id)) + "\n", "utf8");
       if (flags.verdict === "pass") {
         console.log("审查通过 · " + seg.id + " · 交回给你判（段还开着，判决之后才关闭）");
         console.log("  清单 " + handed.brief);

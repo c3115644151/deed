@@ -148,8 +148,9 @@ test("a directory nobody claims is reported, and extras is how you say it does n
   assert.equal(after.verdict, "pass");
 });
 
-// 格名就是位置：允许"改个名字再声明"就等于让这条检查形式化。
-test("a paradigm role cannot be renamed by declaring another directory", () => {
+// 格在不在按 role 判，不按目录名判：一个仓库把可执行那层叫 cli 还是 app 是它的历史，
+// 不是它缺了一类东西。偏离照旧印出来，让读的人看得见——但不因此判它结构不成立。
+test("a paradigm role may be served by a differently named directory, and the deviation is printed", () => {
   const renamed = declared({
     layers: [
       { role: "core", dir: "core", mayImport: [] },
@@ -159,11 +160,23 @@ test("a paradigm role cannot be renamed by declaring another directory", () => {
   });
   const shape = checkAll(doc(renamed), tree(["core/a.mjs", "cli/b.mjs", "test/c.test.mjs"], [{ from: "cli/b.mjs", to: "core/a.mjs" }]))
     .find((one) => one.id === "shape");
-  assert.equal(shape.verdict, "fail");
-  assert.match(shape.detail, /app 用了 cli/u);
-  assert.match(shape.detail, /tests 用了 test/u);
+  assert.equal(shape.verdict, "pass", shape.detail);
+  assert.match(shape.detail, /app 用 cli/u, "偏离要印出来");
+  assert.match(shape.detail, /tests 用 test/u);
 });
-
+// 改名可以，消掉一格不行：格缺了照旧红。
+test("a paradigm role still cannot go missing just because another directory was declared", () => {
+  const short = declared({
+    layers: [
+      { role: "core", dir: "core", mayImport: [] },
+      { role: "app", dir: "cli", mayImport: ["core"] },
+    ],
+  });
+  const shape = checkAll(doc(short), tree(["core/a.mjs", "cli/b.mjs"], [{ from: "cli/b.mjs", to: "core/a.mjs" }]))
+    .find((one) => one.id === "shape");
+  assert.equal(shape.verdict, "fail");
+  assert.match(shape.detail, /缺这1格：tests/u);
+});
 test("a paradigm role cannot be swept into extras either", () => {
   const hid = software({ extras: ["tests"] });
   const shape = checkAll(doc(hid), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"])).find((one) => one.id === "shape");
