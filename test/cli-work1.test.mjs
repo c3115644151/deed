@@ -95,7 +95,7 @@ test("a delivery that said the wrong thing is taken back, not rewritten", () => 
   const text = fs.readFileSync(handed, "utf8");
   assert.equal(text.includes("说要被撤回的那条"), false, "撤回的那条不算数");
   assert.match(text, /- 撤回的交付：这条交付是我手滑打进去的乱码/, "清单要说清哪一条不算数");
-  assert.match(text, /- 交付记录：这次说的是真的/);
+  assert.match(text, /- 交付†：这次说的是真的/);
   // 撤回的那条从账本里消失了，可它当时指着哪份字节是复核这条撤回的唯一依据。
   assert.match(text, /它当时动过的是 proof\.txt/, "撤回也要说清它当时指着什么");
   const taken = readEvents(cwd).find((one) => one.k === "task.undo");

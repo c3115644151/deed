@@ -311,3 +311,37 @@
 {"at":"2026-11-27T14:55:31.549Z","verb":"state","code":0,"ms":81,"switches":[],"why":null,"v":"0.31.0"}
 {"at":"2026-11-27T14:57:10.085Z","verb":"point","code":0,"ms":181,"switches":[],"why":null,"v":"0.31.0"}
 {"at":"2026-11-27T14:57:19.074Z","verb":"serve","code":0,"ms":143,"switches":["--port"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:58:28.672Z","verb":"review","code":0,"ms":40,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:58:28.891Z","verb":"state","code":0,"ms":62,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T14:58:45.240Z","verb":"reply","code":0,"ms":92,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:32.511Z","verb":"review","code":0,"ms":41,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:32.766Z","verb":"review","code":0,"ms":87,"switches":["--segment","--auto"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:32.971Z","verb":"review","code":0,"ms":37,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:33.376Z","verb":"review","code":0,"ms":35,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:34.266Z","verb":"say","code":0,"ms":102,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:52.534Z","verb":"review","code":0,"ms":45,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:00:57.688Z","verb":"state","code":0,"ms":138,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:02:12.431Z","verb":"plan","code":1,"ms":52,"switches":["--print"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:02:13.065Z","verb":"task","code":1,"ms":63,"switches":[],"why":"task 已经改成 写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:13.556Z","verb":"goal","code":1,"ms":53,"switches":[],"why":"goal 已经改成 把目的写在清单第一行（# 这一期要做成什么 下面那一句），deed submit 记账（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:13.999Z","verb":"seal","code":1,"ms":58,"switches":[],"why":"seal 已经改成 deed review --segment S01.1 --skip --why \"…\"（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:14.417Z","verb":"shelve","code":1,"ms":50,"switches":[],"why":"shelve 已经改成 deed sign --shelve --why \"…\"（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:14.940Z","verb":"judge","code":1,"ms":59,"switches":["--overturn"],"why":"judge 已经改成 推翻结论在面板上按（判决、签收、议题出口也都只在面板上）；命令行没有这条路（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:15.377Z","verb":"verify","code":1,"ms":60,"switches":[],"why":"verify 已经改成 deed check --ledger（账本能否重放）；交付记录不比对字节，那是历史（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:15.961Z","verb":"doctor","code":1,"ms":71,"switches":[],"why":"doctor 已经改成 deed check --ledger（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:16.425Z","verb":"gate","code":1,"ms":65,"switches":[],"why":"gate 已经改成 deed check --gates（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:16.926Z","verb":"tick","code":1,"ms":52,"switches":[],"why":"tick 已经改成 deed say \"…\"（deed help 看全部）","v":"0.31.0"}
+{"at":"2026-11-27T15:02:17.443Z","verb":"say","code":1,"ms":65,"switches":["--who"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T15:02:18.106Z","verb":"check","code":0,"ms":227,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:17:05.773Z","verb":"review","code":0,"ms":41,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:17:06.239Z","verb":"review","code":0,"ms":53,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:17:08.381Z","verb":"say","code":0,"ms":161,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:17:48.205Z","verb":"review","code":0,"ms":54,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:17:48.570Z","verb":"state","code":0,"ms":97,"switches":[],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:23:34.392Z","verb":"check","code":0,"ms":18208,"switches":["--ledger"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:25:53.054Z","verb":"reply","code":0,"ms":75,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:28:36.595Z","verb":"review","code":0,"ms":155,"switches":["--segment","--verdict","--rework","--why","--finding","--finding","--finding","--finding","--finding","--finding","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:34:57.906Z","verb":"review","code":0,"ms":42,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:34:58.684Z","verb":"say","code":0,"ms":101,"switches":["--from"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:40:10.272Z","verb":"review","code":0,"ms":61,"switches":["--due"],"why":null,"v":"0.31.0"}
+{"at":"2026-11-27T21:40:10.835Z","verb":"say","code":0,"ms":102,"switches":["--from"],"why":null,"v":"0.31.0"}

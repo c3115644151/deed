@@ -284,8 +284,8 @@ test("a delivery that says what it will show has to show it when the ledger is w
     .filter((one) => !one.endsWith("-reviewer.md"))
     .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8"))
     .at(-1);
-  assert.match(brief, /核过：node say\.mjs => hi/);
-  assert.doesNotMatch(brief, /只是说法/);
+  assert.match(brief, /核过 node say\.mjs => hi/);
+  assert.doesNotMatch(brief, /交付†：/);
 
   // 说得出现象却跑不出来：记账前就拒
   // 这一段已经在审：新的一条开下一段（在审的段不收新条目），这与真实用法一致。

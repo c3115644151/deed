@@ -126,20 +126,31 @@ function taskBlock(task, batches = new Map()) {
   return [
     "### " + task.id + " · " + task.title,
     "",
-    "- 做完的标准：" + task.criteria,
+    "- 标准：" + task.criteria,
       ...(task.source ? ["- 依据：" + task.source] : []),
-    "- 触及路径：" + (task.files.length === 0 ? "（未声明，按要审算）" : task.files.join("、")),
-    "- 状态：" + task.status + (task.deferredWhy ? (task.status === "dropped" ? " · 理由：" : " · 为什么延后：") + task.deferredWhy : ""),
+    // 状态不印：能进这份清单的条目本来就是交过的（没交完的段出不了清单），
+    // 逐条写「done」等于把前提重说五十九遍。只有"不是交付"的那几种才值得一行：
+    // 放弃、延后——它们是决定，审查者要知道为什么不做。
+    ...(task.status === "dropped" || task.status === "deferred"
+      ? [
+          "- " + (task.status === "dropped" ? "放弃" : "延后") + "：" +
+          (task.deferredWhy ?? "没有写理由"),
+        ]
+      : []),
     ...task.evidence.map((proof) => {
-      const files = proof.files ?? [];
+      // 动过哪几个文件：审查者要知道往哪儿看，但一屏里六条也就够了——
+      // 清单是"从哪儿下手"，不是"完整的工作记录"，全列出来只会把他推到别处去。
+      const files = (proof.files ?? []).map((one) => one.path);
+      const shown = files.slice(0, 6).join("、") + (files.length > 6 ? "…（共 " + files.length + " 个）" : "");
+      // † 标记只是说法的那种交付：它在开头的读法里已经解释过一次，逐条重复是噪音。
+      const bare = !proof.run && (proof.expects ?? []).length === 0;
       return (
-        "- 交付记录：" + (proof.claim ?? "") + "（" + proof.by + " · " + stamp0(proof.at) + "）" +
-        (files.length === 0 ? "" : "\n  - 动过：" + files.map((one) => one.path).join("、")) +
-        (proof.run ? "\n  - 跑过：" + proof.run.command + " · 退出 " + proof.run.exit +
-            (proof.run.tests === null ? "" : " · " + proof.run.pass + "/" + proof.run.tests + " 通过") : "") +
+        "- 交付" + (bare ? "†" : "") + "：" + (proof.claim ?? "") + "（" + proof.by + " " + stamp0(proof.at).slice(5).trim() + "）" +
+        (files.length === 0 ? "" : "\n  · 动过 " + shown) +
+        (proof.run ? "\n  · 跑过 " + proof.run.command + " · 退出 " + proof.run.exit +
+            (proof.run.tests === null ? "" : " · " + proof.run.pass + "/" + proof.run.tests) : "") +
         (proof.batch ? batchLine(batches.get(proof.batch.at)) : "") +
-        (proof.expects ?? []).map((one) => "\n  - 核过：" + one.command + " => " + one.want).join("") +
-        (proof.run || (proof.expects ?? []).length > 0 ? "" : "\n  - 只是说法：这条没配命令核过")
+        (proof.expects ?? []).map((one) => "\n  · 核过 " + one.command + " => " + one.want).join("")
       );
     }),
     // 撤回过的放弃：清单要看得见这条走过那一遭，不然「未做」与「一直没做」分不出。
@@ -172,22 +183,27 @@ export function planBrief(root, open, segment, at) {
   // 审查者的临时区：清单发出去时开，结论落地时删。它不属于工作区，也不进账本。
   const scratch = path.join(p.tmp, segment.id + "-" + fileStamp(at));
   fs.mkdirSync(scratch, { recursive: true });
+  const bare = tasks.filter((task) => task.evidence.every((proof) => !proof.run && (proof.expects ?? []).length === 0)).length;
   const text = [
     "# 审查清单 · " + segment.id,
     "",
     "会话 " + open.id + " · 段 " + segment.id + " · " + tasks.length + " 条 · 生成于 " + stamp0(at),
+    "",
+    // 读法只说一次：后面每条再重复，读的人要先跳过五十九行一样的字才看到要判的东西。
+    "读法：每条只有「标准」与「交付」是要判的。† 的交付没有配可核的命令" +
+      (bare > 0 ? "（这一份里 " + bare + " 条）" : "") +
+      "，那句话可以是真的，但账本里没有东西能核它——要信就自己跑一遍。",
+    "跑过／核过 的数字与输出是记账那一刻跑出来的：今天再看可能已经不对，你要用就当场重跑。",
     "",
     "## 要审的任务",
     "",
     ...tasks.flatMap((task) => taskBlock(task, batchInfo(tasks))),
     "## 怎么审",
     "",
-    "1. 对每条标准，看交付记录够不够证明它达成；没有交付记录就是没达成。",
-    "2. 只看这一段的任务，不替它补未来的事。",
-    "3. 每条标准给一个判定，落结论时逐条写：--result T1=met --result T2=unmet；pass 要求这一段每条都有判定。",
-    "4. 结论落盘：deed review --segment " + segment.id + " --verdict pass|fail --finding \"<不合格的那几条>\"",
+    "对每条标准看交付够不够证明它达成；只看这一段，不替它补未来的事。逐条写判定（--result T1=met），"
+      + "pass 要求每条都有；具体问题写 --finding，带位置。",
     "",
-    "这份文件已经记进账本（review.brief）：改了它再落结论会被拒。",
+    "结论：deed review --segment " + segment.id + " --verdict pass|fail --finding \"<哪几条不行>\"（角色包里有完整写法）。",
     "",
   ].join("\n");
   const base = (n) => path.join(p.review, segment.id + "-" + fileStamp(at) + (n === 1 ? "" : "-" + n));

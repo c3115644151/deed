@@ -58,7 +58,7 @@ test("the last segment closed is not the end: the period judgement comes before 
   // 第一段还在等你判，新活先在清单里排到下一段；交付要等它判过、关闭。
   freshPlan(cwd);
   const draftLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const placeholder = draftLines.findIndex((one) => one.startsWith("## 下一段"));
+  const placeholder = draftLines.findIndex((one) => /^## （/u.test(one));
   writePlan(cwd, [...draftLines.slice(0, placeholder), "", "## ", "", "- ? 乙", "  标准：能跑"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
@@ -98,8 +98,8 @@ test("handing the brief out is a fact, and a verdict answers that document", () 
   assert.match(fs.readFileSync(path.join(cwd, ".deed", "review", pack), "utf8"), /不信交付记录，逐条复跑/);
 
   const text = fs.readFileSync(path.join(cwd, ".deed", "review", sheet), "utf8");
-  assert.match(text, /做完的标准：能推事件/);
-  assert.match(text, /交付记录：curl 200/);
+  assert.match(text, /- 标准：能推事件/u);
+  assert.match(text, /- 交付†：curl 200/u, "没有可核的命令的交付带 †");
   assert.match(text, /deed review --segment S01\.1/, "清单自己说清怎么把结论写回来");
   // 没人回答的那份还在手上：再要一次只是把路径再报一遍，不是再写一份。
   const twice = deed(cwd, "review");
@@ -243,7 +243,7 @@ test("a named entry that was given up settles, and the verdict says so", () => {
   const logged = readEvents(cwd).find((one) => one.k === "review.log" && one.verdict === "pass");
   assert.deepEqual(logged.gaveUp, [{ id: "T1", why: "这一期不做了：重放改到下一期" }], "放弃与理由要进账本：只印在终端里，读账本的人看不到");
   const sheet = fs.readFileSync(path.join(cwd, logged.brief), "utf8");
-  assert.match(sheet, /状态：dropped · 理由：这一期不做了/, "审查者手上那份要看得出为什么放弃");
+  assert.match(sheet, /- 放弃：这一期不做了/, "审查者手上那份要看得出为什么放弃");
 });
 
 
@@ -284,7 +284,7 @@ test("a pass seals the segment, so later work opens a new one instead of making 
   // 这一段判过、已经关闭：新活写在空标题的 ## 段里，submit 时领号。
   freshPlan(cwd);
   const laterLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const laterAt = laterLines.findIndex((one) => one.startsWith("## 下一段"));
+  const laterAt = laterLines.findIndex((one) => /^## （/u.test(one));
   writePlan(cwd, [...laterLines.slice(0, laterAt), "", "## ", "", "- ? 再改一处", "  标准：还是一样"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   assert.equal(deliverTask(cwd, "T2", "又跑一遍", { file: "core/fold.mjs" }).status, 0);

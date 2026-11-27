@@ -69,7 +69,7 @@ test("new work waits for the verdict in the next segment, and a brief only ages 
   // 这一段已经送审：新活写在空标题的 ## 段里，submit 时领下一段的号。
   freshPlan(cwd);
   const briefLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const briefAt = briefLines.findIndex((one) => one.startsWith("## 下一段"));
+  const briefAt = briefLines.findIndex((one) => /^## （/u.test(one));
   writePlan(cwd, [...briefLines.slice(0, briefAt), "", "## ", "", "- ? 又想起一条", "  标准：也得做到"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   const session = fold(readEvents(cwd)).sessions[0];
@@ -164,7 +164,7 @@ test("a frozen segment refuses work until the brief is withdrawn, and the withdr
   // 新活不进冻结的段：清单里另开空标题的一节，submit 时领下一段的号。
   freshPlan(cwd);
   const frozenLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const frozenAt = frozenLines.findIndex((one) => one.startsWith("## 下一段"));
+  const frozenAt = frozenLines.findIndex((one) => /^## （/u.test(one));
   writePlan(cwd, [...frozenLines.slice(0, frozenAt), "", "## ", "", "- ? 又想起一条", "  标准：也行"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0, "新活不进冻结的段");
   assert.equal(dropTask(cwd, "T2", "不做了").status, 0, "放弃是记录，不是换字节");
@@ -302,7 +302,7 @@ test("a period whose segments all sat out review signs without anything else", (
   // S01.1 已经封存关闭：新活写在空标题的 ## 段里，submit 时领 S01.2。
   freshPlan(cwd);
   const exemptLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const exemptAt = exemptLines.findIndex((one) => one.startsWith("## 下一段"));
+  const exemptAt = exemptLines.findIndex((one) => /^## （/u.test(one));
   writePlan(cwd, [...exemptLines.slice(0, exemptAt), "", "## ", "", "- ? 改 b", "  标准：docs/b.md 有一句话"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   deliverTask(cwd, "T2", "改好 docs/b.md", { file: "docs/b.md" });
@@ -419,7 +419,7 @@ test("a period verdict that names a segment reopens it, and its items stay deliv
   // S01.1 审查通过、等你判决：新活排到 S01.2，交付等这一段判过、关闭。
   freshPlan(cwd);
   const periodLines = readPlan(cwd).replace(/\s*$/u, "").split("\n");
-  const periodAt = periodLines.findIndex((one) => one.startsWith("## 下一段"));
+  const periodAt = periodLines.findIndex((one) => /^## （/u.test(one));
   writePlan(cwd, [...periodLines.slice(0, periodAt), "", "## ", "", "- ? 写 b", "  标准：b 在"].join("\n") + "\n");
   assert.equal(deed(cwd, "submit").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
@@ -464,7 +464,8 @@ test("a delivery with no command behind it says so in the brief", () => {
     .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8"))
     .at(-1);
   // 没有命令核过的交付在清单上只算说法：审查者看得到它和「跑过」「核过」的区别
-  assert.match(brief, /只是说法：这条没配命令核过/);
+  assert.match(brief, /† 的交付没有配可核的命令/, "只是说法在抬头说一次，不再逐条重复");
+  assert.match(brief, /交付†：/);
 });
 
 
