@@ -93,3 +93,28 @@ test("the wake message carries the verdict in full, not just the names", () => {
   assert.match(text, /清单 · .deed\/review\/S02\.20-11281045\.md/u);
   assert.doesNotMatch(text, /T97 · met/u, "达成的只报数，不逐条念");
 });
+
+// 审查开始也是执行链上的一步：清单交出去了、有人在读，作者不该靠猜自己现在在等什么。
+// 只出清单、还没人落结论的时候，也要叫一次。
+test("a sheet going out is a step of the chain too: the author hears it, once", async () => {
+  const cwd = workspace("adapter-verdicts-brief");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" });
+
+  const said = [];
+  const agent = { status: "idle", followup: (message) => said.push(message) };
+  const state = { watermark: null };
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(said.length, 0, "还没有清单：谁也不叫");
+
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "系统把清单交出去");
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(said.length, 1, "清单出门 → 叫一次");
+  const text = said[0].content.map((one) => one.text).join("\n");
+  assert.match(text, /审查清单发出去了/u);
+  assert.match(text, /等结论/u);
+
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(said.length, 1, "同一份清单只叫一次");
+});

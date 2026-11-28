@@ -13,7 +13,13 @@
 <!-- 已关闭 19 段（不再过目）：S02.1 3 · S02.2 12 · S02.3 2 · S02.4 3 · S02.5 2 · S02.6 1 · S02.7 2 · S02.8 2 · S02.9 3 · S02.10 3 · S02.11 4 · S02.12 3 · S02.13 2 · S02.14 1 · S02.15 1 · S02.16 1 · S02.17 1 · S02.18 16 · S02.19 12 -->
 
 ## 段 S02.20
-<!-- 已完成（37 条）：交过的，往下沉 -->
+<!-- 已完成（39 条）：交过的，往下沉 -->
+- [x] T162 审查开始与结论都回到作者，执行链每一步都有人说话
+  标准：账本出现 review.brief 时，适配器把它当成一条消息回到作者会话（清单路径、交给谁、在等结论），与结论落账时的叫醒同一条路；有用例（只出清单不落结论也叫一次，第二次不再叫）
+  交付：adapters/dsh/verdicts.mjs 的 KINDS 加 review.brief，say() 多一句「审查清单发出去了 · 段 · 清单路径（交给审查者，等结论写进账本）」；test/adapter-verdicts.test.mjs 新增一条（只出清单不落结论也叫一次，第二次不再叫），变异核对一次（KINDS 去掉 review.brief → 红）；DESIGN §12.6.9 同步；期望：node --test test/adapter-verdicts.test.mjs => ℹ fail 0
+- [x] T161 结论过期就该重新出清单，别停在等判决
+  标准：一段审查通过之后又进了新活（结论过期），deed review --due 不再回空，而是给这一段要一份新清单；下一步、签收、面板上的判决按钮都按「pass 还成不成立」这一句算（core/rules.mjs 的 verdictStands 一处出口）；有用例（过期 pass → due 给 brief、不再印等判决、面板不画判决按钮）
+  交付：core/rules.mjs 新增 verdictStands（pass 且结论判的还是现在这份内容），reviewDue、nextAction、signBlockers、cli/verbs/review.mjs 的「已经通过」闸、board/render.mjs 的判过标签与判决按钮五处都改成问它；test/rules.test.mjs 新增一条（过期 pass → review --due 给 brief、签收不再说等判决），变异核对一次（换回只看 verdict → 红）；期望：node --test test/rules.test.mjs => ℹ fail 0
 - [x] T159 屏上看得见一段是怎么走过来的，不只看最后一帧
   标准：执行屏每条条目印它最近一次判定（met 的时刻与那句话），验收屏每段印「第 N 份清单 · 判过 K 次」并可展开那一段的判定时间线（每份清单一行：时间、pass/fail、点名哪几条）；作废的结论在时间线上标出来；判断只从账本的 reviews 与 results 算，不另存；有用例（多份清单多份结论时，屏上读得到每一帧而不是最后一帧）
   交付：board/render.mjs 的验收屏每段加「第 N 份清单 · 判过 K 次」，并给一段做过几份清单、判过几次的 <details> 时间线（每份一行：时间 · 通过/不合格 · 清单名 · 达成/没过/作废 · 谁）；执行屏每条条目印「最近一次判定」（达成/没达成 · 谁 · 什么时候 · 那句话），判过之后又改过的写「这条之后改过，判定说的是旧内容」；顺手修掉段条里多出来的一个 </span>；新增 test/board.test.mjs 一条用例，变异核对两次（摘时间线 → 红、改判定行标题 → 红），真开页面截图看过（.shots/t159-exec.png、.shots/probe-e.png）；期望：node --test test/board.test.mjs => ℹ fail 0

@@ -21,6 +21,7 @@ import {
   takingSegment,
   turnNumbers,
   userTurns,
+  verdictStands,
 } from "../core/rules.mjs";
 
 const esc = (value) =>
@@ -405,7 +406,8 @@ function segmentBlock(session, segment, index, config, zone, anchors) {
   const here = take?.id === segment.id;
   const stamp =
     segment.closedAt === null && !here ? tag("quiet", "等前面") :
-    segment.verdict === "pass" ? tag("pass", "判过") :
+    segment.verdict === "pass" && verdictStands(session, segment) ? tag("pass", "判过") :
+    segment.verdict === "pass" ? tag("grit", "要重审") :
     segment.verdict === "exempt" ? tag("quiet", "免审") :
     segment.verdict === "rework" ? tag("fail", "打回") : tag(state === "pass" ? "quiet" : "grit", STAMP[state] ?? "要审");
   const tasks = byOrder(session.tasks.filter((task) => task.segment === segment.id));
@@ -489,11 +491,16 @@ function acceptScreen(doc, session, config, zone, on) {
       const sheets = session.briefs.filter((one) => (one.segment ?? null) === segment.id);
       const logs = session.reviews.filter((one) => one.scope === "segment" && one.segment === segment.id);
       const queued = segment.closedAt === null && taking !== segment;
-      const waiting = segment.verdict === "pass" && segment.closedAt === null;
+      // 判决按钮只画在"那份结论判的还是现在这份内容"的段上：结论过期了，
+      // 该做的是重审，不是让人去判一份已经不对的内容。
+      const waiting = verdictStands(session, segment) && segment.closedAt === null;
+      const outgrown = segment.verdict === "pass" && !verdictStands(session, segment) && segment.closedAt === null;
       const word = queued
         ? "等前面"
         : waiting
         ? "等判决"
+        : outgrown
+        ? "要重审"
         : review
           ? review.verdict === "pass" ? "审查通过" : "不合格"
           : segment.verdict === "exempt" ? "免审" : STAMP[state] ?? "要审";

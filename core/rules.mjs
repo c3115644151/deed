@@ -224,6 +224,11 @@ export const freshBrief = (session, segment) => {
 // 一期要做成什么：签收拿它当尺子。可以改，账本留每一次。
 export const goalOf = (session) => session?.goal?.text ?? null;
 
+// 一句结论算不算数，看它判的那份内容还是不是现在这份。三处（下一步、该谁审、签收）
+// 各自判一遍"pass 还成不成立"，就会各说各话：本该重审的段，一处说等判决、一处说没due。
+export const verdictStands = (session, segment) =>
+  Boolean(segment) && segment.verdict === "pass" && !staleReview(session, segment);
+
 const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
   const last = lastSegmentChange(session, segment);
@@ -351,8 +356,10 @@ export function reviewDue(doc, config = null) {
 
   const segment = openSegment(session);
   if (!segment) return null;
-  // 审查通过之后这一段在等人判：那一刻没有审查者的活。
-  if (segment.verdict === "pass") return null;
+  // 审查通过、而且那份结论判的还是现在这份内容：那一刻轮到人判，没有审查者的活。
+  // 结论过期（之后又交了活）就得重新出清单——否则这一段永远停在"等判决"，
+  // 该审的那一步谁都不动，作者在那边干等。
+  if (verdictStands(session, segment)) return null;
   // 审查设置说这一段不用审：它的结局是 agent 封存，不是一份没人答的卷子。
   if (config && !needsReview(config, session, segment)) return null;
   // 还有没交的条目：清单上写的东西还没成形，出了也是旧的。
@@ -373,7 +380,7 @@ export function signBlockers(doc, session, config = null) {
     // 要审的段等审查者的 pass；免审的段等交付的人写清凭什么不审。同一句「还没有审查通过」
     // 放在免审段上是假话——没人会来审它。
     const owed = config ? needsReview(config, session, shut) : true;
-    if (awaitingJudgement(session, shut))
+    if (awaitingJudgement(session, shut) && verdictStands(session, shut))
       blockers.push(shut.id + " 审查通过了，等你判决（这一段过不过，不是审查者说了算）");
     else
       blockers.push(
@@ -568,7 +575,7 @@ export function nextAction(doc, config) {
   // 审查通过只把这一段交回来：此刻轮到人判，它不是签收，也不是再审。
   // 但判决只能落在那份被判过的字节上：之后这一段又有了新活，那份结论就旧了，
   // 下一步是把新活做完、再出一份清单，而不是让人去判一份已经不对的内容。
-  if (awaitingJudgement(session, segment) && reviewState(config, session, segment) !== "stale")
+  if (awaitingJudgement(session, segment) && verdictStands(session, segment))
     return {
       who: "user",
       what: "判决",

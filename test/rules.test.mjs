@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
   byOrder,
+  reviewDue,
+  verdictStands,
   stalePeriod,
   needsReview,
   nextAction,
@@ -426,4 +428,22 @@ test("a pass that the segment has outgrown asks for the new work, not for a judg
   assert.equal(step.who, "agent");
   assert.equal(step.what, "交付", "先做新的一条");
   assert.match(step.text, /T2/u);
+});
+
+// 一段审查通过、之后又进了新活：那份结论判的不是现在的内容，"等你判决"就不成立。
+// 以前 reviewDue 只看 segment.verdict，回空——该谁审这一步谁都不动，作者在那边干等。
+test("a pass the segment has outgrown asks for a new sheet instead of a verdict", () => {
+  const ledger = [
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), done(4, "T1"),
+    { v: 35, at: T(5), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b.md", findings: [], results: [{ id: "T1", verdict: "met" }] },
+    { v: 1, at: T(6), k: "task.add", s: null, id: "T2", title: "T2", criteria: "c", files: ["core/rules.mjs"] },
+    done(7, "T2"),
+  ];
+  const doc = fold(ledger);
+  const session = doc.sessions[0];
+  const due = reviewDue(doc, config);
+  assert.equal(due.needs, "brief", "该重新出一份清单");
+  assert.equal(due.segment, "S01.1");
+  assert.equal(verdictStands(session, session.segments[0]), false, "过期的 pass 不算数");
+  assert.deepEqual(signBlockers(doc, session, config), ["S01.1 还没有审查通过（审查者判的是这一段通不通过）"], "不再说等判决");
 });
