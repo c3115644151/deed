@@ -495,3 +495,36 @@
 {"at":"2026-11-28T03:09:10.164Z","verb":"review","code":0,"ms":221,"switches":["--segment","--verdict","--finding","--finding","--finding","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T03:09:24.407Z","verb":"state","code":0,"ms":162,"switches":[],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T03:13:09.517Z","verb":"submit","code":0,"ms":223,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:16:06.531Z","verb":"reply","code":0,"ms":90,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:16:07.379Z","verb":"review","code":0,"ms":36,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:16:21.694Z","verb":"state","code":0,"ms":61,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:16:21.893Z","verb":"review","code":0,"ms":37,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:16:22.049Z","verb":"panel","code":0,"ms":10,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:16:41.105Z","verb":"reply","code":0,"ms":92,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:20:01.673Z","verb":"review","code":0,"ms":44,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:20:02.150Z","verb":"say","code":0,"ms":85,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:24:25.874Z","verb":"reply","code":0,"ms":88,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:25:04.769Z","verb":"review","code":0,"ms":40,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:25:05.224Z","verb":"say","code":0,"ms":79,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:27:14.990Z","verb":"reply","code":0,"ms":124,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:32:56.520Z","verb":"review","code":0,"ms":47,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:32:57.129Z","verb":"say","code":0,"ms":100,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:41:55.673Z","verb":"review","code":0,"ms":56,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:41:56.576Z","verb":"say","code":0,"ms":97,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:45:15.445Z","verb":"submit","code":0,"ms":195,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:45:19.235Z","verb":"serve","code":0,"ms":68,"switches":["--port"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T03:54:29.659Z","verb":"submit","code":1,"ms":4,"switches":[],"why":"清单有 2 处看不懂，一个字都没落：","v":"0.33.0"}
+{"at":"2026-11-28T03:55:39.817Z","verb":"submit","code":1,"ms":24588,"switches":[],"why":"这一批勾了 2 条交付（T156、T157）：一次只交一条——先交此刻在做的那一条（deed state 说是 T156），写完 交付： 提交一次，再做下一条。账本一个字都没动","v":"0.33.0"}
+{"at":"2026-11-28T03:56:19.187Z","verb":"submit","code":1,"ms":27347,"switches":[],"why":"S02.20 审查通过了、等你判决：这一段先冻着，判过之后才收新的交付（判决在面板上按）","v":"0.33.0"}
+{"at":"2026-11-28T04:02:54.115Z","verb":"submit","code":1,"ms":28299,"switches":[],"why":"S02.20 审查通过了、等你判决：这一段先冻着，判过之后才收新的交付（判决在面板上按）","v":"0.33.0"}
+{"at":"2026-11-28T04:02:57.132Z","verb":"serve","code":0,"ms":87,"switches":["--port"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:04:34.903Z","verb":"submit","code":0,"ms":27348,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:05:19.771Z","verb":"submit","code":1,"ms":417,"switches":[],"why":"T157 在段 S02.21 里，轮到它的那一段还没开（现在收活的是 S02.20：它判过、关闭之后这一段才接过活）：清单上这一节是排好的下一段，它只记条目，交付等轮到再做","v":"0.33.0"}
+{"at":"2026-11-28T04:06:05.924Z","verb":"submit","code":1,"ms":404,"switches":[],"why":"T157 在段 S02.21 里，轮到它的那一段还没开（现在收活的是 S02.20：它判过、关闭之后这一段才接过活）：清单上这一节是排好的下一段，它只记条目，交付等轮到再做","v":"0.33.0"}
+{"at":"2026-11-28T04:06:25.294Z","verb":"submit","code":0,"ms":239,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:06:45.126Z","verb":"submit","code":1,"ms":172,"switches":[],"why":"T158 勾上了，但这一批没有量到任何改动，记录里也没有一条当场能跑出来的 期望：——交付总得指着点什么：要么先真的动过一个文件，要么在 交付： 后面写一行 期望：<命令> => <要看到的话>，它会当场跑一遍","v":"0.33.0"}
+{"at":"2026-11-28T04:07:04.552Z","verb":"submit","code":0,"ms":463,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:07:25.908Z","verb":"submit","code":0,"ms":202,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:08:11.861Z","verb":"check","code":0,"ms":71,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:11:01.943Z","verb":"check","code":0,"ms":11157,"switches":["--ledger"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T04:11:02.555Z","verb":"state","code":0,"ms":68,"switches":[],"why":null,"v":"0.33.0"}

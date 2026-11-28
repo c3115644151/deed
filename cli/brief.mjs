@@ -251,6 +251,9 @@ export function planBrief(root, open, segment, at) {
     text,
     guideFile: base(n) + "-reviewer.md",
     guideText: guide,
+    // 这一份清单要判的是哪几条：账本记下它，才说得清"冻结管的是谁"——
+    // 列在里面的不能动，后来的照收。
+    todo: fresh.map((task) => task.id),
   };
 }
 

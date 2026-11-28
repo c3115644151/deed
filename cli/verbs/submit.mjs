@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { SEGMENT_MAX, nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
+import { SEGMENT_MAX, nextAction, segmentRoom, sessionById, takingSegment } from "../../core/rules.mjs";
 import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } from "../../lib/store.mjs";
 import { prints, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { EVENT_VERSION } from "../../core/events.mjs";
-import { frozenFor } from "../../core/fold.mjs";
+import { onTheSheet } from "../../core/fold.mjs";
 import { findStaleTasks } from "../../core/stale.mjs";
 import { checkLanded } from "../../lib/landed.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf, commandSurface } from "../session.mjs";
@@ -254,27 +254,15 @@ export default function submit(argv) {
                 fail("清单里写的 ## 段 " + title + " 账本里没有：新的一段写成空标题的 ## 段，submit 时领号");
               const home = one.segments.find((seg) => seg.id === title);
               if (home.closedAt !== null) fail("段 " + title + " 已经关闭：新条目进不去，另开一段写");
-              // 在审（或等判决）的那一段不收新条目：审查者手上那份清单还没答完，
-              // 清单又长出一条，他答的是哪一份就成了糊涂账。
-              if (frozenFor(one, title, EVENT_VERSION))
-                fail(
-                  title + " 的清单已经发出去（" +
-                    (home.verdict === "pass" ? "审查通过、等你判决" : "还没人回答") +
-                    "）：它不再收新条目——新的一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段",
-                );
+              // 在审（或等判决）的段**照收新条目**：冻结管的是"手上那一份清单里列的条目"
+              // 不能交付、不能撤回；新加的一条不在那一份里，它进的是下一份清单。
+              // 以前把新条目也挡在外面，结果是每有一笔临时活就得多开一段。
               id = title;
             } else if (take && ![...bySection.values()].includes(take.id)) {
               // 空标题的第一节就是现在收活的那一段：草稿里它本来写着段号，
               // 手写一份没写号时按"手上那一段"理解，不然一条活都落不下去。
               // 前面已经认领过它的话，再一个空节就是新的一段。
-              // 手上这一段在审（或等判决）就不收新条目：那时候的活该开下一段，
-              // 否则审查者手上那份清单还没答完，它上面就又长出一条。
-              if (frozenFor(one, take.id, EVENT_VERSION))
-                fail(
-                  take.id + " 的清单已经发出去（" +
-                    (take.verdict === "pass" ? "审查通过、等你判决" : "还没人回答") +
-                    "）：它不再收新条目——新的一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段",
-                );
+              // 同样：手上这一段在审也照收新条目（它们进下一份清单）。
               id = take.id;
             } else {
               topNumber += 1;
@@ -284,7 +272,8 @@ export default function submit(argv) {
             // 一段装不下太多：段是被一起审的那一批，大到一次读不完，清单就没人真读。
             // 到了上限，新的一条另起一节（空标题的 ## 段），submit 时自己开下一段。
             const already = one.tasks.filter((task) => task.segment === id && task.status !== "dropped").length;
-            if (already >= SEGMENT_MAX)
+            const home = one.segments.find((seg) => seg.id === id);
+            if (home && segmentRoom(one, home) && already >= SEGMENT_MAX)
               fail(
                 id + " 已经有 " + already + " 条（一段最多 " + SEGMENT_MAX + " 条）：这一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段；" +
                   "段是审查的单位，大到一次读不完，清单就没人真读了",
@@ -422,8 +411,9 @@ export default function submit(argv) {
                 if (item.claim === recorded) continue;
                 const session = one;
                 const home = session.segments.find((seg) => seg.id === task.segment);
-                // 冻结的判断只有一处（core/fold.mjs 的 frozenFor）：在审、审查通过等判决都算。
-                if (home && frozenFor(session, task.segment, EVENT_VERSION))
+                // 冻结管的是"手上那份清单里列的条目"（core/fold.mjs 的 onTheSheet）：
+                // 审查者正在读的那些字节不能在他眼下换掉，别的条目照收。
+                if (home && onTheSheet(session, task.segment, task.id))
                   fail(
                     home.verdict === "pass"
                       ? task.segment + " 审查通过了、等你判决：这一段先冻着，判过之后才收新的交付（判决在面板上按）"
@@ -436,6 +426,12 @@ export default function submit(argv) {
               }
               const take = takingSegment(one);
               const home = one.segments.find((seg) => seg.id === task.segment);
+              // 新条目只要不在手上那份清单里，冻结就管不着它——它进的是下一份清单。
+              if (task.status === "todo" && home && onTheSheet(one, task.segment, task.id))
+                fail(
+                  task.segment + " 的清单已经发出去、这一条也在那一份里：先等结论（或者把清单撤回再改）" +
+                    "，别让审查者读的字节在他眼下换掉",
+                );
               if (!take || (home && home.plannedAt !== null && take.id !== task.segment))
                 fail(
                   item.id + " 在段 " + task.segment + " 里，轮到它的那一段还没开" +

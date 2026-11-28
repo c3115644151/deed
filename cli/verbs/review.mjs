@@ -240,7 +240,16 @@ export default function review(argv) {
         const guide = rel(ROOT, plan.guideFile);
         transact(
           flags,
-          () => ({ k: "review.brief", s: one.id, segment: seg.id, brief, guide, by: "agent", ...(flags.auto ? { via: "auto" } : {}) }),
+          () => ({
+            k: "review.brief",
+            s: one.id,
+            segment: seg.id,
+            brief,
+            guide,
+            tasks: plan.todo,
+            by: "agent",
+            ...(flags.auto ? { via: "auto" } : {}),
+          }),
           () => writeBrief(plan, brief),
         );
         // 账本里已有几份，加上手上这份：一次审只回答一份清单。

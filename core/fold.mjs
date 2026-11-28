@@ -115,15 +115,26 @@ export const awaitingVerdict = (session, segment) => {
 export const awaitingJudgement = (session, segment) =>
   Boolean(segment) && segment.closedAt === null && segment.verdict === "pass";
 
-// 清单没被回答之前，这一段是冻结的：要么审，要么先把清单撤回再改。从账本含义第 19 版
-// 起这么读；旧行按当时的样子重放——那时边审边改是允许的，拿今天的话去判它们是坏账。
-// 第 23 版起多一格：审查通过了、等你判决的这段时间同样不收交付——审查者判的是那份字节，
-// 人在判之前又换掉了它，判决落在一份没人看过的内容上。
-export const frozenFor = (session, segmentId, meaning) => {
-  if (meaning < MEANING.freeze) return false;
+// 冻结管的是"手上那一份清单里列的条目"：审查者正在读的那些字节不许在他眼下换掉，
+// 别的条目照收——它们进的是下一份清单。审查通过、等你判决的这段时间同理：判的是那一份
+// 里列的东西，人换掉它，判决就落在一份没人看过的内容上。
+// 清单记了它要判哪几条（含义第 36 版起）；更早的清单没记，那时整段都算在审——照旧一律挡，
+// 别拿今天的话去回读旧行。
+export const onTheSheet = (session, segmentId, taskId) => {
   const segment = session.segments.find((one) => one.id === segmentId);
-  if (awaitingVerdict(session, segment)) return true;
-  return meaning >= MEANING.judgement && awaitingJudgement(session, segment);
+  if (!segment) return false;
+  if (awaitingVerdict(session, segment)) {
+    const last = (session.briefs ?? []).filter((one) => one.scope === "segment" && one.segment === segment.id).at(-1);
+    if (!last) return false;
+    return Array.isArray(last.tasks) ? last.tasks.includes(taskId) : true;
+  }
+  if (awaitingJudgement(session, segment)) {
+    const live = session.reviews.filter((one) => one.voidedAt === null && one.scope === "segment" && one.segment === segment.id);
+    const last = live.at(-1);
+    if (!last) return false;
+    return Array.isArray(last.results) ? last.results.some((one) => one.id === taskId) : true;
+  }
+  return false;
 };
 
 // 下一个段：队列里最后一个还没关闭的段（清单排好的就是它）。
@@ -668,6 +679,7 @@ export function fold(events) {
           goal: ev.goal ?? null,
           segment: segment ? segment.id : null,
           brief: ev.brief,
+          tasks: ev.tasks ?? null,
     
           guide: ev.guide ?? null,
           guideDigest: ev.guideDigest ?? null,

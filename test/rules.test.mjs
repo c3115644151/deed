@@ -396,3 +396,20 @@ test("a period brief goes stale only for segments that existed when it went out"
   touched.reviews.push({ scope: "segment", segment: "S01.1", at: "2026-01-02T03:00:00Z" });
   assert.equal(stalePeriod(touched), true, "已有段在发出之后又落了结论");
 });
+
+// 一段走过一轮之后，"要不要再审"按这一份清单真要判的条目算：判过、之后没动过的沿用，
+// 不再把这一段的审查设置算作凭据。否则只要段里躺过一条碰过 core/** 的旧交付，
+// 这段永远都要审——"判过的不再判"就白写了。
+test("whether a segment needs another review is asked of the items still open, not all of them", () => {
+  const doc = fold([
+    turn(1), goal(2),
+    add(3, "T1", ["core/fold.mjs"]), add(4, "T2", ["docs/b.md"]), done(5, "T1"),
+    { v: 1, at: T(6), k: "task.done", s: null, id: "T2", evidence: "ran", by: "agent", digest: "b".repeat(64), digestPath: "docs/b.md", changed: ["docs/b.md"], bytes: { "docs/b.md": 100 } },
+    { v: 35, at: T(7), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b.md", findings: [], results: [{ id: "T1", verdict: "met" }, { id: "T2", verdict: "met" }] },
+    { v: 1, at: T(8), k: "task.add", s: null, id: "T3", title: "T3", criteria: "c", files: ["docs/c.md"] },
+    { v: 1, at: T(9), k: "task.done", s: null, id: "T3", evidence: "ran", by: "agent", digest: "c".repeat(64), digestPath: "docs/c.md", changed: ["docs/c.md"], bytes: { "docs/c.md": 90 } },
+  ]);
+  const session = doc.sessions[0];
+  // T1（碰过 core/**）已经判过、之后没动过：它不参与下一份清单，也就不再把这段拖进审查。
+  assert.equal(needsReview(config, session, session.segments[0]), false, "新的一条只碰 docs/** 的小改动，这段不必再出清单");
+});

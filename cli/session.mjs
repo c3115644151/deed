@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { digest } from "../core/digest.mjs";
-import { fold, frozenFor } from "../core/fold.mjs";
+import { fold, onTheSheet } from "../core/fold.mjs";
 import { findStaleTasks } from "../core/stale.mjs";
 import { refused } from "./trace.mjs";
 import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
@@ -119,7 +119,8 @@ const refuseFrozen = (doc, evs) => {
       fail(
         task.segment + " 还没轮到（现在收活的是 " + take.id + "）：清单预排的那一段只记条目，前面这段判过、关闭之后它才接过活",
       );
-    if (!frozenFor(session, task.segment, EVENT_VERSION)) continue;
+    // 冻结管的是"手上那份清单里列的条目"：新加的一条不在那一份里，它进下一份清单。
+    if (!onTheSheet(session, task.segment, task.id)) continue;
     const waiting = home && home.verdict === "pass" && home.closedAt === null;
     fail(
       waiting

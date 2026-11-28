@@ -1,6 +1,6 @@
 // rules: the questions a projection asks about the document. No clock, no IO.
 import { MEANING } from "./events.mjs";
-import { awaitingJudgement } from "./fold.mjs";
+import { awaitingJudgement, settledSince } from "./fold.mjs";
 // If a rule here disagrees with what fold allows, fold wins and this file is
 // wrong -- these functions explain a state, they never permit one.
 
@@ -138,7 +138,12 @@ export function needsReview(config, session, segment) {
   const limits = { ...SIZE_DEFAULTS, ...(config?.review?.size ?? {}) };
   const tasks = tasksIn(session, segment);
   if (tasks.length === 0) return false;
-  return tasks.some((task) => {
+  // 一个段走过几轮之后，大部分条目早就判过、之后也没动过——它们不会再进下一份清单。
+  // 判断"这一段要不要审"要按**这一份清单真要判的**来算：沿用的一律不算，否则一段
+  // 只要有过一次要审的交付，它永远都要审，"判过的不再判"这件事就白写了。
+  const fresh = tasks.filter((task) => settledSince(session, task) === null);
+  if (fresh.length === 0) return false;
+  return fresh.some((task) => {
     // What the work touched counts as much as what it declared: a task may not
     // step out of review by describing itself as documentation.
     const files = [...new Set([...(task.files ?? []), ...(task.changed ?? [])])];
@@ -165,9 +170,12 @@ export function needsReview(config, session, segment) {
   });
 }
 
-// 一段最多放这么多条：审查的单位是段，段大到一次读不完，清单就没人真读，
-// 判也就成了走过场。到了这个数，新的一条另起一节，submit 时自己开下一段。
+// 一段最多放这么多条——说的只是**第一次**：最初担心的是第一份清单就被塞进几十条，
+// 审查者一次读不完，判就成了走过场。所以这个数只在"这一段还没进过审查"时算数；
+// 一旦出过清单，后来的活照收不误（它们进的是下一份清单，而下一份只展开要重判的）。
 export const SEGMENT_MAX = 20;
+export const segmentRoom = (session, segment) =>
+  !(session.briefs ?? []).some((one) => one.scope === "segment" && one.segment === segment.id);
 
 // The last delivery inside a segment. A conclusion older than this answered an
 // earlier version of the work, so it stops counting as a conclusion.

@@ -467,37 +467,23 @@ test("the draft's own next-section heading takes a new item", () => {
   assert.equal(one.tasks[0].segment, one.segments[0].id);
 });
 
-// 在审（或等判决）的那一段不再收新条目：审查者手上那份清单还没答完，它上面又多一条，
-// 他答的是哪一份就成了糊涂账。新的一条要另起一节，submit 时开下一段。
-test("a segment waiting for its verdict takes no new items", () => {
-  const cwd = workspace("frozen-takes-no-items");
+// 冻结管的是"手上那份清单里列的条目"，不是这一段的门：新加的活照收，它进下一份清单。
+test("a segment waiting for its verdict still takes new entries", () => {
+  const cwd = workspace("frozen-takes-items");
   deed(cwd, "init", "--said", "开始", "--review", "core/**");
   addTask(cwd, "先交的这一条", "跑得通");
   assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单发出去了，这一段在审");
 
-  {
-    const file = path.join(cwd, ".deed", "plan.md");
-    const lines = fs.readFileSync(file, "utf8").replace(/\s*$/u, "").split("\n");
-    // 写进手上那一段：应当拒，并指出去写一个新的空标题节。
-    const plain = lines.slice();
-    plain.push("", "- ? 在审时加的一条", "  标准：不该落进来");
-    fs.writeFileSync(file, plain.join("\n") + "\n", "utf8");
-    const refused = deed(cwd, "submit");
-    assert.equal(refused.status, 1, "在审的段不收新条目");
-    assert.match(refused.stderr, /不再收新条目/u);
-    assert.match(refused.stderr, /空标题/u, "要说出路");
-    // 另起一节：这一段不重画，直接追加一节，submit 领一个新段。
-    const fresh = lines.slice();
-    fresh.push("", "## 段", "- ? 在审时加的一条", "  标准：落到下一段");
-    fs.writeFileSync(file, fresh.join("\n") + "\n", "utf8");
-    const landed = deed(cwd, "submit");
-    assert.equal(landed.status, 0, landed.stdout + landed.stderr);
-    const doc = fold(readEvents(cwd));
-    const one = doc.sessions[0];
-    const added = one.tasks.find((t) => t.title === "在审时加的一条");
-    assert.equal(added.segment, "S01.2", "新的一条落在下一段，不挤进在审的那一段");
-  }
+  const file = path.join(cwd, ".deed", "plan.md");
+  const lines = fs.readFileSync(file, "utf8").replace(/\s*$/u, "").split("\n");
+  lines.push("", "- ? 在审时加的一条", "  标准：跑得通");
+  fs.writeFileSync(file, lines.join("\n") + "\n", "utf8");
+  const landed = deed(cwd, "submit");
+  assert.equal(landed.status, 0, landed.stdout + landed.stderr);
+  const doc = fold(readEvents(cwd));
+  const added = doc.sessions[0].tasks.find((t) => t.title === "在审时加的一条");
+  assert.equal(added.segment, "S01.1", "新的一条留在这段里：它进下一份清单，不另开一段");
 });
 
 // 标准不是想改就改：只有它引用的命令与开关今天已经不在命令面上（照它敲只会撞上
@@ -635,4 +621,74 @@ test("the landed check reports a file that changed, emptied, or vanished", async
   fs.rmSync(path.join(cwd, "a.md"));
   assert.match(checkLanded(cwd, [row({ "a.md": 10 })])[0], /不在盘上/u);
   assert.deepEqual(checkLanded(cwd, [{ k: "task.done", files: [], bytes: {} }]), [], "靠 期望 自证的交付没有文件可指");
+});
+
+// 冻结管的是"手上那份清单里列的条目"，不是"这一段的门"：新加的活进下一份清单。
+test("a segment in review still takes new entries, but not new deliveries of listed ones", () => {
+  const cwd = workspace("frozen-takes-entries");
+  deed(cwd, "init", "--said", "开始");
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), "# x\n\n## 段\n- ? 做一\n  标准：跑得通\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0);
+  fs.writeFileSync(path.join(cwd, "a.md"), "x\n", "utf8");
+  const plan = fs.readFileSync(path.join(cwd, ".deed", "plan.md"), "utf8").replace("- [ ] T1 做一", "- [x] T1 做一");
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), plan.replace(/\s*$/u, "") + "\n  交付：写了 a.md\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单发出去，这一段冻结");
+
+  // 冻结期间：新的一条照样收（它进下一份清单）。
+  const withNew = fs.readFileSync(path.join(cwd, ".deed", "plan.md"), "utf8") + "\n- ? 临时加一条\n  标准：也跑得通\n";
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), withNew, "utf8");
+  const added = deed(cwd, "submit");
+  assert.equal(added.status, 0, added.stderr);
+  assert.equal(kinds(cwd).filter((one) => one === "task.add").length, 2, "第二条进账了");
+
+  // 但手上那份清单里列出的 T1 要再交一版：仍然被拒。
+  // 取消勾选要写在条目自己那几行里（理由 跟在标题下面），不是甩到文件尾巴上。
+  const again = fs
+    .readFileSync(path.join(cwd, ".deed", "plan.md"), "utf8")
+    .split("\n")
+    .flatMap((line) =>
+      line.startsWith("- [x] T1 做一") ? ["- [ ] T1 做一", "  理由：再改一版"] : [line],
+    )
+    .join("\n");
+  fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), again, "utf8");
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1, "冻结的是清单里的条目");
+  assert.match(refused.stderr, /在审|撤回/u);
+});
+
+// 20 条只防"第一份清单就塞进几十条"：出过清单之后，后来的活照收——它们进下一份清单，
+// 而下一份只展开要重判的那几条。
+test("the twenty-item cap is about the first brief of a segment, not every entry after it", () => {
+  const cwd = workspace("segment-cap-first-only");
+  deed(cwd, "init", "--said", "开始");
+  const plan = path.join(cwd, ".deed", "plan.md");
+  addTask(cwd, "开头的一条", "跑得通");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "第一份清单发出去了");
+
+  // 还没进过审查的段才有 20 条这条线；这一段已经出过清单，20 条以上照样收。
+  const lines = fs.readFileSync(plan, "utf8").replace(/\s*$/u, "").split("\n");
+  for (let k = 1; k <= 20; k += 1) lines.push("- ? 后来的第 " + k + " 条", "  标准：跑得通");
+  fs.writeFileSync(plan, lines.join("\n") + "\n", "utf8");
+  const landed = deed(cwd, "submit");
+  assert.equal(landed.status, 0, landed.stdout + landed.stderr);
+  const doc = fold(readEvents(cwd));
+  const here = doc.sessions[0].tasks.filter((one) => one.segment === "S01.1");
+  assert.equal(here.length, 21, "21 条都在这一段里：出过清单的段不再按条数挡");
+});
+
+// 还没出过清单的段照旧封顶：第一份清单就该短。
+test("a segment that has never been briefed still stops at twenty", () => {
+  const cwd = workspace("segment-cap-first");
+  deed(cwd, "init", "--said", "开始");
+  const plan = path.join(cwd, ".deed", "plan.md");
+  const lines = ["# x", ""];
+  for (let k = 1; k <= 20; k += 1) lines.push("- ? 第 " + k + " 条", "  标准：跑得通");
+  fs.writeFileSync(plan, lines.join("\n") + "\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0);
+  fs.writeFileSync(plan, fs.readFileSync(plan, "utf8").replace(/\s*$/u, "") + "\n- ? 第 21 条\n  标准：跑得通\n", "utf8");
+  const refused = deed(cwd, "submit");
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /20 条/u);
 });
