@@ -289,13 +289,21 @@ export const needsPeriodReview = (session) => {
   return session.segments.every((one) => one.closedAt !== null);
 };
 
-// 期审的清单旧了没有：它发出之后，任何一段又落了结论或又被打开，它就答的不是这一期了。
+// 期审的清单旧了没有：只看它发出那一刻**已经存在**的段。之后另开的段（预备段）里
+// 又加活、又交付，那是下一期的事，不能让这一份结论作废；已经存在的段又落了结论、
+// 或被点名退回后重判，才算这一期变了。段的出生时刻是 plannedAt（预排）或 openedAt。
+const existedAt = (segment, at) => String(segment.plannedAt ?? segment.openedAt ?? "") <= at;
+
 export const stalePeriod = (session) => {
   const brief = lastPeriodBrief(session);
   if (!brief) return false;
   if (brief.withdrawnAt !== undefined) return false;
-  return session.reviews.some((one) => one.scope === "segment" && one.at > brief.at) ||
-    session.segments.some((one) => one.closedAt !== null && one.closedAt > brief.at && one.sealedByReview !== undefined);
+  const known = new Set(session.segments.filter((one) => existedAt(one, brief.at)).map((one) => one.id));
+  const touched = session.reviews.some((one) => one.scope === "segment" && one.at > brief.at && known.has(one.segment));
+  const sealed = session.segments.some(
+    (one) => one.sealedByReview !== undefined && one.closedAt !== null && one.closedAt > brief.at && known.has(one.id),
+  );
+  return touched || sealed;
 };
 
 export function periodState(session) {

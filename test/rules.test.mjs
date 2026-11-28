@@ -369,19 +369,30 @@ test("tasks are read in the order they were given, and the ones without one come
   assert.deepEqual(byOrder(tasks).map((one) => one.id), ["T2", "T3", "T1"]);
 });
 
-// T97：期审清单发出那一刻的段才算它的范围；之后预备段里新加的活不让它过期。
+// T97：期审清单发出那一刻已有的段才算它的范围；之后预备段里新加的活、新的交付不让它过期。
 test("a period brief goes stale only for segments that existed when it went out", () => {
   const at = "2026-01-02T01:00:00Z";
-  const base0 = {
-    segments: [{ id: "S01.1", closedAt: "2026-01-01T00:00:00Z" }],
+  const make = () => ({
+    segments: [
+      { id: "S01.1", openedAt: "2026-01-01T00:00:00Z", closedAt: "2026-01-01T12:00:00Z" },
+      { id: "S01.2", plannedAt: "2026-01-02T02:00:00Z", openedAt: "2026-01-02T02:00:00Z", closedAt: null },
+    ],
     briefs: [{ scope: "session", at, answeredBy: null }],
     reviews: [{ scope: "session", at, v: 20, verdict: "pass", voidedAt: null }],
-    tasks: [],
-  };
-  assert.equal(stalePeriod(base0), false, "发出之后什么都没动：结论还是这一期的");
-  // 发出之后又落了一条段结论：这一期又动了，期审要重出。
-  assert.equal(
-    stalePeriod({ ...base0, reviews: [...base0.reviews, { scope: "segment", at: "2026-01-02T02:00:00Z" }] }),
-    true,
-  );
+    tasks: [
+      { id: "T1", segment: "S01.1", status: "done" },
+      { id: "T2", segment: "S01.2", status: "done" },
+    ],
+  });
+  assert.equal(stalePeriod(make()), false, "发出之后什么都没动：结论还是这一期的");
+
+  // 发出之后预备段（S01.2，发出那一刻还不存在）里又加活、又交付：不让这一期作废。
+  const later = make();
+  later.tasks.push({ id: "T3", segment: "S01.2", status: "done" });
+  assert.equal(stalePeriod(later), false, "新段里的新活不算这一期变了");
+
+  // 但那一份结论若是对**当时已有**的段下的（且在这之后），这一期就变了。
+  const touched = make();
+  touched.reviews.push({ scope: "segment", segment: "S01.1", at: "2026-01-02T03:00:00Z" });
+  assert.equal(stalePeriod(touched), true, "已有段在发出之后又落了结论");
 });

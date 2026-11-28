@@ -586,3 +586,18 @@ test("the reviewer's scratch sits outside the workspace and the pack says no com
     "--rework", "T1", "--why", "没做到").status, 0);
   assert.equal(fs.existsSync(scratch), false, "结论落地时临时区被删掉");
 });
+
+// 交付记录里的那三样只服务当场核对与不重跑：清单与审查材料里不出现它们（尤其是指纹）。
+test("the review sheet carries the claim, not the byte counts or fingerprints", () => {
+  const cwd = workspace("sheet-hides-hashes");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const sheet = fs
+    .readdirSync(path.join(cwd, ".deed", "review"))
+    .filter((one) => !one.endsWith("-reviewer.md"))
+    .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8"))
+    .pop();
+  assert.doesNotMatch(sheet, /sha256|[0-9a-f]{16}/u, "清单里没有指纹");
+});

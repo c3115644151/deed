@@ -453,3 +453,14 @@
 {"at":"2026-11-28T02:18:59.983Z","verb":"review","code":0,"ms":54,"switches":["--due"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T02:19:00.624Z","verb":"say","code":0,"ms":117,"switches":["--from"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T02:21:14.120Z","verb":"review","code":0,"ms":347,"switches":["--segment","--verdict","--why","--rework","--finding","--finding","--finding","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:38:19.851Z","verb":"review","code":0,"ms":55,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:39:06.733Z","verb":"point","code":0,"ms":74,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:39:07.038Z","verb":"state","code":0,"ms":92,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:39:27.156Z","verb":"reply","code":0,"ms":95,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:39:28.091Z","verb":"review","code":0,"ms":45,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:41:36.755Z","verb":"init","code":0,"ms":2,"switches":["--print-agents"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:41:53.839Z","verb":"submit","code":1,"ms":149,"switches":[],"why":"S02.20 已经有 34 条（一段最多 20 条）：这一条写在这一节之后另起一个空标题的 ## 段，submit 时直接开下一段；段是审查的单位，大到一次读不完，清单就没人真读了","v":"0.33.0"}
+{"at":"2026-11-28T02:41:56.907Z","verb":"serve","code":0,"ms":87,"switches":["--port"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:42:17.344Z","verb":"submit","code":0,"ms":216,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:42:41.119Z","verb":"submit","code":0,"ms":453,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:43:49.376Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.33.0"}
