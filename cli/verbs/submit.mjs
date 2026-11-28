@@ -392,6 +392,24 @@ export default function submit(argv) {
               specs.push({ k: "task.carry", s: one.id, id: item.id });
               continue;
             }
+            // 已经改到下一段的条目要拿回来：把它写回"收活的那一节"、去掉 改到下一段：，
+            // 再写一行 理由：。改到下一段是决定，不是判决——它得有回头路。
+            {
+              const take = takingSegment(one);
+              const home = one.segments.find((seg) => seg.id === task.segment);
+              const landed = bySection.get(item.section) ?? null;
+              // 只认"还没被谁审过"的段：拿回一条会让那一段的清单/结论对不上它当时的样子。
+              const untouched =
+                home &&
+                !(one.briefs ?? []).some((brief) => (brief.segment ?? null) === home.id) &&
+                !one.reviews.some((review) => review.segment === home.id);
+              if (take && task.segment !== take.id && home && home.closedAt === null && untouched && landed === take.id) {
+                if (!item.why)
+                  fail(item.id + " 要从 " + task.segment + " 拿回 " + take.id + "：写一行 理由：——撤回一条改到下一段得说清为什么");
+                specs.push({ k: "task.uncarry", s: one.id, id: item.id, to: take.id, why: item.why });
+                continue;
+              }
+            }
             // 放弃过的条目能撤回：撤回是一条新事实（task.undo），撤回来它回到未做，
             // 同一批再勾上就是重新交付。没有 理由： 的撤回转不成一条能读的事实。
             if (task.status === "dropped") {

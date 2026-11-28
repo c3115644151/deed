@@ -45,8 +45,11 @@ export const SPEC = {
     ],
   },
   plan: {
-    flags: ["session"],
-    usage: ["deed plan [--session S01]   这一期还没有清单时写一份（写法印在文件头部；再要一份，submit 记账之后自己会重画）"],
+    flags: ["session", "redo"],
+    usage: [
+      "deed plan [--session S01]   这一期还没有清单时写一份（写法印在文件头部）",
+      "          --redo            按账本重画现有那份（手改坏了的时候用：解析不了、交付行被删掉）",
+    ],
   },
   submit: {
     flags: ["session", "run"],

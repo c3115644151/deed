@@ -472,8 +472,30 @@ export function fold(events) {
         task.status = task.evidence.length > 0 ? "done" : "todo";
         break;
       }
-      // 这一段送审之后就不再收新活：没做的条目改到下一段，等一下段开出来。
-      // 开路只有这一条——放弃（drop）说的是「不做了」，写不成「换个时候做」。
+      // 改到下一段是决定，不是判决：它也能撤回——条目回到"现在收活的那一段"接着做。
+      // 撤回要说清为什么（与撤回一条放弃、一条交付同一套）。
+      case "task.uncarry": {
+        const session = sessionOf(doc, ev);
+        const task = taskOf(session, ev.id);
+        editable(session, task);
+        if (task.status !== "todo")
+          noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能从下一段拿回来`);
+        const take = session.segments.find((one) => one.closedAt === null && one.plannedAt === null) ?? null;
+        const to = ev.to ? session.segments.find((one) => one.id === ev.to) : take;
+        if (!to) noway(`${task.id} 要回到哪一段？现在没有收活的段`);
+        if (to.closedAt !== null) noway(`${to.id} 已经封闭：条目回不去`);
+        if (to.id === task.segment) noway(`${task.id} 已经在这一段（${to.id}）：没有可撤回的`);
+        const from = task.segment;
+        task.segment = to.id;
+        // 走了空的段跟着消失：一个只剩格子的"下一段"会让下一条新活落进谁也没打算做的段。
+        const left = session.segments.find((one) => one.id === from);
+        const used =
+          session.tasks.some((one) => one.segment === from) ||
+          (session.briefs ?? []).some((one) => (one.segment ?? null) === from) ||
+          session.reviews.some((one) => one.segment === from);
+        if (left && !used) session.segments = session.segments.filter((one) => one.id !== from);
+        break;
+      }
       case "task.carry": {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);

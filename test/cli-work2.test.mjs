@@ -692,3 +692,85 @@ test("a segment that has never been briefed still stops at twenty", () => {
   assert.equal(refused.status, 1);
   assert.match(refused.stderr, /20 条/u);
 });
+
+// 清单被手改坏了（解析不了、或者已交付条目的 交付： 行被删掉）之后，得有一条命令按账本重画。
+// 没有这一步，坏掉的那份只能靠人记得原本写的是什么。
+test("a plan that was broken by hand can be redrawn from the ledger", () => {
+  const cwd = workspace("plan-redo");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  fs.writeFileSync(path.join(cwd, "a.md"), "x\n");
+  assert.equal(deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" }).status, 0);
+
+  const plan = path.join(cwd, ".deed", "plan.md");
+  // 手把它改坏：删掉交付行，再掺一行谁也不认识的字。
+  const broken = fs.readFileSync(plan, "utf8").split("\n").filter((line) => !line.startsWith("  交付：" )).join("\n") + "\n这一行谁也看不懂\n";
+  fs.writeFileSync(plan, broken, "utf8");
+  assert.equal(deed(cwd, "submit").status, 1, "坏了的清单交不上去");
+
+  assert.equal(deed(cwd, "plan").status, 1, "有文件时不带 --redo 不覆盖");
+  const redrawn = deed(cwd, "plan", "--redo");
+  assert.equal(redrawn.status, 0, redrawn.stderr);
+  assert.match(redrawn.stdout, /重画/u);
+  const after = fs.readFileSync(plan, "utf8");
+  assert.match(after, /  交付：跑：跑得通/u, "已交付条目的交付行回来了");
+  assert.doesNotMatch(after, /这一行谁也看不懂/u, "看不懂的那行没了");
+  // 重画出来的那份与账本一致：submit 会说"没有要落的改动"（exit 1），
+  // 但那不再是看不懂的行——这才是重画要的结果。
+  const again = deed(cwd, "submit");
+  assert.equal(again.status, 1);
+  assert.match(again.stdout + again.stderr, /没有要落的改动/u, "重画之后与账本一致");
+  assert.doesNotMatch(again.stdout + again.stderr, /看不懂/u);
+});
+
+// 改到下一段是决定，不是判决：要能撤回。
+// 撤回之后条目回到收活的那一段；它走后空掉的那一段跟着消失，别留下一个只剩格子的"下一段"。
+test("a carry can be taken back, and the segment it left disappears", () => {
+  const cwd = workspace("carry-back");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  addTask(cwd, "做二", "也跑得通");
+  const plan = path.join(cwd, ".deed", "plan.md");
+  const text = () => fs.readFileSync(plan, "utf8");
+
+  // 先在空标题的一节里写一条新条目：submit 领出下一段。
+  fs.writeFileSync(plan, text().trimEnd() + "\n\n## \n\n- ? 做三\n  标准：三也跑得通\n", "utf8");
+  assert.equal(deed(cwd, "submit").status, 0, "领一个下一段");
+  let doc = fold(readEvents(cwd));
+  const next = doc.sessions[0].segments.at(-1);
+  assert.equal(next.id, "S01.2");
+
+  // 把 T2 改到下一段。
+  fs.writeFileSync(plan, text().replace("- [ ] T2 做二", "- [ ] T2 做二\n  改到下一段：这一轮先不做"), "utf8");
+  assert.equal(deed(cwd, "submit").status, 0, "改到下一段");
+  doc = fold(readEvents(cwd));
+  assert.equal(doc.sessions[0].tasks.find((one) => one.id === "T2").segment, "S01.2");
+
+  // 拿回来：把 T2 写回 S01.1 那一节、去掉 改到下一段：、写一行 理由：。
+  const drop = (all, word) => {
+    const out = [];
+    let skip = false;
+    for (const line of all) {
+      if (/^- \[[ x~?]\] /u.test(line)) skip = line.includes(word);
+      if (!skip) out.push(line);
+    }
+    return out;
+  };
+  const lines = drop(text().split("\n"), "T2 做二");
+  const head = lines.findIndex((line) => /^## 段 S01\.1/u.test(line));
+  lines.splice(head + 1, 0, "- [ ] T2 做二", "  标准：也跑得通", "  理由：这一轮就做，不必等", "");
+  fs.writeFileSync(plan, lines.join("\n"), "utf8");
+  const back = deed(cwd, "submit");
+  assert.equal(back.status, 0, back.stdout + back.stderr);
+  doc = fold(readEvents(cwd));
+  assert.equal(doc.sessions[0].tasks.find((one) => one.id === "T2").segment, "S01.1", "回到收活的那一段");
+
+  // 把 T3 也拿回来：S01.2 只剩格子，跟着消失。
+  const again = drop(text().split("\n"), "T3 做三");
+  const at11 = again.findIndex((line) => /^## 段 S01\.1/u.test(line));
+  again.splice(at11 + 1, 0, "- [ ] T3 做三", "  标准：三也跑得通", "  理由：一起做");
+  fs.writeFileSync(plan, again.join("\n"), "utf8");
+  assert.equal(deed(cwd, "submit").status, 0);
+  doc = fold(readEvents(cwd));
+  assert.deepEqual(doc.sessions[0].segments.map((one) => one.id), ["S01.1"], "空掉的下一段消失了");
+});
