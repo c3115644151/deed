@@ -259,7 +259,8 @@ export const verdictStands = (session, segment) => {
     return !(moved !== null && moved > review.at);
   }
   return delivered.every((one) => {
-    const verdict = review.results.find((r) => r.id === one.id);
+    // 沿用的判定也算：清单只展开要重判的那几条，判过又没动过的不在 results 里。
+    const verdict = review.results.find((r) => r.id === one.id) ?? settledSince(session, one);
     if (!verdict) return false;
     // 判过之后这一条又动过：那句判定说的是旧内容。
     const moved = [one.touchedAt, ...one.evidence.map((proof) => proof.at), ...(one.undone ?? []).map((gone) => gone.at)]
