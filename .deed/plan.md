@@ -13,7 +13,10 @@
 <!-- 已关闭 19 段（不再过目）：S02.1 3 · S02.2 12 · S02.3 2 · S02.4 3 · S02.5 2 · S02.6 1 · S02.7 2 · S02.8 2 · S02.9 3 · S02.10 3 · S02.11 4 · S02.12 3 · S02.13 2 · S02.14 1 · S02.15 1 · S02.16 1 · S02.17 1 · S02.18 16 · S02.19 12 -->
 
 ## 段 S02.20
-<!-- 已完成（45 条）：交过的，往下沉 -->
+<!-- 已完成（46 条）：交过的，往下沉 -->
+- [x] T169 排队晚到的叫醒要说明白自己是哪一刻的事
+  标准：叫醒消息的每一行后面带它在账本上的时刻（HH:MM:SSZ），并明说「已经走得更远就以 deed state 为准」；有用例钉住这两点；不必改投递队列本身
+  交付：adapters/dsh/verdicts.mjs 的 wakeMessage 给每一行带账本时刻（stampOf），尾句改成「已经走得更远的话，以 deed state 为准，这条只是排队晚到的」；test/adapter-verdicts.test.mjs 新增一条钉住时刻与这句话；期望：node --test test/adapter-verdicts.test.mjs => ℹ fail 0
 - [x] T168 那条「开 SSE 超闲置不退」的用例吃机器负载
   标准：它不再靠真实时间等超时线，改成把闲置线调小（或注入时钟）来判，并行跑五份文件时也稳定红/绿；连跑十次全量不再出现偶发超时
   交付：board/serve.mjs 把「该不该收摊」抽成纯函数 shouldRetire({streams,lastRequest,idle,now})，定时器只当节拍；test/board.test.mjs 新增三条纯函数用例（有人看→不退、没到线→不退、到了→退），集成用例的固定 sleep 从 2200ms 改成 3200ms（走过三个节拍）；变异核对一次（去掉 streams 判断 → 两条红）；连跑三次 24/24 稳；期望：node --test test/board.test.mjs => ℹ fail 0

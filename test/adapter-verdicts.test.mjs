@@ -137,3 +137,20 @@ test("a sheet written while the watcher is starting is news, not history", async
   assert.equal(said.length, 1, "重启之后刚写的清单也要说一句");
   assert.match(said[0].content.map((one) => one.text).join("\n"), /审查清单发出去了/u);
 });
+
+// 排队会滞后：这条消息可能十几分钟后才送到，那时账本早走远了。每条都带账本时间。
+test("every wake line says when it happened in the ledger", async () => {
+  const cwd = workspace("adapter-verdicts-stamp");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" });
+  const said = [];
+  const agent = { status: "idle", followup: (message) => said.push(message) };
+  const state = { watermark: null };
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单在记账之后才出门");
+  await pollVerdicts({ root: cwd, agent, state });
+  const text = said[0].content.map((one) => one.text).join("\n");
+  assert.match(text, /（\d{2}:\d{2}:\d{2}Z）/u, "带了账本上的时刻");
+  assert.match(text, /以 deed state 为准/u, "说清晚到这件事");
+});

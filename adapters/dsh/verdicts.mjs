@@ -100,8 +100,12 @@ export function newVerdicts(root, after) {
 }
 
 // 一轮只唤醒一次：同一次落下的好几条（结论 + 判决）合成一句，别连开好几轮。
+// 排队会滞后：长回合里这条消息可能十几分钟后才送到，那时账本早走远了。
+// 所以每条都带上它自己在账本上的时间——读的人一眼看得出"这是哪一刻的事"。
+const stampOf = (at) => String(at ?? "").slice(11, 19) + "Z";
+
 export function wakeMessage(rows, doc) {
-  const lines = rows.flatMap((one) => detail(one).map((line, n) => (n === 0 ? "· " + line : line)));
+  const lines = rows.flatMap((one) => detail(one).map((line, n) => (n === 0 ? "· " + line + "（" + stampOf(one.at) + "）" : line)));
   return {
     id: randomUUID(),
     role: "user",
@@ -112,7 +116,8 @@ export function wakeMessage(rows, doc) {
           "<system-reminder>",
           "deed · 审查那边有结论了（账本上刚落下，不是谁传话）：",
           ...lines,
-          "接着做：不合格就按点名的条目改；通过就等人在面板上判。下一步看 deed state。",
+          "接着做：不合格就按点名的条目改；通过就等人在面板上判。上面每条后面是它在账本上的时间——",
+          "已经走得更远的话，以 deed state 为准，这条只是排队晚到的。",
           "</system-reminder>",
         ].join("\n"),
       },
