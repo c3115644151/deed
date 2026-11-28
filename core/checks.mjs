@@ -48,7 +48,6 @@ const MAY_IMPORT = {
 const LIMITS = [
   // 今天的热点：拆完就该落回上限内。把它们写在这里，红的就是"要拆的地方"，不是"新写的代码"。
   { match: /^core\/fold\.mjs$/u, lines: 80, branches: 6, what: "core/fold.mjs（目标：分发器）" },
-  { match: /^core\/rules\.mjs$/u, lines: 150, branches: 8, what: "core/rules.mjs（目标：拆成 policy）" },
   { match: /^core\/events\.mjs$/u, lines: 220, branches: 12, what: "core/events.mjs（目标：拆成 events/<域>）" },
   { match: /^cli\/session\.mjs$/u, lines: 150, branches: 8, what: "cli/session.mjs（目标：只剩 io 帮助）" },
   { match: /^board\/render\.mjs$/u, lines: 400, branches: 12, what: "board/render.mjs（目标：拆成 render/*）" },

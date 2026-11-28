@@ -4,9 +4,10 @@
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { awaitingJudgement } from "../core/facts/review.mjs";
-import {
-  signBlockers, exemptSegments, debt, openSegment, needsReview, needsPeriodReview, reviewable, lastBrief, lastPeriodBrief,
-} from "../core/rules.mjs";
+import { signBlockers, exemptSegments, debt } from "../core/policy/sign.mjs";
+import { openSegment } from "../core/policy/segment.mjs";
+import { needsReview, reviewable, lastBrief } from "../core/policy/review.mjs";
+import { needsPeriodReview, lastPeriodBrief } from "../core/policy/period.mjs";
 
 // 面板按下「开始审查」之后，出清单这件事由命令自己做完（写两份文件、记一条 review.brief）。
 // 它是同一套逻辑的第二个入口：命令行那条默认关着，--panel 只在面板按下时带上。

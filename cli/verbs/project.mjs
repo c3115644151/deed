@@ -1,5 +1,5 @@
 import { projectState } from "../../core/checks.mjs";
-import { nextAction } from "../../core/rules.mjs";
+import { nextAction } from "../../core/policy/step.mjs";
 import { treeOf } from "../../lib/tree.mjs";
 import { ROOT, parse, load, transact, fail, guard } from "../session.mjs";
 

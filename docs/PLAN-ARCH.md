@@ -349,6 +349,14 @@ export const reduce = (ctx, ev) => {
 - 对拍：旧 fold 与新 fold 在同一份账本上 sha256 前 16 位一致（`0ff0ad27be65b7ad`，645482 字）
 - 用例：分三批跑完 172 + 119 + 37（board/适配器单跑）= 全部通过
 
+**P3 完成（策略按问题分家，rules.mjs 已删）**：
+
+- `core/policy/`：session · segment · task · review · period · sign · step（一个文件一个问题）
+- `core/facts/`：errors · session · segment · task · review · turns · paths（路径匹配的私有助手也搬了出来）
+- 16 个调用方改成直接 import 目标文件；`core/rules.mjs` 这个转出口连同"过渡"一起删掉了，
+  没有留下两条路。
+- 对拍仍成立（`0ff0ad27be65b7ad`）；用例 128 + 152 + 37 全过；依赖方向 386 条全对。
+
 **还没做的**：
 - `checks:tree`（地图 ↔ 目录对账，P2 结束前做成软报告）——尚未实现。
 - 分支数检查现在点了 13 个文件：`render`/`session`/`submit`/`review`（cli 侧）与 `events.mjs`（129）——

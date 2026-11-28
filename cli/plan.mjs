@@ -8,7 +8,7 @@
 
 import { awaitingJudgement } from "../core/facts/review.mjs";
 import { awaitingVerdict } from "../core/facts/review.mjs";
-import { groupsOf } from "../core/rules.mjs";
+import { groupsOf } from "../core/policy/session.mjs";
 
 export const HEAD = "# 这一期要做成什么";
 

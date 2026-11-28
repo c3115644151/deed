@@ -1,20 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  lastBrief,
-  lastPeriodBrief,
-  needsPeriodReview,
-  needsReview,
-  nextAction,
-  openSegment,
-  reviewDue,
-  sealBlockers,
-  stalePeriod,
-  sheetHolds,
-  takingSegment,
-  tasksIn,
-  verdictStands,
-} from "../../core/rules.mjs";
+import { lastBrief, needsReview, reviewDue, sheetHolds, verdictStands } from "../../core/policy/review.mjs";
+import { lastPeriodBrief, needsPeriodReview, stalePeriod } from "../../core/policy/period.mjs";
+import { nextAction } from "../../core/policy/step.mjs";
+import { openSegment, takingSegment } from "../../core/policy/segment.mjs";
+import { sealBlockers } from "../../core/policy/sign.mjs";
+import { tasksIn } from "../../core/policy/task.mjs";
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, removeScratch, writeBrief } from "../brief.mjs";
 import { draft as planDraft } from "../plan.mjs";

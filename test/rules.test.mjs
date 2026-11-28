@@ -3,24 +3,12 @@ import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import { onTheSheet, settledSince  } from "../core/facts/task.mjs";
 import { awaitingJudgement } from "../core/facts/review.mjs";
-import {
-  byOrder,
-  freshBrief,
-  reviewDue,
-  sheetHolds,
-  verdictStands,
-  stalePeriod,
-  needsReview,
-  nextAction,
-  reading,
-  reviewOf,
-  reviewState,
-  pointsAtNothing,
-  sealBlockers,
-  signBlockers,
-  reviewable,
-  unpinned,
-} from "../core/rules.mjs";
+import { byOrder, pointsAtNothing, unpinned } from "../core/policy/task.mjs";
+import { freshBrief, reviewDue, sheetHolds, verdictStands, needsReview, reviewOf, reviewState, reviewable } from "../core/policy/review.mjs";
+import { stalePeriod } from "../core/policy/period.mjs";
+import { nextAction } from "../core/policy/step.mjs";
+import { reading } from "../core/policy/session.mjs";
+import { sealBlockers, signBlockers } from "../core/policy/sign.mjs";
 
 const config = { review: { required: ["src/**", "core/**", "apps/**"], exempt: ["docs/**", "*.md"] } };
 // 期审：段都关了之后，这一期做成的样子还要有人判。它记在整期上，判的不是条目。

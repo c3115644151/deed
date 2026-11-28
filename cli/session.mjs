@@ -18,7 +18,13 @@ import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.m
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { projectState } from "../core/checks.mjs";
 import { treeOf } from "../lib/tree.mjs";
-import { countIn, currentSession, debt, goalOf, nextAction, openSegment, pressure, reading, reviewOf, configDrift, reviewState, sessionById, signBlockers, tasksIn, userTurns } from "../core/rules.mjs";
+import { countIn, tasksIn } from "../core/policy/task.mjs";
+import { currentSession, goalOf, pressure, reading, sessionById } from "../core/policy/session.mjs";
+import { debt, signBlockers } from "../core/policy/sign.mjs";
+import { nextAction } from "../core/policy/step.mjs";
+import { openSegment } from "../core/policy/segment.mjs";
+import { reviewOf, configDrift, reviewState } from "../core/policy/review.mjs";
+import { userTurns } from "../core/facts/turns.mjs";
 import { append, appendMany, paths, readConfigFile, readEvents, withLock } from "../lib/store.mjs";
 import { SPEC, closest } from "./spec.mjs";
 import { stamp0 } from "../lib/format.mjs";

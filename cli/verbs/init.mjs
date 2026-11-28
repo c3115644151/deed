@@ -1,5 +1,7 @@
 import path from "node:path";
-import { currentSession, nextAction, configDrift } from "../../core/rules.mjs";
+import { currentSession } from "../../core/policy/session.mjs";
+import { nextAction } from "../../core/policy/step.mjs";
+import { configDrift } from "../../core/policy/review.mjs";
 import { DEFAULT_CONFIG, changedPaths, ensureDirs, readConfigFile, writeConfig, writeSnapshot } from "../../lib/store.mjs";
 import { BLOCK as AGENTS_BLOCK } from "../../lib/words.mjs";
 import { ROOT, sameJson, parse, load, transact, fail, split, show, optionalBlock } from "../session.mjs";

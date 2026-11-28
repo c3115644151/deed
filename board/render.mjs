@@ -4,28 +4,14 @@
 // and the sign. The ledger, the hashes and the thresholds stay behind them --
 // they are how the answer is computed, not what the reader came for.
 
-import {
-  byOrder,
-  groupsOf,
-  countIn,
-  currentSession,
-  goalOf,
-  lastPeriodBrief,
-  needsPeriodReview,
-  needsReview,
-  nextAction,
-  openSegment,
-  periodReviewOf,
-  reading,
-  reviewable,
-  reviewOf,
-  reviewState,
-  signBlockers,
-  takingSegment,
-  turnNumbers,
-  userTurns,
-  verdictStands,
-} from "../core/rules.mjs";
+import { byOrder, countIn } from "../core/policy/task.mjs";
+import { groupsOf, currentSession, goalOf, reading } from "../core/policy/session.mjs";
+import { lastPeriodBrief, needsPeriodReview, periodReviewOf } from "../core/policy/period.mjs";
+import { needsReview, reviewable, reviewOf, reviewState, verdictStands } from "../core/policy/review.mjs";
+import { nextAction } from "../core/policy/step.mjs";
+import { openSegment, takingSegment } from "../core/policy/segment.mjs";
+import { signBlockers } from "../core/policy/sign.mjs";
+import { turnNumbers, userTurns } from "../core/facts/turns.mjs";
 
 const esc = (value) =>
   String(value ?? "")

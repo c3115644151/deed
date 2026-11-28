@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
-import { needsReview, userTurns } from "../core/rules.mjs";
+import { needsReview } from "../core/policy/review.mjs";
+import { userTurns } from "../core/facts/turns.mjs";
 
 const T = (n) => new Date(Date.UTC(2026, 10, 22, 10, n)).toISOString();
 

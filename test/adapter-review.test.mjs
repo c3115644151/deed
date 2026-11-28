@@ -7,7 +7,7 @@ import path from "node:path";
 import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
-import { reviewDue } from "../core/rules.mjs";
+import { reviewDue } from "../core/policy/review.mjs";
 import { deed, addTask, deliverTask, gate , startReview, startPeriodReview} from "./support/cli.mjs";
 
 // 一个够用的宿主：把钩子收进来，服务用替身。

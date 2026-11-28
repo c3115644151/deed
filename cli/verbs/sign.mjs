@@ -1,4 +1,5 @@
-import { debt, nextAction } from "../../core/rules.mjs";
+import { debt } from "../../core/policy/sign.mjs";
+import { nextAction } from "../../core/policy/step.mjs";
 import { parse, load, transact, targetSession, fail, guard, show } from "../session.mjs";
 
 // 签收与归档是同一支笔的两种落法：都不用推演规则，都是"人把这一期放下"。

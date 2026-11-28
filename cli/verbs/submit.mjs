@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { SEGMENT_MAX, nextAction, segmentRoom, sessionById, takingSegment } from "../../core/rules.mjs";
+import { SEGMENT_MAX, segmentRoom, takingSegment } from "../../core/policy/segment.mjs";
+import { nextAction } from "../../core/policy/step.mjs";
+import { sessionById } from "../../core/policy/session.mjs";
 import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } from "../../lib/store.mjs";
 import { prints, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";

@@ -1,5 +1,6 @@
 import fs from "node:fs";
-import { sessionById, userTurns } from "../../core/rules.mjs";
+import { sessionById } from "../../core/policy/session.mjs";
+import { userTurns } from "../../core/facts/turns.mjs";
 import { parse, transact, fail, guard, load } from "../session.mjs";
 
 // 一轮 = 你和用户之间的一轮对话。said 是位置参数：这个动作只说一件事，

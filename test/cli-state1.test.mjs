@@ -192,7 +192,7 @@ test("a panel is replaced when any module it loaded changes, not only its own fi
   // 页面上会印一段命令行根本不认的段号。指纹要盖住它加载过的每一份。
   const pkg = path.join(import.meta.dirname, "..");
   const listed = watchedFiles();
-  for (const one of ["board/render.mjs", "board/serve.mjs", "core/fold.mjs", "core/rules.mjs", "lib/store.mjs"]) {
+  for (const one of ["board/render.mjs", "board/serve.mjs", "core/fold.mjs", "core/policy/review.mjs", "lib/store.mjs"]) {
     assert.ok(listed.includes(one), "指纹要盖住 " + one);
   }
   const stale = createHash("sha256");
