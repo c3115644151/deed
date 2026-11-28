@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fold } from "../core/fold.mjs";
+import { awaitingJudgement, fold, onTheSheet, settledSince } from "../core/fold.mjs";
 import {
   byOrder,
   freshBrief,
@@ -466,4 +466,65 @@ test("a new entry does not invalidate the sheet in the reviewer's hands", () => 
   // 但结论要是 pass，它不覆盖 T2——所以它不能算"这一段已经审过"。
   const judged = fold([...ledger, { v: 35, at: T(8), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "s1.md", findings: [], results: [{ id: "T1", verdict: "met" }] }]);
   assert.equal(verdictStands(judged.sessions[0], judged.sessions[0].segments[0]), false, "T2 没在这份结论里，pass 不算覆盖这一段");
+});
+
+// 沿用只在有在案结论时成立：期审把这一段点名重开（它的 pass 被顶掉），
+// 这一段每一条都要重新过一遍，不能拿一份不存在的结论放行。
+test("carried judgements do not outlive the conclusion they hang on", () => {
+  const ledger = [
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), done(4, "T1"),
+    { v: 36, at: T(5), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "s1.md", guide: "s1-reviewer.md", tasks: ["T1"] },
+    { v: 35, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "s1.md", findings: [], results: [{ id: "T1", verdict: "met" }] },
+    { v: 20, at: T(7), k: "review.brief", s: null, scope: "session", by: "qa", brief: "p1.md", briefDigest: "e".repeat(64) },
+    { v: 35, at: T(8), k: "review.log", s: null, scope: "session", by: "qa", verdict: "fail", brief: "p1.md", findings: [], rework: ["S01.1"], why: "这一段说得不对" },
+  ];
+  const doc = fold(ledger);
+  const session = doc.sessions[0];
+  const seg = session.segments[0];
+  assert.equal(reviewOf(session, seg), null, "期审把那一段的结论顶掉了");
+  assert.equal(needsReview(config, session, seg), true, "没有在案结论，这一段得重新过一遍");
+});
+
+// 结论一落就把上一份的逐条判定全作废，会让"判过的不再判"永远不成立：
+// 作废的是"这一段现在由谁说了算"，不是"当初那一条判成什么"。
+test("per-item judgements outlive the conclusion that was superseded", () => {
+  const brief = (n, name, tasks) => ({ v: 36, at: T(n), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: name, guide: name + "-r.md", tasks });
+  const log = (n, results, brief) => ({ v: 35, at: T(n), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief, findings: [], results });
+  const ledger = [
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), add(4, "T2", ["core/rules.mjs"]), done(5, "T1"), done(6, "T2"),
+    brief(7, "a.md", ["T1", "T2"]),
+    log(8, [{ id: "T1", verdict: "met" }, { id: "T2", verdict: "met" }], "a.md"),
+    { v: 1, at: T(9), k: "task.done", s: null, id: "T2", evidence: "改了一版", by: "agent", digest: "b".repeat(64), digestPath: "core/rules.mjs", changed: ["core/rules.mjs"], bytes: { "core/rules.mjs": 90 } },
+    brief(10, "b.md", ["T2"]),
+    log(11, [{ id: "T2", verdict: "met" }], "b.md"),
+  ];
+  const doc = fold(ledger);
+  const session = doc.sessions[0];
+  const t1 = session.tasks.find((one) => one.id === "T1");
+  const t2 = session.tasks.find((one) => one.id === "T2");
+  assert.equal(settledSince(session, t1)?.verdict, "met", "T1 没动过：它那一判还在，第二份清单不必展开它");
+  assert.equal(settledSince(session, t2)?.verdict, "met", "T2 改过之后又被判了，新判定算数");
+  // 被推翻才是"判错了"：那一判不能再沿用。
+  const overturned = fold([
+    ...ledger,
+    { v: 1, at: T(12), k: "review.overturn", s: null, review: "R2", why: "这判不对", by: "user" },
+  ]).sessions[0];
+  assert.equal(settledSince(overturned, overturned.tasks.find((one) => one.id === "T2")), null, "被推翻的那一判不再沿用");
+});
+
+// 先判 pass 再判 fail：不合格把这一段交回执行。段头还挂着 pass 的话，
+// 冻结、判决按钮、签收差三处会一起说错话（今天就是被这一格挡住的）。
+test("a fail after a pass takes the segment back into execution, not into judgement", () => {
+  const ledger = [
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), done(4, "T1"),
+    { v: 36, at: T(5), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "a.md", guide: "a-r.md", tasks: ["T1"] },
+    { v: 35, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "a.md", findings: [], results: [{ id: "T1", verdict: "met" }] },
+    { v: 36, at: T(7), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "b.md", guide: "b-r.md", tasks: ["T1"] },
+    { v: 35, at: T(8), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "b.md", findings: [], rework: ["T1"], why: "没过", results: [{ id: "T1", verdict: "unmet" }] },
+  ];
+  const session = fold(ledger).sessions[0];
+  const seg = session.segments[0];
+  assert.equal(seg.verdict, null, "段头不再挂 pass");
+  assert.equal(awaitingJudgement(session, seg), false, "不再等你判决");
+  assert.equal(onTheSheet(session, "S01.1", "T1"), false, "清单已经回答过，这一段不再冻着");
 });

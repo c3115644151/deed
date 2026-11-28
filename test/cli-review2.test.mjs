@@ -630,3 +630,41 @@ test("an entry that is not on the sheet does not hold the verdict back", () => {
   const pass2 = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result", "T2=met");
   assert.equal(pass2.status, 0, pass2.stdout + pass2.stderr);
 });
+
+// 不合格那一判同样只问卷子上的条目：清单外新交的一条不该把 fail 挡住。
+test("a fail verdict is asked of the sheet's items, not of everything in the segment", () => {
+  const cwd = workspace("fail-outside-sheet");
+  assert.equal(deed(cwd, "init", "--said", "开始", "--review", "core/**").status, 0);
+  addTask(cwd, "做一", "跑得通");
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "x\n");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "core.mjs" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  // 卷子外新加并交掉一条：它不在这一份上。
+  addTask(cwd, "后来的一条", "也算跑通");
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "x2\n");
+  deliverTask(cwd, "T2", "跑：也行", { file: "core.mjs" });
+  const fail = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到");
+  assert.equal(fail.status, 0, fail.stdout + fail.stderr);
+});
+
+// 打回的返工只重开被点名的条目：其余交付不重判，重审清单上它们只留一行「判定沿用」。
+test("a fail reopens what it named, and the next sheet does not re-expand the rest", () => {
+  const cwd = workspace("fail-names-one");
+  assert.equal(deed(cwd, "init", "--said", "开始", "--review", "core/**").status, 0);
+  addTask(cwd, "做一", "跑得通");
+  addTask(cwd, "做二", "也跑得通");
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "x\n");
+  deliverTask(cwd, "T1", "跑：T1", { file: "core.mjs" });
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "y\n");
+  deliverTask(cwd, "T2", "跑：T2", { file: "core.mjs" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  const fail = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=met", "--result", "T2=unmet", "--rework", "T2", "--why", "T2 没做到");
+  assert.equal(fail.status, 0, fail.stdout + fail.stderr);
+
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "y2\n");
+  deliverTask(cwd, "T2", "跑：改了一版", { file: "core.mjs" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "重审清单");
+  const doc = fold(readEvents(cwd));
+  const sheet = doc.sessions[0].briefs.at(-1);
+  assert.deepEqual(sheet.tasks, ["T2"], "只展开被点名的那条；T1 的判定沿用");
+});

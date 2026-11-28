@@ -141,7 +141,11 @@ export function needsReview(config, session, segment) {
   // 一个段走过几轮之后，大部分条目早就判过、之后也没动过——它们不会再进下一份清单。
   // 判断"这一段要不要审"要按**这一份清单真要判的**来算：沿用的一律不算，否则一段
   // 只要有过一次要审的交付，它永远都要审，"判过的不再判"这件事就白写了。
-  const fresh = tasks.filter((task) => settledSince(session, task) === null);
+  // 沿用只在"这一段还有一份在案结论"时成立：结论被后一份顶掉、或者被期审点名重开，
+  // 这一段的每一条都要重新过一遍——那时沿用就是拿一份不存在的结论放行。
+  const standing = reviewOf(session, segment);
+  const kept = standing && standing.verdict === "pass";
+  const fresh = kept ? tasks.filter((task) => settledSince(session, task) === null) : tasks;
   if (fresh.length === 0) return false;
   return fresh.some((task) => {
     // What the work touched counts as much as what it declared: a task may not

@@ -216,7 +216,10 @@ function editable(session, task) {
 // 也让同一条标准在两处留下两个可以改的说法。
 export const lastResultOf = (session, id) => {
   const hits = session.reviews
-    .filter((one) => one.scope !== "session" && one.voidedAt === null)
+    // 被后一份结论取代的（voidedBy 换代）：它的逐条判定仍然是对当时那份字节下的，
+    // 只要那一条自己没再动过，就该沿用。被推翻的（review.overturn）不一样——那是一句
+    // "判错了"，它的判定不能再用，所以 overturned 的仍然排除。
+    .filter((one) => one.scope !== "session" && !one.overturned)
     .flatMap((one) => (one.results ?? []).filter((two) => two.id === id).map((two) => ({ ...two, at: one.at, by: one.by })));
   return hits.at(-1) ?? null;
 };
@@ -807,6 +810,8 @@ export function fold(events) {
         if (meaning >= MEANING.resultsOnFail && ev.verdict === "fail" && segment) {
           const judged = new Map(results.map((one) => [one.id, one.verdict]));
           const bare = inScope
+            // 只问卷子上那几条：清单外新加的条目是下一份的事。
+            .filter((one) => sheet === null || sheet.has(one.id))
             .filter((one) => one.status !== "dropped" && one.status !== "deferred")
             .filter((one) => !judged.has(one.id))
             .filter((one) => settledSince(session, one) === null)
@@ -826,6 +831,8 @@ export function fold(events) {
         for (const one of live) {
           one.voidedAt = ev.at;
           one.supersededBy = id;
+          // 不是被推翻：它的逐条判定留给 settledSince 沿用（那一条自己再动就失效）。
+          one.overturned = false;
         }
         session.reviews.push({
           id,
@@ -863,6 +870,14 @@ export function fold(events) {
             segment.verdict = "pass";
             segment.reviewedAt = ev.at;
             segment.reviewedBy = ev.by;
+          }
+        } else if (segment && meaning >= MEANING.judgement) {
+          // 不合格把这一段交回执行：它不再"等你判决"。少了这一步，先判 pass 再判 fail，
+          // 段头上会一直挂着 pass——冻结、判决按钮、签收差三处全说错话。
+          if (segment) {
+            segment.verdict = null;
+            segment.reviewedAt = null;
+            segment.reviewedBy = null;
           }
         } else if (ev.verdict === "pass" && meaning >= 3) {
           const shut = segment ? [segment] : session.segments.filter((one) => one.closedAt === null);
@@ -959,6 +974,8 @@ export function fold(events) {
         review.voidedAt = ev.at;
         review.voidedBy = ev.by;
         review.voidedWhy = ev.why;
+        // 推翻是一句「判错了」：它的逐条判定不能再被沿用。被后一份结论取代不是这个意思。
+        review.overturned = true;
         // 被推翻的是签收核对：它封过的段一起打开，活回到桌面上。
         if (review.scope === "session") {
           for (const one of session.segments) {
