@@ -605,3 +605,8 @@
 {"at":"2026-11-28T06:03:17.467Z","verb":"submit","code":0,"ms":193,"switches":[],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T06:03:20.007Z","verb":"review","code":0,"ms":45,"switches":["--due"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T06:04:15.647Z","verb":"serve","code":0,"ms":79,"switches":["--port"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:19:03.589Z","verb":"review","code":0,"ms":91,"switches":["--segment","--verdict","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--finding","--finding","--finding"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:19:06.261Z","verb":"review","code":0,"ms":35,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:19:29.773Z","verb":"check","code":0,"ms":15815,"switches":["--ledger"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:19:40.558Z","verb":"state","code":0,"ms":64,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:19:48.659Z","verb":"state","code":0,"ms":55,"switches":[],"why":null,"v":"0.33.0"}

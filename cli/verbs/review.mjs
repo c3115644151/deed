@@ -264,12 +264,16 @@ export default function review(argv) {
         console.log("  结论用 deed review --segment " + seg.id + " --verdict pass|fail");
         return;
       }
-      const waiting = tasksIn(one, seg).filter((task) => task.status === "todo");
-      if (waiting.length > 0)
-        fail("段 " + seg.id + " 还有没交付的（" + waiting.map((task) => task.id).join("、") + "）：结论只能落在交付之后");
       // A verdict answers the document that was handed out. Writing a fresh one
       // here would pin bytes produced after the reading -- a brief nobody read.
       const handed = lastBrief(one, seg.id);
+      // 结论回答的是卷子：卷子上列的那几条交完了就行。卷子外新加的条目是下一份的事——
+      // 它们不该把这一份结论挡死（挡死等于作者每加一条就要换一份清单，审查者永远判不完）。
+      const onSheet = handed && Array.isArray(handed.tasks) && handed.tasks.length > 0 ? new Set(handed.tasks) : null;
+      const waiting = tasksIn(one, seg).filter((task) => task.status === "todo" && (onSheet === null || onSheet.has(task.id)));
+      // 先说人此刻该做的事：还有没交付的就先说这一句，再说缺清单。
+      if (waiting.length > 0)
+        fail("段 " + seg.id + " 还有没交付的（" + waiting.map((task) => task.id).join("、") + "）：结论只能落在交付之后");
       if (!handed) fail("这一段还没有清单：先 deed review --segment " + seg.id + " 出清单，再把结论落回来");
       if (handed.withdrawnAt !== undefined)
         fail("这一段的那份清单已经撤回（" + handed.brief + "）：先 deed review --segment " + seg.id + " 重出一份，再落结论");
@@ -330,6 +334,7 @@ export default function review(argv) {
       {
         const judged = new Set(results.map((one2) => one2.id));
         const bare = tasksIn(one, seg)
+          .filter((task) => onSheet === null || onSheet.has(task.id))
           .filter((task) => task.status !== "dropped" && task.status !== "deferred")
           .filter((task) => !judged.has(task.id))
           .filter((task) => settledSince(one, task) === null)

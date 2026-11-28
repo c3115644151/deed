@@ -601,3 +601,32 @@ test("the review sheet carries the claim, not the byte counts or fingerprints", 
     .pop();
   assert.doesNotMatch(sheet, /sha256|[0-9a-f]{16}/u, "清单里没有指纹");
 });
+
+// 清单是一份卷子：卷子外新加的条目（还没交的）不该把这一份结论挡死——
+// 挡死等于作者每加一条就要换一份清单，审查者手上那份永远判不完。
+test("an entry that is not on the sheet does not hold the verdict back", () => {
+  const cwd = workspace("verdict-outside-sheet");
+  assert.equal(deed(cwd, "init", "--said", "开始", "--review", "core/**").status, 0);
+  addTask(cwd, "做一", "跑得通");
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "x\n");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "core.mjs" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "第一份清单");
+
+  // 卷子之外新加一条，还没交：卷子上的 T1 交完了，结论该能落。
+  addTask(cwd, "后来的一条", "也算跑通");
+  const pass = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result", "T1=met");
+  assert.equal(pass.status, 0, pass.stdout + pass.stderr);
+  assert.match(pass.stdout + pass.stderr, /审查通过/u);
+
+  // 再把卷子外那一条交掉：那份结论不覆盖它，要覆盖就另出一份，只判它一条。
+  fs.writeFileSync(path.join(cwd, "core.mjs"), "x2\n");
+  deliverTask(cwd, "T2", "跑：也行", { file: "core.mjs" });
+  const next = deed(cwd, "review", "--segment", "S01.1");
+  assert.equal(next.status, 0, next.stdout + next.stderr);
+  const doc = fold(readEvents(cwd));
+  const one = doc.sessions[0];
+  const sheet = one.briefs.filter((b) => b.segment === "S01.1").at(-1);
+  assert.deepEqual(sheet.tasks, ["T2"], "第二份清单只展开卷子外新交的那一条");
+  const pass2 = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result", "T2=met");
+  assert.equal(pass2.status, 0, pass2.stdout + pass2.stderr);
+});
