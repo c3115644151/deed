@@ -3,7 +3,7 @@
 // fold 也是那道闸。会把文档变成不可能状态的行在这里先抛，CLI 记账之前先重放一遍，
 // 于是被拒的动作从未落到账本上。重放本身按域住在 core/replay/reducers/<域>.mjs。
 
-import { UnknownKindError } from "./events.mjs";
+import { UnknownKindError } from "./events/index.mjs";
 import { blank } from "./facts/session.mjs";
 import { reduce } from "./replay/index.mjs";
 

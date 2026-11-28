@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { UnknownKindError } from "../core/events.mjs";
+import { UnknownKindError } from "../core/events/index.mjs";
 import { fold } from "../core/fold.mjs";
 import { pressure, reading, currentSession } from "../core/policy/session.mjs";
 import { countIn } from "../core/policy/task.mjs";

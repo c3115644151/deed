@@ -7,7 +7,7 @@ import { sessionById } from "../../core/policy/session.mjs";
 import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } from "../../lib/store.mjs";
 import { prints, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
-import { EVENT_VERSION } from "../../core/events.mjs";
+import { EVENT_VERSION } from "../../core/events/index.mjs";
 import { onTheSheet } from "../../core/facts/task.mjs";
 import { findStaleTasks } from "../../core/stale.mjs";
 import { checkLanded } from "../../lib/landed.mjs";

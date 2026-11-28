@@ -14,7 +14,7 @@ import { fold } from "../core/fold.mjs";
 import { onTheSheet } from "../core/facts/task.mjs";
 import { findStaleTasks } from "../core/stale.mjs";
 import { refused } from "./trace.mjs";
-import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events.mjs";
+import { EVENT_VERSION, UnknownKindError, validateEvent } from "../core/events/index.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { projectState } from "../core/checks.mjs";
 import { treeOf } from "../lib/tree.mjs";

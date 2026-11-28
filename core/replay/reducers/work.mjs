@@ -1,7 +1,7 @@
 // work 域（一）：条目怎么立、怎么改说法、怎么在段之间挪。
 // 第二件事（交付、撤回、延后、放弃）在 delivery.mjs——那是状态的转向，不是记账。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";

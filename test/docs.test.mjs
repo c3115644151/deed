@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { BLOCK } from "../lib/words.mjs";
 import { SPEC } from "../cli/spec.mjs";
-import { WHO } from "../core/events.mjs";
+import { WHO } from "../core/events/index.mjs";
 
 const ROOT = path.join(import.meta.dirname, "..");
 

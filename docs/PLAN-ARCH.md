@@ -352,10 +352,16 @@ export const reduce = (ctx, ev) => {
 **P3 完成（策略按问题分家，rules.mjs 已删）**：
 
 - `core/policy/`：session · segment · task · review · period · sign · step（一个文件一个问题）
-- `core/facts/`：errors · session · segment · task · review · turns · paths（路径匹配的私有助手也搬了出来）
+- `core/facts/`：errors · session · segment · task · review · turns · paths（路径匹配的私有助手也移了出来）
 - 16 个调用方改成直接 import 目标文件；`core/rules.mjs` 这个转出口连同"过渡"一起删掉了，
   没有留下两条路。
 - 对拍仍成立（`0ff0ad27be65b7ad`）；用例 128 + 152 + 37 全过；依赖方向 386 条全对。
+
+**P3.5 完成（events 也分家）**：
+
+- `core/events/`：shape（含义版本表 + 校验工具）· index（汇总与分发）· talk/topic/work/review/segment/session/legacy（各自的 KINDS 与逐条校验）
+- `core/events.mjs` 这个 545 行的单文件删掉了，23 个调用方改到 `core/events/index.mjs`
+- 对拍仍一致（`0ff0ad27be65b7ad`）；用例 128 + 151 + 37 全过；依赖方向 401 条全对
 
 **还没做的**：
 - `checks:tree`（地图 ↔ 目录对账，P2 结束前做成软报告）——尚未实现。

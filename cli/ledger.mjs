@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fold } from "../core/fold.mjs";
-import { UnknownKindError, validateEvent } from "../core/events.mjs";
+import { UnknownKindError, validateEvent } from "../core/events/index.mjs";
 import { currentVersion, unknownKindNotice } from "../lib/version.mjs";
 import { paths } from "../lib/store.mjs";
 import { stamp0 } from "../lib/format.mjs";

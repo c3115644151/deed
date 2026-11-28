@@ -1,6 +1,6 @@
 // review 域（二）：结论落下与被推翻。清单的发出与撤回在 brief.mjs。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";

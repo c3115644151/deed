@@ -1,7 +1,7 @@
 // review 域（一）：清单交出去、撤回。这里回答「卷子出门了没有」。
 // 结论（判成什么、被推翻）在 verdict.mjs——那是「卷子答完了没有」。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";

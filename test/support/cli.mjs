@@ -8,7 +8,7 @@ import net from "node:net";
 import { workspace } from "../../support/lib.mjs";
 import { readEvents } from "../../lib/store.mjs";
 import { fold } from "../../core/fold.mjs";
-import { EVENT_VERSION, validateEvent } from "../../core/events.mjs";
+import { EVENT_VERSION, validateEvent } from "../../core/events/index.mjs";
 import { panelRecord, buildNow, watchedFiles } from "../../lib/panel.mjs";
 import { applyGate, gatesOf } from "../../board/gates.mjs";
 

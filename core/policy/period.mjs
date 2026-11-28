@@ -1,5 +1,5 @@
 // policy/period: 期审——这一期做成的样子该不该判、判过之后还成不成立。
-import { MEANING } from "../events.mjs";
+import { MEANING } from "../events/index.mjs";
 import { sealed } from "../facts/segment.mjs";
 
 

@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
-import { EVENT_VERSION } from "../core/events.mjs";
+import { EVENT_VERSION } from "../core/events/index.mjs";
 import { signBlockers } from "../core/policy/sign.mjs";
 import { nextAction } from "../core/policy/step.mjs";
 import { applyGate, gatesOf } from "../board/gates.mjs";

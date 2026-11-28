@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EVENT_VERSION, validateEvent } from "../core/events.mjs";
+import { EVENT_VERSION, validateEvent } from "../core/events/index.mjs";
 import { compareVersions, currentVersion, unknownKindNotice } from "../lib/version.mjs";
 
 test("versions compare by three numbers, and only by them", () => {

@@ -1,7 +1,7 @@
 // session 域：一期怎么开、怎么结束；项目声明、审查设置、目的的改动也在这一域。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
 // 一个 kind 一个函数——加一类事实就是加一个函数，不改别人的分支。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";

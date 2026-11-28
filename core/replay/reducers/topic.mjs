@@ -1,7 +1,7 @@
 // topic 域：要点聚成议题；议题由人两次确认（成立、出口），出口之后才能变成条目。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
 // 一个 kind 一个函数——加一类事实就是加一个函数，不改别人的分支。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";

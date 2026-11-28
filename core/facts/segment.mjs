@@ -1,6 +1,6 @@
 // facts/segment: 段的事实——哪一段在收活、哪一段在等判决、这一段还收不收新条目。
 // 纯函数：doc/session/segment 进，值出。
-import { MEANING } from "../events.mjs";
+import { MEANING } from "../events/index.mjs";
 import { noway } from "./errors.mjs";
 import { awaitingVerdict } from "./review.mjs";
 import { awaitingJudgement } from "./review.mjs";

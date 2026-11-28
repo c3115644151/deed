@@ -1,7 +1,7 @@
 // work 域（二）：交付与撤回。一条活从「没做」变成「做了」，以及延后、放弃这两种收尾。
 // 记账与挪动在 work.mjs。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";

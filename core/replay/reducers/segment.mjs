@@ -1,7 +1,7 @@
 // segment 域：段的开与关，以及旧账本里那两种结局（judge.pass / judge.rework）的读法。
 // 纯重放：doc 与 ev 进，改 doc；不读盘、不看时钟。
 // 一个 kind 一个函数——加一类事实就是加一个函数，不改别人的分支。
-import { meaningOf, MEANING } from "../../events.mjs";
+import { meaningOf, MEANING } from "../../events/index.mjs";
 import { noway } from "../../facts/errors.mjs";
 import { sessionOf, taken } from "../../facts/session.mjs";
 import { segmentById, segmentOf, nextSegment, nextOpen, settle, sealed, editable } from "../../facts/segment.mjs";
