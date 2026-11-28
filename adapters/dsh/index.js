@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { pollVerdicts } from "./verdicts.mjs";
 
 export const name = "deed-dsh";
 export const inject = ["sessions"];
@@ -134,6 +135,7 @@ export function apply(ctx, config = {}) {
     try {
       const root = session?.header?.cwd;
       if (!root || !boundRoot(root)) return;
+      if (!session?.header?.parentSession && session?.header?.origin !== "subagent") watch(session);
       // 子代理（审查者）的会话不是这一场对话：它的开场提示词不是人说的，
       // 它的答复也不进账本，惯例也不往它那里塞。
       const sub = session?.header?.parentSession !== undefined || session?.header?.origin === "subagent";
@@ -416,6 +418,43 @@ export function apply(ctx, config = {}) {
       running.delete(session.id);
     }
   };
+
+  // 结论落下之后回到作者那一步：账本尾巴上出现结论 → 在作者那个会话里开一轮。
+  // 子代理的完成通知回的是它自己的父会话，主会话这边收不到，所以盯账本。
+  const watchers = new Map(); // 会话 id → { watermark }
+
+  const watch = (session) => {
+    const id = session?.id;
+    const root = session?.header?.cwd;
+    if (!id || !root || !boundRoot(root)) return;
+    if (watchers.has(id)) return;
+    const state = { watermark: null };
+    watchers.set(id, state);
+    const timer = setInterval(() => {
+      void (async () => {
+        const agents = ctx.get("agents");
+        const agent = agents?.get?.(id) ?? live.get(id) ?? null;
+        try {
+          await pollVerdicts({ root, agent, state, log: (line) => note(root, line) });
+        } catch (err) {
+          note(root, "盯结论出错 · " + clip(err?.message ?? err, 160));
+        }
+      })();
+    }, 2000);
+    timer.unref?.();
+    pollTimers.set(id, timer);
+  };
+
+  const pollTimers = new Map();
+  const stopWatch = (id) => {
+    const timer = pollTimers.get(id);
+    if (timer) clearInterval(timer);
+    pollTimers.delete(id);
+    watchers.delete(id);
+  };
+  ctx.effect(() => () => {
+    for (const id of [...pollTimers.keys()]) stopWatch(id);
+  });
 
 }
 

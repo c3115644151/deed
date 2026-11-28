@@ -207,3 +207,10 @@
   标准：cli-review1/cli-review2 里不再调用 deed task；每条用例的条目一次写进清单再交付（现在逐条 addTask 会开新段，18 条用例因此变红）；改完 deed task 动词删除、敲它 exit 1 并指到清单，test/ 里 0 处调用；全量用例绿
   理由：与 T83 是同一件事的两半（T83 已含「测试改走清单+submit」），并到 T83 一起交付
 
+## 段 S02.21
+<!-- 还没轮到：现在收活的是 S02.20，轮到了这一段才收交付 -->
+<!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
+- [x] T154 审查结论落下之后自动把作者叫回来
+  标准：账本尾巴上出现 review.log／verdict.pass／review.overturn／sign／segment.seal 时，适配器以一条 source.kind 不是 user 的跟进消息在作者会话里开一轮（正在跑就排到下一轮）；第一次只记水线，重载不重播旧结论，同一条只叫一次；有用例直接驱动这三条（没结论不叫、落了叫一次、第二次不再叫；正在跑走 next-turn；几条一起落只开一轮）
+  交付：adapters/dsh/verdicts.mjs 盯账本尾巴（最后 256KB、跨月文件），出现 review.log／verdict.pass／review.overturn／sign／segment.seal 就以 source.kind:"deed-verdict" 的跟进消息开一轮；正在跑就 send(..., "next-turn")，不打断；第一次只记水线、重载不重播、同一条只叫一次；index.js 每个会话第一次见面起一个 2 秒的定时器，卸载时清干净；DESIGN §12.6.9 记下这件事；三条用例同在这个文件里（叫一次、忙时排队、几条合一句）；期望：node --test test/adapter-verdicts.test.mjs => ✔ a verdict on the ledger is what wakes the author, once
+
