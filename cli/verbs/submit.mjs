@@ -514,6 +514,19 @@ export default function submit(argv) {
               specs.push({ k: "task.defer", s: one.id, id: item.id, why: item.later });
             }
           }
+          // 写了 理由： 却没有任何事件可落的行：按条回一句。静默收下等于把人说的话吞掉，
+          // 只回一句"没有要落的改动"又让人不知道该去哪找那一条。
+          for (const item of plan.items) {
+            if (!item.why) continue;
+            if (specs.some((spec) => spec.id === item.id)) continue;
+            // 放弃/延后过的条目，清单上那行 理由：/延后： 是账本印出来的事实，不是新说的话。
+            const was = known.get(item.id);
+            if (was && (was.status === "dropped" || was.status === "deferred")) continue;
+            fail(
+              item.id + " 没有改到下一段，也没有交付或放弃可撤回：这行 理由： 没有可撤的东西" +
+                (item.box === "x" ? "（勾着的条目：交付要写 交付：，撤回要把它改回 - [ ]）" : ""),
+            );
+          }
           // 一次只做一件事：一次 submit 只收一条交付。同一批里落下好几条，改动的归属
           // 就分不出来（工作区只量了一次差），账本上只能写「这几条共用一份差」——
           // 那是替读账本的人猜。做完一条就勾一条，是这里的规矩，也是它的用法。

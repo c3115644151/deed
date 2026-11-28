@@ -774,3 +774,17 @@ test("a carry can be taken back, and the segment it left disappears", () => {
   doc = fold(readEvents(cwd));
   assert.deepEqual(doc.sessions[0].segments.map((one) => one.id), ["S01.1"], "空掉的下一段消失了");
 });
+
+// 写了 理由： 却没东西可撤的那一条：要点名说出来，而不是只回一句"没有要落的改动"。
+test("a reason with nothing to undo names the entry it belongs to", () => {
+  const cwd = workspace("reason-nothing");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  const plan = path.join(cwd, ".deed", "plan.md");
+  const text = fs.readFileSync(plan, "utf8");
+  fs.writeFileSync(plan, text.replace("- [ ] T1 做一", "- [ ] T1 做一\n  理由：只是试试"), "utf8");
+  const r = deed(cwd, "submit");
+  assert.equal(r.status, 1);
+  assert.match(r.stdout + r.stderr, /T1 没有改到下一段，也没有交付或放弃可撤回/u);
+  assert.match(r.stdout + r.stderr, /没有可撤的东西/u);
+});
