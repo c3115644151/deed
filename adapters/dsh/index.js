@@ -347,7 +347,9 @@ export function apply(ctx, config = {}) {
         request: { parent: agent, prompt },
         signal,
       });
-      return { childId: started.childId, api: "startContinuable" };
+      // result 一起带回去：它落定的那一刻就是"这个审查者已经收工"，
+      // 之后这一段再来一份清单不能再发给他。
+      return { childId: started.childId, api: "startContinuable", result: started.result };
     }
     // 本机装的是 startActivation：它要 delivery:"caller" 才把结果交给调用方，
     // 而 dsh-subagent 的 notifySettlement 在 delivery === "caller" 时直接返回——
@@ -442,8 +444,22 @@ export function apply(ctx, config = {}) {
     saveHands(root);
     note(root, "起了审查者 · " + started.api + " · " + String(started.childId).slice(0, 12) + " · " + (due.segment ?? "整期"));
     started.result?.then?.(
-      (result) => note(root, "审查者收工 · " + clip(result?.stopReason ?? "?", 80)),
-      (err) => note(root, "审查者出错 · " + clip(err?.message ?? err, 200)),
+      (result) => {
+        note(root, "审查者收工 · " + clip(result?.stopReason ?? "?", 80));
+        const now = hands.get(key);
+        if (now && now.childId === started.childId) {
+          hands.delete(key);
+          saveHands(root);
+        }
+      },
+      (err) => {
+        note(root, "审查者出错 · " + clip(err?.message ?? err, 200));
+        const now = hands.get(key);
+        if (now && now.childId === started.childId) {
+          hands.delete(key);
+          saveHands(root);
+        }
+      },
     );
   };
 

@@ -154,3 +154,53 @@ test("a period review opens its own agent, not the segment's", async () => {
   assert.notEqual(started[1], segmentHand, "期审的名字与段审不同：" + started[1]);
   assert.match(logText(cwd), /整期/u, "日志里说的是整期那一次");
 });
+
+// 收工的审查者收不到新消息（host 那边 sendMessage 照样返回，人已经不在了）：
+// 这一段再来一份清单，得另起一个，而不是发给一个结束了的会话。
+test("a reviewer that already settled does not get the next brief", async () => {
+  const cwd = workspace("adapter-settled");
+  assert.equal(deed(cwd, "init", "--said", "开始", "--review", "core/**").status, 0);
+  addTask(cwd, "做一", "跑得通");
+  fs.writeFileSync(path.join(cwd, "a.md"), "改动\n");
+  deliverTask(cwd, "T1", "跑：跑得通");
+
+  const started = [];
+  const messaged = [];
+  let settle;
+  const services = {
+    agents: { get: () => ({ session: sessionOf(cwd) }) },
+    subagents: {
+      startContinuable: async (args) => {
+        started.push(args.label);
+        // 第一个审查者很快收工（就像真跑完落完结论那样）；第二个留着。
+        const result = started.length === 1 ? new Promise((resolve) => { settle = resolve; }) : undefined;
+        return { childId: "child-" + started.length, result };
+      },
+      sendMessage: async (agent, childId, prompt) => {
+        messaged.push({ childId, text: prompt?.[0]?.text ?? "" });
+      },
+      listChildren: async () => [],
+    },
+  };
+  const { ctx, handlers } = host(cwd, services);
+  const mod = await import("../adapters/dsh/index.js");
+  mod.apply(ctx, {});
+
+  handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
+  assert.ok(await waitFor(() => started.length === 1), "第一个审查者起来了");
+
+  settle({ stopReason: "completed" });
+  assert.ok(await waitFor(() => /审查者收工/u.test(logText(cwd))), "收工那一刻记下来了");
+
+  // 判一份、修完再交，出第二份清单。
+  assert.equal(
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status,
+    0,
+  );
+  fs.writeFileSync(path.join(cwd, "a.md"), "改动 · 第二版\n");
+  deliverTask(cwd, "T1", "跑：跑得通 v2", { file: "a.md" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "出第二份清单");
+  handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
+  assert.ok(await waitFor(() => started.length === 2), "另起一个，而不是发给收工的那个");
+  assert.equal(messaged.length, 0, "一个字都没发给已经结束的那个");
+});
