@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
-import { CLI, OFF, deed, addTask, deliverTask, setGoal, proof, briefs } from "./support/cli.mjs";
+import { CLI, OFF, deed, addTask, deliverTask, setGoal, proof, briefs , startReview, startPeriodReview } from "./support/cli.mjs";
 
 
 const due = (cwd, ...args) => {
@@ -64,10 +64,13 @@ test("the due query says what needs a reviewer, and never asks the person", () =
   assert.equal(want.needs, "brief", "条目都交付了：要的是一份清单");
   assert.equal(want.hand, "r-s01-1", "这一段交给同一个名字");
 
-  const wrote = deed(cwd, "review", "--segment", "S01.1", "--auto");
-  assert.equal(wrote.status, 0, wrote.stderr);
+  // 出清单只在面板上按：命令行连 --auto 也拒（钩子不再擅自出清单）。
+  const refused = deed(cwd, "review", "--segment", "S01.1", "--auto");
+  assert.equal(refused.status, 1);
+  const wrote = startReview(cwd, "S01.1");
+  assert.equal(wrote.status, 0, wrote.stdout + wrote.stderr);
   const handed = readEvents(cwd).filter((one) => one.k === "review.brief").at(-1);
-  assert.equal(handed.via, "auto", "记账的是钩子那一侧");
+  assert.equal(handed.segment, "S01.1", "记账的是这一段的那一份");
   const then = due(cwd);
   assert.equal(then.needs, "verdict", "清单已经交出去：这一步是落结论");
   assert.equal(then.hand, "r-s01-1", "复用的是同一个名字");
@@ -102,7 +105,8 @@ test("the period asks for a fresh reviewer, and only after every segment has an 
   assert.equal(want.kind, "period", "段都关了：轮到这一期的样子");
   assert.equal(want.needs, "brief");
   assert.equal(want.hand, "r-period-s01");
-  assert.equal(deed(cwd, "review", "--all", "--auto").status, 0);
+  assert.equal(deed(cwd, "review", "--all", "--auto").status, 1, "期审清单也只在面板上按");
+  assert.equal(startPeriodReview(cwd).status, 0);
   assert.equal(due(cwd).needs, "verdict");
   assert.equal(deed(cwd, "review", "--all", "--verdict", "pass").status, 0);
   assert.deepEqual(due(cwd), { kind: null }, "期审过了：下一步是签收，不是再审");

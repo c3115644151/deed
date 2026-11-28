@@ -624,10 +624,10 @@ export function nextAction(doc, config) {
     }
     if (state === "stale") {
       return {
-        who: "reviewer",
-        what: "重判这一期",
-        text: session.id + " 的期审结论早于之后的段变动：那一次判的不是这一期现在的样子；另出一份重判",
-        command: `deed review --all`,
+        who: "user",
+        what: "重新开始期审",
+        text: session.id + " 的期审结论早于之后的段变动：那一次判的不是这一期现在的样子；面板上「开始期审」按下去才出清单",
+        command: "deed panel",
       };
     }
     if (state === "fail") {
@@ -639,10 +639,10 @@ export function nextAction(doc, config) {
       };
     }
     return {
-      who: "reviewer",
-      what: "期审",
-      text: session.id + " 的各段都关了（" + session.segments.length + " 段）：这一期做成的样子还没有人判",
-      command: `deed review --all`,
+      who: "user",
+      what: "开始期审",
+      text: session.id + " 的各段都关了（" + session.segments.length + " 段）：面板上「开始期审」按下去，才出一份期审清单",
+      command: "deed panel",
     };
   }
   // 审查通过只把这一段交回来：此刻轮到人判，它不是签收，也不是再审。
@@ -685,10 +685,10 @@ export function nextAction(doc, config) {
         command: `deed review --segment ${segment.id} --verdict pass`,
       };
     return {
-      who: "reviewer",
-      what: "重审",
-      text: `${segment.id} 的结论早于最后一次交付：它回答的是旧内容`,
-      command: `deed review --segment ${segment.id}`,
+      who: "user",
+      what: "重新开始审查",
+      text: `${segment.id} 的结论早于最后一次交付（它回答的是旧内容）：面板上「开始审查」按下去才出下一份清单`,
+      command: "deed panel",
     };
   }
   if (state !== "fail" && needsReview(config, session, segment)) {
@@ -715,10 +715,10 @@ export function nextAction(doc, config) {
       };
     }
     return {
-      who: "reviewer",
-      what: voidedReview(session, segment) ? "重审" : "审这一段",
-      text: `${segment.id} 的 ${count.total} 条都交付了，要一份独立结论`,
-      command: `deed review --segment ${segment.id}`,
+      who: "user",
+      what: voidedReview(session, segment) ? "重新开始审查" : "开始审查",
+      text: `${segment.id} 的 ${count.total} 条都交付了，要一份独立结论：面板上「开始审查」按下去才出清单`,
+      command: "deed panel",
     };
   }
   if (state === "fail") {
@@ -768,19 +768,19 @@ export function nextAction(doc, config) {
     const gave = named.filter((one) => one.status === "dropped");
     if (gave.length > 0)
       return {
-        who: "system",
-        what: "出清单",
+        who: "user",
+        what: "开始审查",
         text:
           `${segment.id} 的不合格（${review.by}）点名了 ${gave.map((one) => one.id).join("、")}，它们改主意不做了：` +
-          "要一份新清单去判放弃算不算结清（接了钩子的工作区由系统在下一轮开头出，不再手敲）",
-        command: `deed review --segment ${segment.id}`,
+          "要一份新清单去判放弃算不算结清——面板上「开始审查」按下去才出",
+        command: "deed panel",
       };
     return {
-      who: "system",
-      what: "出清单",
+      who: "user",
+      what: "开始审查",
       text: `${segment.id} 的不合格（${review.by}）还在案，被点名的已经重新交付或放弃：` +
-        "旧清单已作废，要一份新的去判（接了钩子由系统在下一轮开头出，没钩子就敲这一句）",
-      command: `deed review --segment ${segment.id}`,
+        "旧清单已作废，要一份新的去判——面板上「开始审查」按下去才出",
+      command: "deed panel",
     };
   }
   // 走到这里只剩一种：审查设置说这一段不用审，而它还没封。免审就是不用审，所以不再

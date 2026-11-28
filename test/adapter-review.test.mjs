@@ -8,7 +8,7 @@ import { workspace } from "../support/lib.mjs";
 import { readEvents } from "../lib/store.mjs";
 import { fold } from "../core/fold.mjs";
 import { reviewDue } from "../core/rules.mjs";
-import { deed, addTask, deliverTask, gate } from "./support/cli.mjs";
+import { deed, addTask, deliverTask, gate , startReview, startPeriodReview} from "./support/cli.mjs";
 
 // 一个够用的宿主：把钩子收进来，服务用替身。
 const host = (root, services) => {
@@ -78,7 +78,9 @@ test("the same segment's review goes back to the same agent; a period review get
   const doc = () => fold(readEvents(cwd));
   assert.equal(reviewDue(doc(), doc().config).kind, "segment", "这一段此刻该审");
 
-  // 第一次：清单与角色包还没出，适配器让 deed 自己出一份，然后把清单交给一个新起的审查者。
+  // 出清单只在面板上按（人同意过才开审）：测试按下那一下，再让钩子看到"该落结论"。
+  const pressed = startReview(cwd, "S01.1");
+  assert.equal(pressed.status, 0, pressed.stderr);
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   assert.ok(await waitFor(() => started.length === 1), "起了一个审查者");
   const firstChild = started.length;
@@ -95,7 +97,7 @@ test("the same segment's review goes back to the same agent; a period review get
   );
   fs.writeFileSync(path.join(cwd, "a.md"), "改动 · 第二版\n");
   deliverTask(cwd, "T1", "跑：跑得通 v2", { file: "a.md" });
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "出第二份清单");
+  assert.equal(startReview(cwd, "S01.1").status, 0, "出第二份清单");
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   const sent = await waitFor(() => messaged.length >= 1);
   assert.ok(sent, "把第二份发回给同一个审查者");
@@ -136,7 +138,8 @@ test("a period review opens its own agent, not the segment's", async () => {
   const mod = await import("../adapters/dsh/index.js");
   mod.apply(ctx, {});
 
-  // 先让段审起一个审查者：它留在内存里，正是"期审别把清单与角色包发给他"要防的那一个。
+  // 先让段审起一个审查者（清单由人按下才出）：它留在内存里，正是"期审别把清单与角色包发给他"要防的那一个。
+  assert.equal(startReview(cwd, "S01.1").status, 0);
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   assert.ok(await waitFor(() => started.length === 1), "段审起了一个审查者");
   const segmentHand = started[0];
@@ -148,6 +151,7 @@ test("a period review opens its own agent, not the segment's", async () => {
   assert.ok(doc0.sessions[0].segments.every((one) => one.closedAt !== null), "段都关了");
   assert.equal(reviewDue(doc0, doc0.config).kind, "period", "轮到期审");
 
+  assert.equal(startPeriodReview(cwd).status, 0, "期审清单也由人按下才出");
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   assert.ok(await waitFor(() => started.length === 2), "期审另起了一个");
   assert.equal(messaged.length, 0, "没有把期审清单与角色包发给段审那个审查者");
@@ -186,6 +190,7 @@ test("a reviewer that already settled does not get the next brief", async () => 
   const mod = await import("../adapters/dsh/index.js");
   mod.apply(ctx, {});
 
+  assert.equal(startReview(cwd, "S01.1").status, 0);
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   assert.ok(await waitFor(() => started.length === 1), "第一个审查者起来了");
 
@@ -199,7 +204,7 @@ test("a reviewer that already settled does not get the next brief", async () => 
   );
   fs.writeFileSync(path.join(cwd, "a.md"), "改动 · 第二版\n");
   deliverTask(cwd, "T1", "跑：跑得通 v2", { file: "a.md" });
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "出第二份清单");
+  assert.equal(startReview(cwd, "S01.1").status, 0, "出第二份清单");
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   assert.ok(await waitFor(() => started.length === 2), "另起一个，而不是发给收工的那个");
   assert.equal(messaged.length, 0, "一个字都没发给已经结束的那个");
@@ -214,7 +219,7 @@ test("a segment that outgrew its pass gets a fresh sheet at the top of a turn", 
   addTask(cwd, "做一", "跑得通");
   fs.writeFileSync(path.join(cwd, "a.md"), "一版\n");
   deliverTask(cwd, "T1", "跑：跑得通");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "第一份清单");
+  assert.equal(startReview(cwd, "S01.1").status, 0, "第一份清单");
   assert.equal(
     deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result", "T1=met").status,
     0,
@@ -242,7 +247,12 @@ test("a segment that outgrew its pass gets a fresh sheet at the top of a turn", 
   fs.writeFileSync(path.join(cwd, "b.md"), "二版\n");
   deliverTask(cwd, "T2", "跑：跑得通", { file: "b.md" });
 
+  // 过期 pass 之后，下一步是人在面板上说"再判一次"，不是钩子自己出清单。
+  const state = deed(cwd, "state").stdout;
+  assert.match(state, /开始审查|重新开始审查/u, "过期 pass 的下一步是面板上那一下");
+  const pressed = startReview(cwd, "S01.1");
+  assert.equal(pressed.status, 0, pressed.stderr);
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
-  assert.ok(await waitFor(() => started.length === 1), "过期的 pass 也把审查者起起来，而不是干等判决");
+  assert.ok(await waitFor(() => started.length === 1), "过期 pass 之后，按下去就把审查者起起来");
   assert.ok(await waitFor(() => readEvents(cwd).some((one) => one.k === "review.brief" && one.at > new Date(Date.now() - 60000).toISOString())), "新的一份清单进了账本");
 });

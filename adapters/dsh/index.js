@@ -525,20 +525,10 @@ export function apply(ctx, config = {}) {
       if (!due || due.kind === null) return;
       due.session = session.id;
       if (due.needs === "brief") {
-        // 材料还没出：让 deed 自己出（--auto 记下这一份是钩子那一侧写的）。
-        const made = due.kind === "period" ? runDeed(root, ["review", "--all", "--auto"]) : runDeed(root, ["review", "--segment", due.segment, "--auto"]);
-        if (made.code !== 0) {
-          note(root, "出清单失败 · " + clip(made.err || made.out, 200));
-          return;
-        }
-        asked = runDeed(root, ["review", "--due"]);
-        try {
-          due = JSON.parse(asked.out.split("\n").pop());
-        } catch {
-          return;
-        }
-        if (!due || due.kind === null || due.needs !== "verdict") return;
-        due.session = session.id;
+        // 出清单只在面板上按：审查必须经过人同意，钩子不代按（用户定下的规矩）。
+        // 这里说出来就够——面板那一格亮着，人按下去账本才动。
+        note(root, "等你按「开始审查」 · " + String(due.segment ?? due.kind));
+        return;
       }
       await deliver(root, due);
     } catch (err) {

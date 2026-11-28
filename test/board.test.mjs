@@ -7,6 +7,7 @@ import { fold } from "../core/fold.mjs";
 import { append } from "../lib/store.mjs";
 import { renderBoard, when } from "../board/render.mjs";
 import { shouldRetire, start } from "../board/serve.mjs";
+import { applyGate } from "../board/gates.mjs";
 import { buildNow } from "../lib/panel.mjs";
 import { workspace } from "../support/lib.mjs";
 import { addTask, deliverTask } from "./support/cli.mjs";
@@ -386,7 +387,9 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
   fs.writeFileSync(path.join(root, "core", "a.mjs"), "a\n");
   assert.equal(deliverTask(root, "T1", "写完了", { file: "core/a.mjs" }).status, 0, "勾上就是交付");
   // 审查通过只把这一段交回来：判决那一按才是它的结局。
-  assert.equal(run("review", "--segment", "S01.1").status, 0);
+  assert.equal(run("review", "--segment", "S01.1").status, 1, "出清单只在面板上按：命令行这条被拒");
+  // 面板那一按走的是同一个 /gate：这里直接经 applyGate 按下，跟页面按下去是同一条路。
+  applyGate(root, { action: "review-start", segment: "S01.1" });
   assert.equal(run("review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
 
   const server = start(root, 0);
@@ -428,7 +431,9 @@ test("the one write the panel accepts is a gate, and signing happens there", asy
     assert.equal(closed.judgedBy, "user");
     const again2 = await post({ action: "judgement", segment: "S01.1" });
     assert.equal(again2.status, 400, "判过的段不再判");
-    assert.equal(run("review", "--all").status, 0);
+    assert.equal(run("review", "--all").status, 1, "期审清单也只在面板上按");
+    const periodPressed = await post({ action: "period-review" });
+    assert.equal(periodPressed.status, 200, JSON.stringify(periodPressed.body));
     assert.equal(run("review", "--all", "--verdict", "pass").status, 0);
 
     const open = await get(port, "/");
@@ -578,4 +583,29 @@ test("the panel retires on idle only when nobody is watching", () => {
   assert.equal(shouldRetire({ streams: 1, lastRequest: now - 10 * idle, idle, now }), false, "页面连着：一直不收");
   assert.equal(shouldRetire({ streams: 0, lastRequest: now - idle + 1, idle, now }), false, "还没到闲置线");
   assert.equal(shouldRetire({ streams: 0, lastRequest: now - idle, idle, now }), true, "到了就退");
+});
+
+// 审查由人按下才开始：该审的时候，屏上那一格必须真的长着按钮。
+test("a segment that wants review shows the button that starts it", () => {
+  const cwd = workspace("panel-review-button");
+  const run = (...args) =>
+    spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "cli", "deed.mjs"), ...args], {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, DEED_NO_PANEL: "1" },
+    });
+  run("init", "--said", "开始", "--review", "core/**");
+  addTask(cwd, "做一", "跑得通");
+  fs.mkdirSync(path.join(cwd, "core"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "a\n");
+  deliverTask(cwd, "T1", "写了", { file: "core/a.mjs" });
+  const doc = fold(readEvents(cwd));
+  const page = renderBoard(doc, doc.config, { zone: "UTC" });
+  assert.match(page, /data-gate="review-start"/, "该审的那一段长着「开始审查」");
+  assert.match(page, /开始审查 S01\.1/);
+  // 按下之后清单出去了：按钮换成"在判"，不该再让人按第二遍。
+  applyGate(cwd, { action: "review-start", segment: "S01.1" });
+  const after = fold(readEvents(cwd));
+  const page2 = renderBoard(after, after.config, { zone: "UTC" });
+  assert.doesNotMatch(page2, /data-gate="review-start"/, "清单出门之后，按钮收起来");
 });

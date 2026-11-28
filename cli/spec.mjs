@@ -59,9 +59,11 @@ export const SPEC = {
     ],
   },
   review: {
-    flags: ["segment", "verdict", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip", "due", "auto"],
+    // panel 不是给人敲的开关：它是面板按下按钮时带的记号。出清单（段审与期审）只认它，
+    // 其余所有动作照旧。帮助里不印它。
+    flags: ["segment", "verdict", "finding", "result", "result-all", "rework", "why", "withdraw", "session", "all", "skip", "due", "auto", "panel"],
     repeat: ["finding", "result"],
-    booleans: ["withdraw", "all", "skip", "due", "auto"],
+    booleans: ["withdraw", "all", "skip", "due", "auto", "panel"],
     usage: [
       "deed review [--segment S01.1]          发审查清单与角色包（记一条 review.brief），打印两份路径",
       'deed review --segment S01.1 --skip --why "…"   封一个免审段（没人审过，落款留着）',

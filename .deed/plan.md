@@ -13,16 +13,21 @@
 <!-- 已关闭 19 段（不再过目）：S02.1 3 · S02.2 12 · S02.3 2 · S02.4 3 · S02.5 2 · S02.6 1 · S02.7 2 · S02.8 2 · S02.9 3 · S02.10 3 · S02.11 4 · S02.12 3 · S02.13 2 · S02.14 1 · S02.15 1 · S02.16 1 · S02.17 1 · S02.18 16 · S02.19 12 -->
 
 ## 段 S02.20
-<!-- 已完成（54 条）：交过的，往下沉 -->
-- [x] T175 签收差按「指着点什么」算
+<!-- 在做（1 条）：只做这一条，做完立刻勾上，再动下一条 -->
+- [ ] T173 一条交付都没有的段不当作要审
+  标准：reviewable(session, segment)：没有 done/accepted 条目、也没有在案结论的段，不出清单、不算欠结论、可以直接 --skip 封存；三条全放弃的段不再起审查；有用例
+
+<!-- 等着（1 条）：上面那条做完再动 -->
+- [ ] T175 签收差按「指着点什么」算
   标准：pointsAtNothing 把「期望：命令 => 要看到的话」也算指着（submit 收的就是它）；签收差的话从「没记下任何文件」改成「什么也没指着」；有用例（只带期望的交付不再挡签收）
-  交付：core/rules.mjs 的 pointsAtNothing 把 expects 也算指着（submit 收的就是它），签收差的话改成「什么也没指着」；test/rules.test.mjs 新增一条（只带期望的交付 unpinned 为空）；期望：node --test test/rules.test.mjs => ℹ fail 0
+
+<!-- 已完成（53 条）：交过的，往下沉 -->
+- [x] T176 审查只在面板上按「开始审查」才启动
+  标准：出清单（段审与期审）无论从哪条路来，都必须是人按下面板那一格：命令行的 deed review --segment/--all 出清单被拒并指路面板；面板上该审的段长着「开始审查 S0x.N」、整期长着「开始期审」，按下才真出清单；规则层说的下一步是「user · 开始审查」而不是 reviewer 直接出；适配器遇到「该出清单」只记一句等你按，不自己出；按下之后起审查者仍由系统做（按钮就是授权）；有用例（按钮在页上、按下出清单、命令行被拒、适配器不代按），变异核对一次
+  交付：cli/verbs/review.mjs 的两处出清单要求面板带的 --panel（命令行拒并指路）；cli/spec.mjs 为此记 --panel；board/gates.mjs 新增 review-start／period-review 两闸（按下才出清单，已出过的那份只回一句不再写）；board/render.mjs 在执行屏每段长「开始审查 S0x.N」、验收屏长「开始期审」，只在该审且没人在判时亮；core/rules.mjs 的下一步改成 user · 开始审查／开始期审（deed panel）；adapters/dsh/index.js 的 checkDue 遇到 needs=brief 只记「等你按」；test/support/cli.mjs 加 startReview／startPeriodReview（走 applyGate，与页面同一条路），67 处用例改走它；期望：node --test test/board.test.mjs => ℹ fail 0
 - [x] T174 封存前拒还挂着没人回答的清单
   标准：段上还有一份 answeredBy 为空、未撤回的清单时，--skip 封存被拒并指路先撤回；有用例
   交付：core/rules.mjs 的 sealBlockers 多一条——段上还挂着 answeredBy 为空、未撤回的清单就拒封并指路 --withdraw；test/cli-review2.test.mjs 新增一条（清单出门后 --skip 被拒、并指路 --withdraw）；期望：node --test test/cli-review2.test.mjs => ℹ fail 0
-- [x] T173 一条交付都没有的段不当作要审
-  标准：reviewable(session, segment)：没有 done/accepted 条目、也没有在案结论的段，不出清单、不算欠结论、可以直接 --skip 封存；三条全放弃的段不再起审查；有用例
-  交付：core/rules.mjs 新增 reviewable（有 done/accepted 或有在案结论），reviewDue／signBlockers 的欠结论／sealBlockers 三处问它——一条交付都没有的段不出清单、封得了；test/rules.test.mjs 新增一条（全放弃的段 reviewable=false、due 为空、封存无阻碍）；期望：node --test test/rules.test.mjs => ℹ fail 0
 - [x] T172 清单抬头按账本上的理由印封存
   标准：封存过的段在清单抬头只说账本上记的那句凭什么（sealedWhy），不再对所有段都印「审查设置说这一段不用审」；有用例（按「没有交付」封的段，抬头不出现「审查设置」）
   交付：cli/brief.mjs 的段行对封存段只说账本上记的那句凭什么（sealedWhy），不再对所有封存都印「审查设置说这一段不用审」；test/cli-review2.test.mjs 新增一条（按「一条交付都没有」封的段 → 抬头写凭什么、不出现审查设置）；期望：node --test test/cli-review2.test.mjs => ℹ fail 0

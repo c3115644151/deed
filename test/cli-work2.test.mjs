@@ -16,8 +16,7 @@ import {
   writeLines, planFile, writePlan, readPlan,
   freshPlan,
 
-  addTask, deliverTask, undoDelivery, dropTask,
-} from "./support/cli.mjs";
+  addTask, deliverTask, undoDelivery, dropTask,startReview, startPeriodReview} from "./support/cli.mjs";
 
 
 test("a plan with a line nobody can read lands nothing, and a task cannot vanish", () => {
@@ -278,7 +277,7 @@ test("a delivery that says what it will show has to show it when the ledger is w
   // 成立的那条留下了凭据：账本记下命令与它必须印出的那段话，清单上也看得到
   const first = readEvents(cwd).find((one) => one.k === "task.done");
   assert.deepEqual(first.expects, [{ command: "node say.mjs", want: "hi" }]);
-  deed(cwd, "review", "--segment", "S01.1");
+  startReview(cwd, "S01.1");
   const brief = fs
     .readdirSync(path.join(cwd, ".deed", "review"))
     .filter((one) => !one.endsWith("-reviewer.md"))
@@ -436,13 +435,13 @@ test("the plan can line up several segments, and only the first takes work", () 
   const queued = deliverTask(cwd, "T2", "试试看");
   assert.equal(queued.status, 1, "还没轮到的那一段不能交付");
   assert.match(queued.stderr, /轮到它的那一段还没开/u);
-  const early = deed(cwd, "review", "--segment", "S01.2");
+  const early = startReview(cwd, "S01.2");
   assert.equal(early.status, 1);
   assert.match(early.stderr, /轮到它的那一段还没开|还没轮到/u);
 
   // 第一段交付、审过、判过之后，第二段才接过活。
   assert.equal(deliverTask(cwd, "T1", "做完了").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(startReview(cwd, "S01.1").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
   assert.match(deed(cwd, "state").stdout, /S01\.2/);
@@ -473,7 +472,7 @@ test("a segment waiting for its verdict still takes new entries", () => {
   deed(cwd, "init", "--said", "开始", "--review", "core/**");
   addTask(cwd, "先交的这一条", "跑得通");
   assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单发出去了，这一段在审");
+  assert.equal(startReview(cwd, "S01.1").status, 0, "清单发出去了，这一段在审");
 
   const file = path.join(cwd, ".deed", "plan.md");
   const lines = fs.readFileSync(file, "utf8").replace(/\s*$/u, "").split("\n");
@@ -547,7 +546,7 @@ test("a verdict redraws the draft so a reworked entry is no longer ticked", () =
   addTask(cwd, "一件事", "跑得通");
   assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
   assert.match(readPlan(cwd), /- \[x\] T1 /u, "交付之后勾上了");
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(startReview(cwd, "S01.1").status, 0);
   assert.equal(
     deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status,
     0,
@@ -633,7 +632,7 @@ test("a segment in review still takes new entries, but not new deliveries of lis
   const plan = fs.readFileSync(path.join(cwd, ".deed", "plan.md"), "utf8").replace("- [ ] T1 做一", "- [x] T1 做一");
   fs.writeFileSync(path.join(cwd, ".deed", "plan.md"), plan.replace(/\s*$/u, "") + "\n  交付：写了 a.md\n", "utf8");
   assert.equal(deed(cwd, "submit").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单发出去，这一段冻结");
+  assert.equal(startReview(cwd, "S01.1").status, 0, "清单发出去，这一段冻结");
 
   // 冻结期间：新的一条照样收（它进下一份清单）。
   const withNew = fs.readFileSync(path.join(cwd, ".deed", "plan.md"), "utf8") + "\n- ? 临时加一条\n  标准：也跑得通\n";
@@ -665,7 +664,7 @@ test("the twenty-item cap is about the first brief of a segment, not every entry
   const plan = path.join(cwd, ".deed", "plan.md");
   addTask(cwd, "开头的一条", "跑得通");
   assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "第一份清单发出去了");
+  assert.equal(startReview(cwd, "S01.1").status, 0, "第一份清单发出去了");
 
   // 还没进过审查的段才有 20 条这条线；这一段已经出过清单，20 条以上照样收。
   const lines = fs.readFileSync(plan, "utf8").replace(/\s*$/u, "").split("\n");

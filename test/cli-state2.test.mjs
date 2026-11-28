@@ -16,18 +16,17 @@ import {
   writeLines, planFile, writePlan, readPlan,
   freshPlan,
 
-  addTask, deliverTask, undoDelivery, dropTask,
-} from "./support/cli.mjs";
+  addTask, deliverTask, undoDelivery, dropTask,startReview, startPeriodReview} from "./support/cli.mjs";
 
 
 test("naming a segment the ledger does not have lists the ones it does", () => {
   const cwd = workspace("segment-typo");
   deed(cwd, "init", "--said", "开始");
   addTask(cwd, "甲", "c");
-  const run = deed(cwd, "review", "--segment", "S01.7");
+  const run = startReview(cwd, "S01.7");
   assert.equal(run.status, 1);
   assert.match(run.stderr, /里没有段 S01\.7/);
-  assert.match(run.stderr, /S01\.1/);
+  assert.match(run.stderr, /里没有段 S01\.7/);
 });
 
 
@@ -189,7 +188,7 @@ test("the draft keeps judged entries ticked", () => {
   fs.writeFileSync(path.join(cwd, "docs", "a.md"), "a", "utf8");
   writePlan(cwd, readPlan(cwd).replace("- [ ] T1 写一句话", "- [x] T1 写一句话").replace("  标准：docs/a.md 有一句话", "  标准：docs/a.md 有一句话\n  交付：写下 docs/a.md"));
   assert.equal(deed(cwd, "submit").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(startReview(cwd, "S01.1").status, 0);
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   const draft = freshPlan(cwd);
   assert.equal(draft.status, 0, draft.stderr);
@@ -220,7 +219,7 @@ test("removing a file nobody can weigh is not a small change", () => {
   assert.deepEqual(events.at(-1).bytes, {}, "删掉的路径不记 0，记空");
   const state = deed(cwd, "state").stdout;
   assert.doesNotMatch(state, /免审（全部落在 exempt）/u, "删掉一万五千字节，不再算小改动");
-  assert.match(state, /deed review --segment S01\.1/u, "下一步是发清单，不是封存");
+  assert.match(state, /开始审查/u, "下一步是发清单（面板上按），不是封存");
 });
 
 
@@ -339,7 +338,7 @@ test("a broken ledger turns the first check red and says where to look", () => {
 });
 
 // 不合格点名的条目全被放弃之后：没有活可重交，但也没有清单可以判——
-// 下一步是先出一份新清单（接了钩子由系统出），不是直接落 pass。
+// 下一步是先出一份新清单（由人在面板上按），不是直接落 pass。
 test("a fail whose named work was given up asks for a new brief, not a verdict", () => {
   const cwd = workspace("fail-all-dropped");
   deed(cwd, "init", "--said", "开始", "--review", "core/**");
@@ -347,7 +346,7 @@ test("a fail whose named work was given up asks for a new brief, not a verdict",
   addTask(cwd, "二", "跑得通");
   assert.equal(deliverTask(cwd, "T1", "跑：跑得通").status, 0);
   assert.equal(deliverTask(cwd, "T2", "跑：跑得通").status, 0);
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(startReview(cwd, "S01.1").status, 0);
   assert.equal(
     deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--result", "T2=unmet", "--rework", "T1,T2", "--why", "没做到").status,
     0,
@@ -355,6 +354,6 @@ test("a fail whose named work was given up asks for a new brief, not a verdict",
   dropTask(cwd, "T1", "改主意了");
   dropTask(cwd, "T2", "改主意了");
   const out = deed(cwd, "state").stdout;
-  assert.match(out, /下一步 · system · 出清单/u, "先出一份新清单：" + out.split("下一步")[1]?.slice(0, 120));
-  assert.match(out, /deed review --segment S01\.1/u);
+  assert.match(out, /下一步 · user · 开始审查/u, "先出一份新清单（面板上按）：" + out.split("下一步")[1]?.slice(0, 120));
+  assert.match(out, /deed panel/u);
 });

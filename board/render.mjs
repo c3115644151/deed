@@ -10,11 +10,14 @@ import {
   countIn,
   currentSession,
   goalOf,
+  lastPeriodBrief,
+  needsPeriodReview,
   needsReview,
   nextAction,
   openSegment,
   periodReviewOf,
   reading,
+  reviewable,
   reviewOf,
   reviewState,
   signBlockers,
@@ -428,8 +431,11 @@ function segmentBlock(session, segment, index, config, zone, anchors) {
     '<span class="swhen">' + when(segment.openedAt, zone) + (segment.closedAt ? " → " + when(segment.closedAt, zone) : "") + "</span>" +
     '<span class="stamp">' + stamp + "</span>" +
     "</div>" +
-    (state === "missing" && needsReview(config, session, segment)
-      ? '<p class="why">这一段碰了要审的路径：' + esc(pathsOf(session, segment).join("  ")) + "</p>"
+    (state === "missing" && needsReview(config, session, segment) && reviewable(session, segment) && !judging && here
+      ? '<p class="why">这一段碰了要审的路径：' + esc(pathsOf(session, segment).join("  ")) + "</p>" +
+        '<form class="gate small" data-gate="review-start" data-segment="' + esc(segment.id) + '">' +
+        '<span class="gask">审查由你按下才开始</span>' +
+        '<button class="gpress" type="submit">开始审查 ' + esc(segment.id) + "</button></form>"
       : "") +
     (state === "stale"
       ? judging
@@ -578,6 +584,17 @@ function acceptScreen(doc, session, config, zone, on) {
       (period.findings.length ? '<div class="fds">' + findingList(period.findings) + "</div>" : "") +
       "</article>"
     : "";
+  // 期审也一样由人按下才开始：按钮只在该期审、又没人在判的时候亮。
+  const periodAsk = (() => {
+    if (!session || session.closeKind) return "";
+    if (!needsPeriodReview(session)) return "";
+    const handed = lastPeriodBrief(session);
+    if (handed && handed.answeredBy === null && handed.withdrawnAt === undefined)
+      return '<p class="quiet">期审清单交出去了，正在判：' + esc(String(handed.brief).split(/[\\/]/).pop()) + "</p>";
+    return '<form class="gate small" data-gate="period-review">' +
+      '<span class="gask">这一期做成的样子，由你按下去才开审</span>' +
+      '<button class="gpress" type="submit">开始期审</button></form>';
+  })();
   const signed = session && session.sign;
   const goal = session ? goalOf(session) : null;
   return (
@@ -586,7 +603,7 @@ function acceptScreen(doc, session, config, zone, on) {
     (goal ? '<p class="goal"><span class="k">这一期要做成什么</span>' + esc(goal) + "</p>" : "") +
     '<div class="cols">' +
     '<div class="col">' +
-    '<h3 class="colh">结论</h3>' + (periodCard || "") + (cards || '<p class="quiet">还没有审查结论</p>') +
+    '<h3 class="colh">结论</h3>' + (periodAsk || "") + (periodCard || "") + (cards || '<p class="quiet">还没有审查结论</p>') +
     "</div>" +
     '<aside class="col side">' +
     '<h3 class="colh">签收</h3>' +
@@ -1153,7 +1170,7 @@ document.addEventListener("submit", (event) => {
   const action = form.getAttribute("data-gate");
   const body = { action };
   if (action === "sign") body.words = (form.querySelector(".gwords") || {}).value || "";
-  if (action === "judgement") body.segment = form.getAttribute("data-segment");
+  if (action === "judgement" || action === "review-start") body.segment = form.getAttribute("data-segment");
   if (action === "topic-establish" || action === "topic-release") body.topic = form.getAttribute("data-topic");
   const button = form.querySelector(".gpress");
   if (button) button.disabled = true;

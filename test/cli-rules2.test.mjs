@@ -15,8 +15,9 @@ import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
   setGoal, addTask, deliverTask, undoDelivery, dropTask,
-} from "./support/cli.mjs";
+  startReview, startPeriodReview,
 
+} from "./support/cli.mjs";
 
 test("a line this deed cannot read, written by the same version, is told apart by what it means", () => {
   // 真事：加了 task.undo 但没升版本号，正在跑的老进程（同一个 0.2.0）把它读成坏账，
@@ -145,7 +146,7 @@ test("a sealed segment with no reason written says what it is, without empty bra
   delete ev.why;
   lines[at] = JSON.stringify(ev);
   fs.writeFileSync(file, lines.join("\n") + "\n");
-  assert.equal(judged(cwd, "review", "--all").status, 0, "期审清单出得来");
+  assert.equal(startPeriodReview(cwd).status, 0, "期审清单出得来");
   assert.equal(judged(cwd, "review", "--all", "--verdict", "pass").status, 0);
   const signed = signHere(cwd, "可以");
   assert.equal(signed.status, 0, signed.stderr);

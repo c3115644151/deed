@@ -77,6 +77,11 @@ export default function review(argv) {
       if (flags.segment) fail("--all 判的是整期：--all 与 --segment 一次只用一个");
       const session = one;
       if (!flags.verdict) {
+      if (!flags.panel)
+        fail(
+          "出期审清单这件事只在面板上按：审查必须经过你同意（agent 或系统都不擅自启动）——" +
+            "打开 deed panel，等「开始审查」那个按钮亮起来按下去",
+        );
         if (!needsPeriodReview(session))
           fail(
             "这一期还不到期审的时候：段都关了、没有未做与未判之后才有这一层" +
@@ -206,6 +211,12 @@ export default function review(argv) {
         return;
       }
       if (!flags.verdict) {
+        // 出清单这件事只在面板上按：审查必须经过人同意，agent 与系统都不擅自启动。
+        if (!flags.panel)
+          fail(
+            "出这一段清单这件事只在面板上按：审查必须经过你同意（agent 或系统都不擅自启动）——" +
+              "打开 deed panel，等「开始审查 · " + seg.id + "」那个按钮亮起来按下去",
+          );
         // 审查设置说这一段不用审（改动全落在免审路径）：不出清单。出了一份没人需要的卷子，
         // 账本上就多一条「等着人回答的清单」，而这一段正确的结局是关闭。
         if (!needsReview(doc.config, one, seg)) {

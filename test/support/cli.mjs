@@ -29,11 +29,15 @@ export const later = (cwd, ...args) =>
 export const gate = (cwd, action) => {
   try {
     const result = applyGate(cwd, action);
-    return { status: 0, stdout: (result.notes ?? []).join("\n") + "\n", stderr: "", ev: result.ev };
+    const lines = [result.said, ...(result.notes ?? [])].filter(Boolean).join("\n");
+    return { status: 0, stdout: lines + "\n", stderr: "", ev: result.ev };
   } catch (error) {
     return { status: 1, stdout: "", stderr: String(error.message ?? error), ev: null };
   }
 };
+// 出清单也一样：只在面板上按。用例走同一个入口（只是不经过 HTTP）。
+export const startReview = (cwd, segment) => gate(cwd, { action: "review-start", segment });
+export const startPeriodReview = (cwd) => gate(cwd, { action: "period-review" });
 // 审查通过之后要人判一次：用例里由这个助手把手上等判决的段都按过去（专门测这道闸的
 // 用例不经过它，直接用 gate）。
 export const judgeAll = (cwd) => {

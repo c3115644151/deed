@@ -16,8 +16,7 @@ import {
   writeLines, planFile, writePlan, readPlan,
   freshPlan,
 
-  addTask, deliverTask, undoDelivery, dropTask,
-} from "./support/cli.mjs";
+  addTask, deliverTask, undoDelivery, dropTask,startReview, startPeriodReview} from "./support/cli.mjs";
 
 
 test("an entry needs a standard of done, and the plan says so instead of recording it", () => {
@@ -37,7 +36,7 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   deed(cwd, "init", "--said", "改重放函数");
   addTask(cwd, "改重放", "同账本同文档", "--files", "core/fold.mjs");
   deliverTask(cwd, "T1", "node --test");
-  deed(cwd, "review", "--segment", "S01.1");
+  startReview(cwd, "S01.1");
   const failed = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没有并发记录");
   assert.equal(failed.status, 0, failed.stderr);
   const back = deed(cwd, "state");
@@ -47,7 +46,7 @@ test("a fail sends the named work back, so a pass cannot land until it is delive
   assert.match(early.stderr, /还有没交付的（T1）/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.log").length, 1, "被拒的那条不进账本");
   assert.equal(deliverTask(cwd, "T1", "跑了 8 个并发").status, 0);
-  deed(cwd, "review", "--segment", "S01.1");
+  startReview(cwd, "S01.1");
   const after = deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met");
   assert.equal(after.status, 0, "重新交付、重新审过才放行");
   assert.match(after.stdout, /交回给你判/);
@@ -62,7 +61,7 @@ test("a fail names every task it sends back", () => {
   addTask(cwd, "二", "c", "--files", "core/b.mjs");
   deliverTask(cwd, "T1", "写完了");
   deliverTask(cwd, "T2", "写完了");
-  deed(cwd, "review", "--segment", "S01.1");
+  startReview(cwd, "S01.1");
   const back = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--result", "T2=unmet", "--rework", "T1,T2", "--why", "两处都要补");
   assert.equal(back.status, 0, back.stdout + back.stderr);
   const state = deed(cwd, "state");
@@ -90,7 +89,7 @@ test("a delivery that said the wrong thing is taken back, not rewritten", () => 
   assert.equal(deliverTask(cwd, "T1", "这次说的是真的").status, 0);
   assert.deepEqual(kinds(cwd).filter((one) => one.startsWith("task.")), ["task.add", "task.done", "task.undo", "task.done"]);
 
-  assert.equal(deed(cwd, "review").status, 0);
+  assert.equal(startReview(cwd).status, 0);
   const handed = briefs(cwd).map((one) => path.join(cwd, ".deed", "review", one)).sort().pop();
   const text = fs.readFileSync(handed, "utf8");
   assert.equal(text.includes("说要被撤回的那条"), false, "撤回的那条不算数");
@@ -182,7 +181,7 @@ test("a fail that names nobody is refused, and a pass cannot carry a rework", ()
   deed(cwd, "init", "--said", "开始");
   addTask(cwd, "交一条", "交了", "--files", "proof.txt");
   deliverTask(cwd, "T1", "交了");
-  deed(cwd, "review", "--segment", "S01.1");
+  startReview(cwd, "S01.1");
   const nameless = deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--why", "不行");
   assert.equal(nameless.status, 1, "不点名的结论没人能接");
   assert.match(nameless.stderr, /--rework/);

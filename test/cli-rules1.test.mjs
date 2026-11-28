@@ -14,8 +14,7 @@ import { applyGate, gatesOf } from "../board/gates.mjs";
 import {
   CLI, OFF, deed, later, gate, judgeAll, judgeHere, signHere, judged, kinds, briefs, proof,
   writeLines, planFile, writePlan, readPlan,
-  addTask, deliverTask, undoDelivery, dropTask,
-} from "./support/cli.mjs";
+  addTask, deliverTask, undoDelivery, dropTask,startReview, startPeriodReview} from "./support/cli.mjs";
 
 
 test("init binds the workspace and records the first turn", () => {
@@ -56,19 +55,19 @@ test("a period with one segment still owes the period judgement, and that judgem
   fs.writeFileSync(path.join(cwd, "core", "a.mjs"), "a\n");
   addTask(cwd, "甲", "能跑", "--files", "core/a.mjs");
   deliverTask(cwd, "T1", "node --test");
-  const alone = judged(cwd, "review", "--all");
+  const alone = startPeriodReview(cwd);
   assert.equal(alone.status, 1, "整期上没有审查这件事");
-  assert.match(alone.stderr, /--all/);
+  assert.match(alone.stderr, /不到期审的时候|只在面板上按/);
   assert.equal(readEvents(cwd).filter((one) => one.k === "review.brief").length, 0, "被拒的一个字都不写");
-  deed(cwd, "review", "--segment", "S01.1");
+  startReview(cwd, "S01.1");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   const state = deed(cwd, "state");
   assert.equal(state.status, 0);
   assert.match(state.stdout, /下一步 · user · 判决/, "审查通过之后轮到你判这一段");
   assert.equal(judgeHere(cwd, "S01.1").status, 0);
-  assert.match(deed(cwd, "state").stdout, /下一步 · reviewer · 期审/, "判过之后轮到这一期做成的样子");
+  assert.match(deed(cwd, "state").stdout, /下一步 · user · 开始期审/, "判过之后轮到这一期做成的样子");
   assert.match(deed(cwd, "state").stdout, /deed review --all/u, "期审有它自己的命令");
-  assert.equal(judged(cwd, "review", "--all").status, 0);
+  assert.equal(startPeriodReview(cwd).status, 0);
   const sheet = briefs(cwd)
     .filter((one) => one.startsWith("S01-period-") && !one.endsWith("-reviewer.md"))
     .map((one) => fs.readFileSync(path.join(cwd, ".deed", "review", one), "utf8")).at(-1);
@@ -95,7 +94,7 @@ test("a closed period cannot be written into, and no verb invents a new one", ()
   // 交付落在免审路径上，这一段才封得掉（审查设置只 exempt docs/**）。
   assert.equal(deliverTask(cwd, "T1", "写完了", { file: "docs/a.md" }).status, 0);
   assert.equal(deed(cwd, "review", "--skip", "--why", "只改了文档").status, 0);
-  judged(cwd, "review", "--all");
+  startPeriodReview(cwd);
   assert.equal(judged(cwd, "review", "--all", "--verdict", "pass").status, 0);
   signHere(cwd, "可以");
   const after = readEvents(cwd).length;

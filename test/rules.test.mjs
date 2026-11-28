@@ -143,7 +143,7 @@ test("the last segment closed is not the end: the period still needs its own jud
     add(6, "T2", ["core/b.mjs"]), done(7, "T2"), sealed(8, "S01.2"),
   ]);
   assert.deepEqual(signBlockers(doc, doc.sessions[0], config), [PERIOD_OWED]);
-  assert.equal(nextAction(doc, config).what, "期审");
+  assert.equal(nextAction(doc, config).what, "开始期审");
   const after = fold([
     turn(1), goal(2),
     add(3, "T1", ["core/a.mjs"]), done(4, "T1"), sealed(5),
@@ -177,7 +177,7 @@ test("a brief handed out after the last change is answered, not replaced", () =>
   const old = fold(base);
   // 签收核对把它那条结论作废了：这一段回到没人判过的样子，不是「结论旧了」。
   assert.equal(reviewState(config, old.sessions[0], old.sessions[0].segments[0]), "missing");
-  assert.equal(nextAction(old, config).what, "重审", "手上那份早于最后一次交付：另出一份");
+  assert.equal(nextAction(old, config).what, "重新开始审查", "手上那份早于最后一次交付：等人在面板上另起一份");
   const fresh = fold([...base,
     { v: 6, at: T(12), k: "review.brief", s: null, segment: "S01.1", brief: "S01.1-2.md", briefDigest: "d".repeat(64) },
   ]);
@@ -210,11 +210,12 @@ test("the next step names one actor and one action", () => {
   assert.equal(nextAction(todo, config).who, "agent");
   assert.match(nextAction(todo, config).text, /T1/);
   const unreviewed = fold([turn(1), add(2, "T1", ["core/x.mjs"]), done(3, "T1")]);
-  assert.equal(nextAction(unreviewed, config).who, "reviewer");
-  assert.match(nextAction(unreviewed, config).command, /deed review --segment S01\.1/, "下一步只出清单,不替人写结论");
+  assert.equal(nextAction(unreviewed, config).who, "user");
+  assert.match(nextAction(unreviewed, config).text, /开始审查/, "下一步是人在面板上开审，不是替人出清单");
+  assert.match(nextAction(unreviewed, config).command, /deed panel/);
   const judged = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4)]);
-  assert.equal(nextAction(judged, config).what, "期审", "段判过了，下一步是这一期做成的样子");
-  assert.match(nextAction(judged, config).command, /deed review --all/u);
+  assert.equal(nextAction(judged, config).what, "开始期审", "段判过了，下一步是这一期做成的样子（面板上按）");
+  assert.match(nextAction(judged, config).command, /deed panel/u);
   const afterPeriod = fold([turn(1), add(2, "T1", ["docs/a.md"]), done(3, "T1"), pass(4), ...periodPass(6)]);
   assert.equal(nextAction(afterPeriod, config).what, "签收");
 });
@@ -232,7 +233,7 @@ test("a period whose segments all sat out review signs without anything else", (
   ]);
   const session = doc.sessions[0];
   assert.deepEqual(signBlockers(doc, session, config), [PERIOD_OWED], "免审的段也一样要有人判这一期");
-  assert.equal(nextAction(doc, config).what, "期审");
+  assert.equal(nextAction(doc, config).what, "开始期审");
 });
 // 规模由数得出来的事实说话：几个文件、多少字节、跨了几个顶层目录。
 // 免审是给"看起来很小"的改动留的口子，不是给"说自己很小"的。
@@ -360,7 +361,7 @@ test("an old period verdict is history: the segment it named reopens, nothing el
     { v: 18, at: T(10), k: "review.log", s: null, segment: "S01.1", by: "qa2", verdict: "pass", brief: "b.md", briefDigest: "a".repeat(64), findings: [] },
   ]);
   assert.deepEqual(signBlockers(reopened, reopened.sessions[0], config), [PERIOD_OWED], "段重新判过，这一期还差期审");
-  assert.equal(nextAction(reopened, config).what, "期审");
+  assert.equal(nextAction(reopened, config).what, "开始期审");
 });
 
 
