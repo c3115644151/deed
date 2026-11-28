@@ -305,9 +305,11 @@ export function planWhole(root, session, at) {
         stamp0(review.at) + " · " + count + " 条" +
         (review.findings.length > 0 ? " · " + review.findings.length + " 条发现" : "") +
         (review.rework.length > 0 ? " · 退回 " + review.rework.join("、") : "");
+    // 封存的理由写在账本上（sealedWhy）。别替它编一句"审查设置说这一段不用审"：
+    // 有的段是"没有可审的活"封的，那句话就是假的。
     if (segment.sealedBy)
-      return "- " + segment.id + " · 免审封存 · " + segment.sealedBy + " · " + stamp0(segment.closedAt) + " · " + count + " 条 · 审查设置说这一段不用审" +
-        (segment.sealedWhy ? "（" + segment.sealedWhy + "）" : "");
+      return "- " + segment.id + " · 封存 · " + segment.sealedBy + " · " + stamp0(segment.closedAt) + " · " + count + " 条" +
+        (segment.sealedWhy ? " · 凭什么：" + segment.sealedWhy : "");
     return "- " + segment.id + " · 没有结论 · " + count + " 条";
   };
   const findings = session.segments.flatMap((segment) => {

@@ -94,9 +94,9 @@ test("the wake message carries the verdict in full, not just the names", () => {
   assert.doesNotMatch(text, /T97 · met/u, "达成的只报数，不逐条念");
 });
 
-// 审查开始也是执行链上的一步：清单交出去了、有人在读，作者不该靠猜自己现在在等什么。
-// 只出清单、还没人落结论的时候，也要叫一次。
-test("a sheet going out is a step of the chain too: the author hears it, once", async () => {
+// 叫人只认"事情有了结果"：清单出门只是有人在读，屏上看得见——把它也当成叫醒，
+// 就会变成"出清单 → 叫作者 → 作者动手 → 又出清单"的轮子。
+test("a sheet going out does not wake the author; a verdict does", async () => {
   const cwd = workspace("adapter-verdicts-brief");
   deed(cwd, "init", "--said", "开始");
   addTask(cwd, "做一", "跑得通");
@@ -110,32 +110,33 @@ test("a sheet going out is a step of the chain too: the author hears it, once", 
 
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "系统把清单交出去");
   await pollVerdicts({ root: cwd, agent, state });
-  assert.equal(said.length, 1, "清单出门 → 叫一次");
-  const text = said[0].content.map((one) => one.text).join("\n");
-  assert.match(text, /审查清单发出去了/u);
-  assert.match(text, /等结论/u);
+  assert.equal(said.length, 0, "清单出门不叫人");
 
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status, 0);
   await pollVerdicts({ root: cwd, agent, state });
-  assert.equal(said.length, 1, "同一份清单只叫一次");
+  assert.equal(said.length, 1, "结论写进账本才叫人");
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(said.length, 1, "同一条只叫一次");
 });
 
-// 重启那一刻刚好有一份清单出门：那是"刚刚发生的事"，不是旧账，作者得听到。
+// 重启那一刻刚好有一份结论落下：那是"刚刚发生的事"，不是旧账，作者得听到。
 // 以前第一次轮询只记水线，把这一条也一起吞了——屏幕上什么都没发生，人以为链断了。
-test("a sheet written while the watcher is starting is news, not history", async () => {
+test("a verdict written while the watcher is starting is news, not history", async () => {
   const cwd = workspace("adapter-verdicts-restart");
   deed(cwd, "init", "--said", "开始");
   addTask(cwd, "做一", "跑得通");
   deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
 
   const since = new Date().toISOString();
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单在起这条线之后才出门");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status, 0, "结论在起这条线之后才落");
 
   const said = [];
   const agent = { status: "idle", followup: (message) => said.push(message) };
   const state = { watermark: null, since };
   await pollVerdicts({ root: cwd, agent, state });
-  assert.equal(said.length, 1, "重启之后刚写的清单也要说一句");
-  assert.match(said[0].content.map((one) => one.text).join("\n"), /审查清单发出去了/u);
+  assert.equal(said.length, 1, "重启之后刚落的结论也要说一句");
+  assert.match(said[0].content.map((one) => one.text).join("\n"), /不合格/u);
 });
 
 // 排队会滞后：这条消息可能十几分钟后才送到，那时账本早走远了。每条都带账本时间。
@@ -148,7 +149,8 @@ test("every wake line says when it happened in the ledger", async () => {
   const agent = { status: "idle", followup: (message) => said.push(message) };
   const state = { watermark: null };
   await pollVerdicts({ root: cwd, agent, state });
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单在记账之后才出门");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status, 0);
   await pollVerdicts({ root: cwd, agent, state });
   const text = said[0].content.map((one) => one.text).join("\n");
   assert.match(text, /（\d{2}:\d{2}:\d{2}Z）/u, "带了账本上的时刻");
@@ -165,10 +167,16 @@ test("a running author gets one queued wake, not a stack of them", async () => {
   const agent = { status: "running", send: (message, target) => queued.push({ message, target }) };
   const state = { watermark: null };
   await pollVerdicts({ root: cwd, agent, state });
-  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单出门");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单出去");
   await pollVerdicts({ root: cwd, agent, state });
-  assert.equal(queued.length, 1, "第一条排队");
+  assert.equal(queued.length, 0, "清单出门不排队");
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status, 0);
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(queued.length, 1, "一条结论排队");
+  // 同一轮里又落一条（另一份清单的结论）：已经有一条排着，不再往里塞。
+  deliverTask(cwd, "T1", "跑：改了一版", { file: "a.md" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0);
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result-all", "met").status, 0);
   await pollVerdicts({ root: cwd, agent, state });
   assert.equal(queued.length, 1, "已经有一条排着，不再往里塞");
 });

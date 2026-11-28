@@ -96,10 +96,8 @@ test("the same segment's review goes back to the same agent; a period review get
   fs.writeFileSync(path.join(cwd, "a.md"), "改动 · 第二版\n");
   deliverTask(cwd, "T1", "跑：跑得通 v2", { file: "a.md" });
   assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "出第二份清单");
-  console.log("DEBUG due", deed(cwd, "review", "--due").stdout.trim());
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
   const sent = await waitFor(() => messaged.length >= 1);
-  if (!sent) console.log("DEBUG log\n" + logText(cwd));
   assert.ok(sent, "把第二份发回给同一个审查者");
   assert.equal(started.length, firstChild, "没有再起一个审查者");
   assert.equal(messaged[0].childId, "child-1", "发回的是第一个那个");

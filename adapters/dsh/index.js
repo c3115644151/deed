@@ -379,6 +379,28 @@ export function apply(ctx, config = {}) {
     return { childId: run?.childId ?? run?.id, api: "start", result: run?.result };
   };
 
+  // 名册上那一份是不是已经有人回答过：账本里 review.log／verdict.pass 带着 brief 路径。
+  // 读账本尾巴就够，不必把整本重放一遍。
+  const answeredBriefs = (root) => {
+    try {
+      const dir = path.join(root, ".deed", "log");
+      const names = fs.readdirSync(dir).filter((one) => one.endsWith(".jsonl")).sort().slice(-2);
+      const seen = [];
+      for (const name of names) {
+        for (const line of fs.readFileSync(path.join(dir, name), "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const ev = JSON.parse(line);
+            if (ev.brief && (ev.k === "review.log" || ev.k === "verdict.pass")) seen.push(ev.brief);
+          } catch {}
+        }
+      }
+      return seen;
+    } catch {
+      return [];
+    }
+  };
+
   const deliver = async (root, due) => {
     const subagents = ctx.get("subagents") ?? ctx.subagents ?? null;
     // 起子代理要「精确的在线父级」：先问 agent 注册表，再退回事件里抓到的那一个。
@@ -393,6 +415,15 @@ export function apply(ctx, config = {}) {
     const key = handKey(due);
     loadHands(root);
     if (inflight.has(key)) return; // 同一份材料只起一次：并发问两次会起两个审查者
+    // 这个工作区一次只判一件事：手上已经有别人在判（他的那一份还没被回答），就等它落结论。
+    // 同时起好几个审查者，先是消息排队，接着就是"判 → 叫醒 → 再判"的轮子。
+    // 已经回答过的那一份不算"在判"：那个审查者是空闲的，同一段的新一份还要发回给他。
+    const answered = answeredBriefs(root);
+    const busy = [...hands.entries()].filter(([, one]) => one.brief && !answered.includes(one.brief));
+    if (busy.length > 0 && !busy.some(([old]) => old === key)) {
+      note(root, "已经有人在判（" + busy.map(([old]) => old).join("、") + "） · 等它落结论 · 不再另起");
+      return;
+    }
 
     // 重载或重启之后内存里的那张表没了：先去父会话的子代理目录里找同名的那一个。
     // 找回来就接着给它发消息，而不是另起一个——同一份材料不该有两个读者。

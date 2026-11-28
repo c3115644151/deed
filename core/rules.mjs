@@ -128,6 +128,17 @@ function sizeOf(tasks, sizes = {}) {
   return { files: files.length, bytes, unknown, dirs: dirs.size, list: files };
 }
 
+// 这一段此刻有没有可判的东西：一条交付都没有、也没有在案结论时，出清单只是让审查者
+// 去读"这一段什么也没做"。以前这里只数条目数，于是三条放弃的段也起了一次审查。
+// 已经有结论在案的段不算：打回之后条目被放弃，那一份结论仍要落回来（它要记下"点名的那条
+// 改主意不做了"）——没有结论，这一段关不掉。
+export const reviewable = (session, segment) => {
+  if (!segment) return false;
+  const tasks = tasksIn(session, segment);
+  const judged = (session.reviews ?? []).some((one) => one.segment === segment.id && one.voidedAt === null);
+  return judged || tasks.some((one) => one.status === "done" || one.status === "accepted");
+};
+
 export function needsReview(config, session, segment) {
   // 封存是账本上已经做出的决定：这一段按当时的事实不用审。后来把审查设置写细了，
   // 也不回头改写它——否则一次收紧就能把关闭过的段重新算成"少一份结论"，
@@ -295,9 +306,11 @@ export function reviewState(config, session, segment) {
 // 这个判断只在这里写一遍：签收、下一步、verify 报的空交付都从它出。
 export const pointsAtNothing = (proof) =>
   !proof ||
-  ((proof.files ?? []).length === 0 && !proof.path &&
-
-  (proof.changed ?? []).length === 0);
+  ((proof.files ?? []).length === 0 &&
+    !proof.path &&
+    (proof.changed ?? []).length === 0 &&
+    // 交付也可以指着一条当场跑得出来的现象（submit 收的就是这个）：那不是"没指着"。
+    (proof.expects ?? []).length === 0);
 
 // 复核得靠内容：要审的段里，每条现行交付都得指着点什么。
 export const unpinned = (session, segment) =>
@@ -407,12 +420,23 @@ export function reviewDue(doc, config = null) {
   if (verdictStands(session, segment)) return null;
   // 审查设置说这一段不用审：它的结局是 agent 封存，不是一份没人答的卷子。
   if (config && !needsReview(config, session, segment)) return null;
+  // 一条交付都没有（全是没做、或全是放弃）：没有可判的东西，不出清单。
+  if (!reviewable(session, segment)) return null;
   // 还有没交的条目：清单上写的东西还没成形，出了也是旧的。
   if (tasksIn(session, segment).some((one) => one.status === "todo")) return null;
   const hand = handOf(segment.id);
   const handed = freshBrief(session, segment);
   if (handed)
     return { kind: "segment", segment: segment.id, needs: "verdict", hand, brief: handed.brief, guide: handed.guide ?? null };
+  // 出清单要有理由：**自上一份结论以来，这一段真的变过**。
+  // 少了这一条，一次不合格之后会立刻再出一份清单——判的是同一批字节、同一个问题，
+  // 于是"判 → 不合格 → 再判"自己转起来：审查者一个接一个起，作者被一次次叫醒，
+  // 而中间没有任何人改过东西。回不合格之后该动手的是作者，不是审查者。
+  const judged = reviewOf(session, segment);
+  if (judged) {
+    const moved = lastSegmentChange(session, segment);
+    if (moved === null || moved <= judged.at) return null;
+  }
   return { kind: "segment", segment: segment.id, needs: "brief", hand };
 }
 
@@ -424,7 +448,7 @@ export function signBlockers(doc, session, config = null) {
   if (shut) {
     // 要审的段等审查者的 pass；免审的段等交付的人写清凭什么不审。同一句「还没有审查通过」
     // 放在免审段上是假话——没人会来审它。
-    const owed = config ? needsReview(config, session, shut) : true;
+    const owed = config ? needsReview(config, session, shut) && reviewable(session, shut) : true;
     if (awaitingJudgement(session, shut) && verdictStands(session, shut))
       blockers.push(shut.id + " 审查通过了，等你判决（这一段过不过，不是审查者说了算）");
     else
@@ -465,7 +489,11 @@ export function signBlockers(doc, session, config = null) {
       .filter((segment) => needsReview(config, session, segment))
       .flatMap((segment) => unpinned(session, segment));
     if (bare.length > 0)
-      blockers.push("这些交付没记下任何文件（" + bare.map((one) => one.id).join("、") + "）：签收前记下一个文件");
+      blockers.push(
+        "这些交付什么也没指着（" +
+          bare.map((one) => one.id).join("、") +
+          "）：要么记下一个文件，要么在交付里写一条当场能跑出来的 期望：",
+      );
   }
   return blockers;
 }
@@ -777,7 +805,15 @@ export function sealBlockers(config, session, segment = openSegment(session)) {
   const live = session.reviews.filter((one) => one.segment === segment.id && one.voidedAt === null);
   if (live.length > 0)
     blockers.push("这一段已经有审查结论：结局由那份结论定（要改就开新一期）");
-  if (needsReview(config, session, segment))
+  // 手上还挂着一份没人回答的清单：封存会让它成为一件没人结的账（而且它本来也不该在
+  // 这段的字节已经不用审之后还存在）。先撤回那一份，再封。
+  const handed = lastBrief(session, segment.id);
+  if (handed && handed.answeredBy === null && handed.withdrawnAt === undefined)
+    blockers.push(
+      `这一段还有一份交出去、没人回答的清单（${handed.brief}）：先撤回它（deed review --segment ${segment.id} --withdraw --why "…"）再封存`,
+    );
+  // 要审，而且此刻确实有可判的东西：一条交付都没有的段，结局是"没有可审的"，封就封。
+  if (needsReview(config, session, segment) && reviewable(session, segment))
     blockers.push(`这一段按审查设置要审：结局得由审查者的结论落（deed review --segment ${segment.id}）`);
   return blockers;
 }

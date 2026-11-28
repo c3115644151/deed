@@ -16,6 +16,8 @@ import {
   pointsAtNothing,
   sealBlockers,
   signBlockers,
+  reviewable,
+  unpinned,
 } from "../core/rules.mjs";
 
 const config = { review: { required: ["src/**", "core/**", "apps/**"], exempt: ["docs/**", "*.md"] } };
@@ -527,4 +529,18 @@ test("a fail after a pass takes the segment back into execution, not into judgem
   assert.equal(seg.verdict, null, "段头不再挂 pass");
   assert.equal(awaitingJudgement(session, seg), false, "不再等你判决");
   assert.equal(onTheSheet(session, "S01.1", "T1"), false, "清单已经回答过，这一段不再冻着");
+});
+
+// 一次不合格之后立刻再出一份清单，判的是同一批字节、同一个问题：审查者一个接一个起，
+// 作者被一次次叫醒，中间没人改过东西。出清单要有理由——自上一份结论以来这一段变过。
+test("a fail without new work does not summon another sheet", () => {
+  const ledger = [
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), done(4, "T1"),
+    { v: 36, at: T(5), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "a.md", guide: "a-r.md", tasks: ["T1"] },
+    { v: 35, at: T(6), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "fail", brief: "a.md", findings: [], rework: ["T1"], why: "没过", results: [{ id: "T1", verdict: "unmet" }] },
+  ];
+  const doc = fold(ledger);
+  assert.equal(reviewDue(doc, config), null, "没有新改动：不出清单，该动手的是作者");
+  const moved = fold([...ledger, { v: 1, at: T(7), k: "task.done", s: null, id: "T1", evidence: "改了一版", by: "agent", digest: "c".repeat(64), digestPath: "core/fold.mjs", changed: ["core/fold.mjs"], bytes: { "core/fold.mjs": 90 } }]);
+  assert.equal(reviewDue(moved, config)?.needs, "brief", "改过之后才出清单");
 });

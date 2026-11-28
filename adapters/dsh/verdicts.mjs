@@ -7,7 +7,10 @@ import { randomUUID } from "node:crypto";
 //
 // 为什么不用子代理自己的完成通知：审查者是另一个进程里的独立会话，它的结束提示回的是
 // 它自己的父会话，主会话这边收不到。盯账本这条路与谁起的审查者无关，因此可靠。
-const KINDS = new Set(["review.log", "review.brief", "verdict.pass", "review.overturn", "sign", "segment.seal"]);
+// 叫人只认"事情有了结果"：结论、判决、推翻、签收、封存。清单出门（review.brief）不叫——
+// 它只是"有人在读"，屏上看得见；把它也当成叫醒，就会变成"出清单 → 叫作者 → 作者动手 →
+// 又出清单"的轮子，一轮一轮把自己转起来。
+const KINDS = new Set(["review.log", "verdict.pass", "review.overturn", "sign", "segment.seal"]);
 
 // 一条结论的完整模样：结论本身、为什么、逐条判定、发现。作者要照着改，
 // 只告诉他"打回了哪几条"不够——他得知道每条为什么没过、还有哪些话没被采纳。
@@ -44,11 +47,6 @@ export function say(row, doc) {
     return row.verdict === "pass"
       ? "审查结论落好了 · " + scope + " · 通过（等你判决）"
       : "审查结论落好了 · " + scope + " · 不合格" + (rework ? " · 点名 " + rework : "");
-  }
-  // 审查开始也是执行链上的一步：清单交出去了、有人在读，作者不该靠猜自己现在在等什么。
-  if (row.k === "review.brief") {
-    const scope = row.scope === "session" ? "整期" : segment;
-    return "审查清单发出去了 · " + scope + " · " + String(row.brief ?? "") + "（交给审查者，等结论写进账本）";
   }
   if (row.k === "verdict.pass") return "判决通过 · " + segment + "（这一段关了）";
   if (row.k === "review.overturn") return "结论被推翻 · " + segment + " · " + String(row.why ?? "").slice(0, 80);

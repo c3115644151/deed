@@ -767,3 +767,138 @@
 {"at":"2026-11-28T10:28:46.667Z","verb":"review","code":0,"ms":36,"switches":["--due"],"why":null,"v":"0.34.0"}
 {"at":"2026-11-28T10:28:47.072Z","verb":"review","code":0,"ms":65,"switches":["--due"],"why":null,"v":"0.34.0"}
 {"at":"2026-11-28T10:28:50.289Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:32:55.060Z","verb":"state","code":0,"ms":92,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:32:55.305Z","verb":"point","code":0,"ms":68,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:32:57.528Z","verb":"review","code":0,"ms":55,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:33:13.307Z","verb":"reply","code":0,"ms":122,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:33:13.578Z","verb":"review","code":0,"ms":44,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:33:14.450Z","verb":"review","code":0,"ms":60,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:33:51.305Z","verb":"reply","code":0,"ms":101,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:33:53.701Z","verb":"review","code":0,"ms":63,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:37:07.083Z","verb":"review","code":1,"ms":67,"switches":["--segment","--verdict","--result","--finding"],"why":"--result 的写法是 T1=met 或 T2=unmet:为什么（判定只有 met／unmet／unknown）：test/cli-work2.test.mjs:779-789 在没挪过的 T1 上写 理由：只是试试 → exit 1 并回「T1 没有改到下一段，也没有交付或放弃可撤回：这行 理由： 没有可撤的东西」；实测 node --test test/cli-work2.test.mjs => pass 26 fail 0；变异 cli/verbs/submit.","v":"0.34.0"}
+{"at":"2026-11-28T10:38:15.401Z","verb":"serve","code":0,"ms":53,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:38:15.510Z","verb":"review","code":1,"ms":434,"switches":["--segment","--verdict","--result"],"why":"probe stop","v":"0.34.0"}
+{"at":"2026-11-28T10:38:34.346Z","verb":"serve","code":0,"ms":59,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:38:34.596Z","verb":"review","code":0,"ms":574,"switches":["--segment","--verdict","--result","--finding"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:38:34.939Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:38:35.185Z","verb":"review","code":0,"ms":54,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:38:49.429Z","verb":"state","code":0,"ms":122,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:39:03.786Z","verb":"panel","code":0,"ms":9,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:39:19.401Z","verb":"reply","code":0,"ms":93,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:39:19.663Z","verb":"review","code":0,"ms":53,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T10:39:24.146Z","verb":"state","code":0,"ms":106,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:32:33.896Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:32:34.454Z","verb":"say","code":0,"ms":90,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:32:34.978Z","verb":"review","code":0,"ms":60,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:33:15.898Z","verb":"panel","code":0,"ms":14,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:33:16.138Z","verb":"serve","code":0,"ms":56,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:34:03.359Z","verb":"reply","code":0,"ms":134,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:34:03.652Z","verb":"review","code":0,"ms":61,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:38:46.613Z","verb":"review","code":0,"ms":42,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:38:46.823Z","verb":"review","code":0,"ms":41,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:39:01.444Z","verb":"state","code":0,"ms":135,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:39:19.596Z","verb":"check","code":0,"ms":103,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:21.740Z","verb":"check","code":0,"ms":92,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:43.487Z","verb":"submit","code":0,"ms":230,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:44.166Z","verb":"review","code":0,"ms":81,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:44.574Z","verb":"review","code":0,"ms":144,"switches":["--segment","--auto"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:45.054Z","verb":"review","code":0,"ms":105,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:45.836Z","verb":"review","code":0,"ms":104,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:40:48.496Z","verb":"review","code":0,"ms":58,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:41:11.544Z","verb":"state","code":0,"ms":131,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:41:31.927Z","verb":"state","code":0,"ms":132,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:41:37.366Z","verb":"reply","code":0,"ms":135,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:41:37.686Z","verb":"review","code":0,"ms":81,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:41:38.800Z","verb":"review","code":0,"ms":59,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:42:21.430Z","verb":"reply","code":0,"ms":177,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:42:24.133Z","verb":"review","code":0,"ms":51,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:45:34.566Z","verb":"review","code":0,"ms":57,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:45:35.090Z","verb":"say","code":0,"ms":99,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:45:37.863Z","verb":"review","code":0,"ms":56,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:46:11.417Z","verb":"review","code":0,"ms":124,"switches":["--segment","--withdraw","--why"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:46:11.679Z","verb":"review","code":1,"ms":55,"switches":["--segment","--skip","--why"],"why":"这一段不能封存：这一段按审查设置要审：结局得由审查者的结论落（deed review --segment S02.21）","v":"0.34.0"}
+{"at":"2026-11-28T11:46:14.820Z","verb":"review","code":0,"ms":62,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:46:15.184Z","verb":"review","code":0,"ms":124,"switches":["--segment","--auto"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:46:15.465Z","verb":"review","code":0,"ms":67,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:46:18.755Z","verb":"review","code":0,"ms":51,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:01.306Z","verb":"review","code":0,"ms":172,"switches":["--segment","--skip","--why"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:02.380Z","verb":"serve","code":0,"ms":117,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:04.292Z","verb":"review","code":0,"ms":74,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:04.683Z","verb":"review","code":0,"ms":145,"switches":["--all","--auto"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:05.101Z","verb":"review","code":0,"ms":118,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:05.667Z","verb":"review","code":0,"ms":70,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:08.660Z","verb":"review","code":0,"ms":90,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:09.188Z","verb":"review","code":0,"ms":88,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:49.963Z","verb":"state","code":0,"ms":371,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:47:54.298Z","verb":"state","code":0,"ms":173,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:48:12.022Z","verb":"state","code":0,"ms":154,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:48:12.376Z","verb":"review","code":0,"ms":120,"switches":["--due","--segment"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:48:51.567Z","verb":"review","code":1,"ms":107,"switches":["--segment","--verdict","--rework","--result","--result","--why"],"why":"段 S02.21 已经封存，结论不能再落","v":"0.34.0"}
+{"at":"2026-11-28T11:50:51.624Z","verb":"serve","code":0,"ms":85,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:50:51.813Z","verb":"review","code":0,"ms":540,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:51:34.711Z","verb":"serve","code":0,"ms":257,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:52:27.961Z","verb":"serve","code":0,"ms":172,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:53:56.756Z","verb":"serve","code":0,"ms":89,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:52.159Z","verb":"review","code":0,"ms":292,"switches":["--all","--verdict","--rework","--why","--finding","--finding","--finding","--finding","--finding","--finding"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:53.004Z","verb":"serve","code":0,"ms":114,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:55.307Z","verb":"review","code":0,"ms":67,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:55.662Z","verb":"review","code":0,"ms":120,"switches":["--segment","--auto"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:55.962Z","verb":"review","code":0,"ms":64,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:56.645Z","verb":"review","code":0,"ms":72,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:55:59.576Z","verb":"review","code":0,"ms":96,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:56:42.422Z","verb":"state","code":0,"ms":126,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:57:31.072Z","verb":"reply","code":0,"ms":112,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:57:31.953Z","verb":"review","code":0,"ms":72,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:57:32.480Z","verb":"review","code":0,"ms":57,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:59:04.622Z","verb":"serve","code":0,"ms":208,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T11:59:31.691Z","verb":"state","code":0,"ms":179,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:00:48.663Z","verb":"review","code":0,"ms":173,"switches":["--all","--verdict","--rework","--why","--finding","--finding","--finding","--finding","--finding","--finding"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:00:49.473Z","verb":"serve","code":0,"ms":107,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:00:51.923Z","verb":"review","code":0,"ms":51,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:01:05.857Z","verb":"serve","code":0,"ms":103,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:01:18.074Z","verb":"state","code":0,"ms":115,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:02:25.245Z","verb":"review","code":0,"ms":50,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:02:26.179Z","verb":"say","code":0,"ms":139,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:02:27.098Z","verb":"serve","code":0,"ms":92,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:02:29.333Z","verb":"review","code":0,"ms":69,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:02:44.433Z","verb":"state","code":0,"ms":123,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:03:25.953Z","verb":"state","code":0,"ms":134,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:03:26.273Z","verb":"review","code":0,"ms":106,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:03:59.401Z","verb":"review","code":0,"ms":238,"switches":["--segment","--verdict","--result","--finding"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:04:01.069Z","verb":"review","code":0,"ms":63,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:04:07.157Z","verb":"state","code":0,"ms":131,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:04:45.422Z","verb":"review","code":0,"ms":141,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:06:15.941Z","verb":"reply","code":0,"ms":110,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:06:16.900Z","verb":"review","code":0,"ms":59,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:06:17.499Z","verb":"review","code":0,"ms":66,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:07:01.349Z","verb":"submit","code":1,"ms":8,"switches":[],"why":"清单有 8 处看不懂，一个字都没落：","v":"0.34.0"}
+{"at":"2026-11-28T12:07:17.397Z","verb":"submit","code":0,"ms":226,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:07:17.608Z","verb":"review","code":0,"ms":50,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:07:38.880Z","verb":"serve","code":0,"ms":91,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:08:34.164Z","verb":"say","code":0,"ms":228,"switches":["--from"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:08:35.356Z","verb":"serve","code":0,"ms":130,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:08:35.513Z","verb":"review","code":0,"ms":110,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:09:23.824Z","verb":"serve","code":0,"ms":73,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:10:52.009Z","verb":"serve","code":0,"ms":81,"switches":["--port"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:26:28.098Z","verb":"submit","code":0,"ms":42704,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:26:30.276Z","verb":"review","code":0,"ms":51,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:26:44.077Z","verb":"submit","code":1,"ms":195,"switches":[],"why":"T173 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几","v":"0.34.0"}
+{"at":"2026-11-28T12:26:45.023Z","verb":"submit","code":1,"ms":177,"switches":[],"why":"T174 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几","v":"0.34.0"}
+{"at":"2026-11-28T12:26:45.507Z","verb":"submit","code":1,"ms":224,"switches":[],"why":"T175 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几","v":"0.34.0"}
+{"at":"2026-11-28T12:27:26.280Z","verb":"submit","code":0,"ms":455,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:27:26.643Z","verb":"submit","code":1,"ms":172,"switches":[],"why":"T174 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几","v":"0.34.0"}
+{"at":"2026-11-28T12:27:27.046Z","verb":"submit","code":1,"ms":182,"switches":[],"why":"T175 勾上了，但没有写一行 交付：——勾上就是交付，得写清跑了什么、结果几比几","v":"0.34.0"}
+{"at":"2026-11-28T12:27:30.496Z","verb":"review","code":0,"ms":58,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:28:25.813Z","verb":"submit","code":1,"ms":41848,"switches":[],"why":"T173 的勾去掉了，但没有写一行 理由：——撤回一条交付得说清为什么","v":"0.34.0"}
+{"at":"2026-11-28T12:28:26.388Z","verb":"submit","code":1,"ms":381,"switches":[],"why":"T173 的勾去掉了，但没有写一行 理由：——撤回一条交付得说清为什么","v":"0.34.0"}
+{"at":"2026-11-28T12:28:42.317Z","verb":"submit","code":1,"ms":6,"switches":[],"why":"清单有 1 处看不懂，一个字都没落：","v":"0.34.0"}
+{"at":"2026-11-28T12:29:57.082Z","verb":"submit","code":1,"ms":41732,"switches":[],"why":"T173 的勾去掉了，但没有写一行 理由：——撤回一条交付得说清为什么","v":"0.34.0"}
+{"at":"2026-11-28T12:30:57.380Z","verb":"submit","code":1,"ms":43376,"switches":[],"why":"这一批勾了 2 条交付（T174、T175）：一次只交一条——先交此刻在做的那一条（deed state 说是 T174），写完 交付： 提交一次，再做下一条。账本一个字都没动","v":"0.34.0"}
+{"at":"2026-11-28T12:31:54.067Z","verb":"submit","code":0,"ms":41195,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:31:55.981Z","verb":"review","code":0,"ms":44,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:32:08.735Z","verb":"submit","code":0,"ms":462,"switches":[],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:32:12.068Z","verb":"review","code":0,"ms":62,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:32:12.401Z","verb":"review","code":0,"ms":115,"switches":["--segment","--auto"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:32:12.666Z","verb":"review","code":0,"ms":51,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:32:13.598Z","verb":"review","code":0,"ms":68,"switches":["--due"],"why":null,"v":"0.34.0"}
+{"at":"2026-11-28T12:32:16.068Z","verb":"review","code":0,"ms":63,"switches":["--due"],"why":null,"v":"0.34.0"}

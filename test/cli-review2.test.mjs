@@ -668,3 +668,33 @@ test("a fail reopens what it named, and the next sheet does not re-expand the re
   const sheet = doc.sessions[0].briefs.at(-1);
   assert.deepEqual(sheet.tasks, ["T2"], "只展开被点名的那条；T1 的判定沿用");
 });
+
+// 封存前要看清手上还有没有没回答的清单：有的话，封了它就是一件没人结的账。
+test("sealing over a sheet nobody answered is refused, and says which one", () => {
+  const cwd = workspace("seal-over-sheet");
+  deed(cwd, "init", "--said", "开始", "--review", "docs/**");
+  addTask(cwd, "写文档", "有");
+  fs.writeFileSync(path.join(cwd, "a.md"), "x\n");
+  deliverTask(cwd, "T1", "写了", { file: "a.md" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单出门");
+  const skip = deed(cwd, "review", "--segment", "S01.1", "--skip", "--why", "想省一道");
+  assert.equal(skip.status, 1);
+  assert.match(skip.stdout + skip.stderr, /还有一份交出去、没人回答的清单/u);
+  assert.match(skip.stdout + skip.stderr, /--withdraw/u, "指路先撤回");
+});
+
+// 清单抬头只说账本上记的那句凭什么，不替封存编"审查设置说这一段不用审"。
+test("the sheet prints the reason the ledger holds, not a stock sentence", () => {
+  const cwd = workspace("seal-reason");
+  deed(cwd, "init", "--said", "开始", "--review", "docs/**");
+  addTask(cwd, "写文档", "有");
+  dropTask(cwd, "T1", "这一期不做了");
+  const sealed = deed(cwd, "review", "--segment", "S01.1", "--skip", "--why", "一条交付都没有，没有可审的");
+  assert.equal(sealed.status, 0, sealed.stdout + sealed.stderr);
+  const all = judged(cwd, "review", "--all");
+  assert.equal(all.status, 0, all.stdout + all.stderr);
+  const file = readEvents(cwd).filter((one) => one.k === "review.brief" && one.scope === "session").at(-1).brief;
+  const text = fs.readFileSync(path.join(cwd, file), "utf8");
+  assert.match(text, /凭什么：一条交付都没有，没有可审的/u);
+  assert.doesNotMatch(text, /审查设置说这一段不用审/u);
+});
