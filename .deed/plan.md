@@ -13,7 +13,10 @@
 <!-- 已关闭 19 段（不再过目）：S02.1 3 · S02.2 12 · S02.3 2 · S02.4 3 · S02.5 2 · S02.6 1 · S02.7 2 · S02.8 2 · S02.9 3 · S02.10 3 · S02.11 4 · S02.12 3 · S02.13 2 · S02.14 1 · S02.15 1 · S02.16 1 · S02.17 1 · S02.18 16 · S02.19 12 -->
 
 ## 段 S02.20
-<!-- 已完成（39 条）：交过的，往下沉 -->
+<!-- 已完成（40 条）：交过的，往下沉 -->
+- [x] T163 出清单不必等人开口，账本一动就问一次
+  标准：适配器那个盯账本的节拍（4 秒）在账本大小变过之后也问一次 review --due，该出清单就出、该起审查者就起，不靠下一轮开头；账本没动过不重复问（不白起进程）；有用例（过期 pass 在一次节拍后自己出清单并起审查者）；turn/start 那条路照旧
+  交付：adapters/dsh/index.js 的 2 秒节拍改成 4 秒，并在 ledgerStamp（账本文件名+总字节）变过之后调 checkDue；删掉从来没触发过的 task.done 分支（宿主不发这个事件类型）；头注释写清两个时候各问一次；test/adapter-review.test.mjs 新增一条（过期 pass 在一轮开头问 due 就出清单并起审查者），变异核对一次（reviewDue 换回只看 verdict → 红）；期望：node --test test/adapter-review.test.mjs => ℹ fail 0
 - [x] T162 审查开始与结论都回到作者，执行链每一步都有人说话
   标准：账本出现 review.brief 时，适配器把它当成一条消息回到作者会话（清单路径、交给谁、在等结论），与结论落账时的叫醒同一条路；有用例（只出清单不落结论也叫一次，第二次不再叫）
   交付：adapters/dsh/verdicts.mjs 的 KINDS 加 review.brief，say() 多一句「审查清单发出去了 · 段 · 清单路径（交给审查者，等结论写进账本）」；test/adapter-verdicts.test.mjs 新增一条（只出清单不落结论也叫一次，第二次不再叫），变异核对一次（KINDS 去掉 review.brief → 红）；DESIGN §12.6.9 同步；期望：node --test test/adapter-verdicts.test.mjs => ℹ fail 0

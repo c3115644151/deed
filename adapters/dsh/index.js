@@ -5,8 +5,10 @@
  *   1. 原文——人说的话由这个钩子交给 `deed say`，agent 不必转述；同一个消息号只交一次。
  *   2. 惯例——每个模型步骤都看着「这一轮留下什么判断就记成要点」这段环境规则（系统提示词段，
  *      不是冒充用户说的话）。
- *   3. 审查——轮次结束时问一句 `deed review --due`：有该审的就起一个审查者（同一个段复用同一个，
- *      期审每次新开），材料是清单与角色包；结论由那个审查者自己敲命令落账，这里不代写。
+ *   3. 审查——两个时候各问一句 `deed review --due`：一轮开头，以及账本动过之后的那次节拍
+ *      （作者交完最后一条就再没有"下一轮开头"，只靠轮次开头会让该审的那一步一直挂着）。
+ *      有该审的就起一个审查者（同一个段复用同一个，期审每次新开），材料是清单与角色包；
+ *      结论由那个审查者自己敲命令落账，这里不代写。
  *
  * 边界（写在代码里，不是写在文档里）：
  *   - 钩子里任何异常都吞掉：适配器不能把这一轮带下来。
@@ -166,11 +168,6 @@ export function apply(ctx, config = {}) {
       // 用户消息上——实测 user/message 落在第一个 pre-step 之后，那时注入已经错过了。
       if (type === "turn/start") {
         if (!sub) askPoint.add(session.id);
-        checkDue(session).catch((err) => note(root, "审查钩子异步出错 · " + clip(err?.message ?? err, 200)));
-        return;
-      }
-      // 交付落下时也看一眼：agent 刚 submit 完，材料齐了就把审查交出去。
-      if (type === "task.done" || type === "task.undo") {
         checkDue(session).catch((err) => note(root, "审查钩子异步出错 · " + clip(err?.message ?? err, 200)));
         return;
       }
@@ -517,6 +514,24 @@ export function apply(ctx, config = {}) {
 
   // 结论落下之后回到作者那一步：账本尾巴上出现结论 → 在作者那个会话里开一轮。
   // 子代理的完成通知回的是它自己的父会话，主会话这边收不到，所以盯账本。
+  // 账本动没动：一次 readdir + stat，够便宜，也够准（只在写入之后变）。
+  const ledgerStamp = (root) => {
+    try {
+      const dir = path.join(root, ".deed", "log");
+      let last = "";
+      let size = 0;
+      for (const name of fs.readdirSync(dir)) {
+        if (!name.endsWith(".jsonl")) continue;
+        const st = fs.statSync(path.join(dir, name));
+        size += st.size;
+        last = name;
+      }
+      return last + ":" + size;
+    } catch {
+      return null;
+    }
+  };
+
   const watchers = new Map(); // 会话 id → { watermark }
 
   const watch = (session) => {
@@ -535,8 +550,16 @@ export function apply(ctx, config = {}) {
         } catch (err) {
           note(root, "盯结论出错 · " + clip(err?.message ?? err, 160));
         }
+        // 出清单不能只等人开口：作者交完最后一条之后就再没有"下一轮开头"了，
+        // 该审的那一步会一直挂在原地，而人和作者都以为它在跑。所以这里跟同一个节拍问一次——
+        // 但只在账本动过之后问：没动过就没有答案会变，白起一个 node 进程不值。
+        const stamp = ledgerStamp(root);
+        if (stamp !== null && stamp !== state.ledger) {
+          state.ledger = stamp;
+          checkDue(session).catch((err) => note(root, "问 due 出错 · " + clip(err?.message ?? err, 160)));
+        }
       })();
-    }, 2000);
+    }, 4000);
     timer.unref?.();
     pollTimers.set(id, timer);
   };

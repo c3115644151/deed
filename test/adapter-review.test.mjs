@@ -206,3 +206,45 @@ test("a reviewer that already settled does not get the next brief", async () => 
   assert.ok(await waitFor(() => started.length === 2), "另起一个，而不是发给收工的那个");
   assert.equal(messaged.length, 0, "一个字都没发给已经结束的那个");
 });
+
+// 一段审查通过之后又交了活：结论过期，该重审。这时候一轮开头问 due 必须出清单、
+// 把审查者起起来——不然"该审"这件事只写在 nextAction 里，钩子那边什么都不做，
+// 作者只能在对话里说"我在等重审"。
+test("a segment that outgrew its pass gets a fresh sheet at the top of a turn", async () => {
+  const cwd = workspace("adapter-outgrown");
+  assert.equal(deed(cwd, "init", "--said", "开始", "--review", "docs/**").status, 0, "每一条都碰要审的路径");
+  addTask(cwd, "做一", "跑得通");
+  fs.writeFileSync(path.join(cwd, "a.md"), "一版\n");
+  deliverTask(cwd, "T1", "跑：跑得通");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "第一份清单");
+  assert.equal(
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "pass", "--result", "T1=met").status,
+    0,
+    "审查通过",
+  );
+
+  const started = [];
+  const services = {
+    agents: { get: () => ({ session: sessionOf(cwd) }) },
+    subagents: {
+      startContinuable: async (args) => {
+        started.push(args.label);
+        return { childId: "child-" + started.length, result: new Promise(() => {}) };
+      },
+      sendMessage: async () => {},
+      listChildren: async () => [],
+    },
+  };
+  const { ctx, handlers } = host(cwd, services);
+  const mod = await import("../adapters/dsh/index.js");
+  mod.apply(ctx, {});
+
+  // 通过之后这一段又进了一条活并交掉：那份结论判的不是现在这份内容了。
+  addTask(cwd, "做二", "跑得通");
+  fs.writeFileSync(path.join(cwd, "b.md"), "二版\n");
+  deliverTask(cwd, "T2", "跑：跑得通", { file: "b.md" });
+
+  handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
+  assert.ok(await waitFor(() => started.length === 1), "过期的 pass 也把审查者起起来，而不是干等判决");
+  assert.ok(await waitFor(() => readEvents(cwd).some((one) => one.k === "review.brief" && one.at > new Date(Date.now() - 60000).toISOString())), "新的一份清单进了账本");
+});
