@@ -6,7 +6,7 @@ import path from "node:path";
 import { fold } from "../core/fold.mjs";
 import { append } from "../lib/store.mjs";
 import { renderBoard, when } from "../board/render.mjs";
-import { start } from "../board/serve.mjs";
+import { shouldRetire, start } from "../board/serve.mjs";
 import { buildNow } from "../lib/panel.mjs";
 import { workspace } from "../support/lib.mjs";
 import { addTask, deliverTask } from "./support/cli.mjs";
@@ -162,7 +162,8 @@ test("an open SSE connection keeps the panel from exiting as idle", async () => 
     });
   });
   try {
-    await new Promise((r) => setTimeout(r, 2200));
+    // 等三个检查节拍走过（闲置线 0.12 秒、节拍 1 秒）：够它有机会误退，又不靠一次固定睡。
+    await new Promise((r) => setTimeout(r, 3200));
     assert.equal(closedByUs, false, "SSE 还连着，面板不该按闲置收摊");
     assert.equal(server.listening, true);
   } finally {
@@ -536,6 +537,27 @@ test("a segment shows how it got here: every sheet, every verdict, and what each
 });
 
 // 清单交出去了、还没人回答：这一段此刻"在判"。屏上写成"要审"或"等判决"都说不清谁在动。
+// 结论过期、新的一份已经交出去：说「正在判」，不说「要重审一次」——后者会让人以为
+// 该他动手了，其实审查者在判。
+test("a segment that outgrew its verdict says the new sheet is being judged", () => {
+  const ledger = [
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "做重放" },
+    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["core/fold.mjs"] },
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test", by: "agent" },
+    { v: 36, at: T(4), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "s011-a.md", guide: "s011-a-reviewer.md", tasks: ["T1"] },
+    { v: 35, at: T(5), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "s011-a.md", findings: [], results: [{ id: "T1", verdict: "met" }] },
+    { v: 1, at: T(6), k: "task.add", s: null, id: "T2", title: "再来一条", criteria: "也跑得通", files: ["core/rules.mjs"] },
+    { v: 1, at: T(7), k: "task.done", s: null, id: "T2", evidence: "node --test", by: "agent" },
+    { v: 36, at: T(8), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "s011-b.md", guide: "s011-b-reviewer.md", tasks: ["T2"] },
+  ];
+  const page = renderBoard(fold(ledger), config, { zone, events: ledger.length });
+  const seg = page.slice(page.indexOf('id="S01.1"'));
+  const head = seg.slice(0, 600);
+  assert.match(head, /tag[^>]*>在判/u, "印花说在判");
+  assert.match(head, /新的一份已经交出去了，正在判/u, "下面那行说清谁在动");
+  assert.doesNotMatch(head, /要重审一次/u, "不说「要重审一次」——那是让人去动手的话");
+});
+
 test("a segment whose sheet is out says it is being judged", () => {
   const ledger = [
     { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "做重放" },
@@ -547,4 +569,13 @@ test("a segment whose sheet is out says it is being judged", () => {
   const seg = page.slice(page.indexOf('id="S01.1"'));
   assert.match(seg.slice(0, 400), /在判/u, "清单出去了，这一段在判");
   assert.doesNotMatch(seg.slice(0, 400), /tag[^>]*>要审/u, "印花不是「要审」");
+});
+
+// 什么时候收摊是一个判断，不是一段等待：把它抽出来直接验，免得靠真实时间卡线。
+test("the panel retires on idle only when nobody is watching", () => {
+  const now = 1_000_000;
+  const idle = 60_000;
+  assert.equal(shouldRetire({ streams: 1, lastRequest: now - 10 * idle, idle, now }), false, "页面连着：一直不收");
+  assert.equal(shouldRetire({ streams: 0, lastRequest: now - idle + 1, idle, now }), false, "还没到闲置线");
+  assert.equal(shouldRetire({ streams: 0, lastRequest: now - idle, idle, now }), true, "到了就退");
 });

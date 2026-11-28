@@ -71,6 +71,10 @@ export function identity(root, port) {
   return { deed: true, root: path.resolve(root), pid: process.pid, port, build: buildCached() };
 }
 
+// 一条打开的 SSE 流就是"有人在看"：页面连着，人可能在读，不能按闲置收摊。
+// 没有连接时，最后一次请求过了 idle 这么久就该退。
+export const shouldRetire = ({ streams, lastRequest, idle, now }) => streams === 0 && now - lastRequest >= idle;
+
 export function handler(root, onRequest = () => {}, onRetire = null, onStream = null) {
   return (req, res) => {
     onRequest();
@@ -326,11 +330,13 @@ export function start(root, port, onFatal = null, options = {}) {
   }, 2000);
 
   const idle = Number(process.env.DEED_PANEL_IDLE_MIN ?? 30) * 60 * 1000;
+  // 该不该收摊是一个判断，节拍只是它多久看一次：抽出来，才能不必靠真实时间验它。
+  const retire = () => shouldRetire({ streams, lastRequest, idle, now: Date.now() });
   // 检查间隔随 idle 缩短：生产是 60 秒一次，测试把 idle 调短时也能很快看到结果，
   // 不必为了一个退出分支等上一分钟。
   const tick = Math.min(60 * 1000, Math.max(1000, idle / 2));
   const clock = setInterval(() => {
-    if (streams > 0 || Date.now() - lastRequest < idle) return;
+    if (!retire()) return;
     clearInterval(clock);
     server.close(() => {
       if (options.exit === false) return;
