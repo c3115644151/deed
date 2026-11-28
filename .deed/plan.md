@@ -13,7 +13,10 @@
 <!-- 已关闭 19 段（不再过目）：S02.1 3 · S02.2 12 · S02.3 2 · S02.4 3 · S02.5 2 · S02.6 1 · S02.7 2 · S02.8 2 · S02.9 3 · S02.10 3 · S02.11 4 · S02.12 3 · S02.13 2 · S02.14 1 · S02.15 1 · S02.16 1 · S02.17 1 · S02.18 16 · S02.19 12 -->
 
 ## 段 S02.20
-<!-- 已完成（46 条）：交过的，往下沉 -->
+<!-- 已完成（47 条）：交过的，往下沉 -->
+- [x] T170 正在跑的时候只准排一条叫醒
+  标准：作者在跑时，落第二条结论不往里塞第二条消息（已有一条排着就只记日志）；一轮开头清掉记号；叫醒只讲最新那一条（旧的不再逐条念）；有用例（连落两条 → 队列长度仍是 1），变异核对一次
+  交付：adapters/dsh/verdicts.mjs 的 pollVerdicts 在 agent.status==="running" 时看 state.queued，已排队就只记日志不塞第二条；叫醒只讲最新那一条（rows.slice(-1)）；adapters/dsh/index.js 在 turn/start 清掉 queued；test/adapter-verdicts.test.mjs 新增加一条（连落两条 → 队列仍是 1），变异核对一次；期望：node --test test/adapter-verdicts.test.mjs => ℹ fail 0
 - [x] T169 排队晚到的叫醒要说明白自己是哪一刻的事
   标准：叫醒消息的每一行后面带它在账本上的时刻（HH:MM:SSZ），并明说「已经走得更远就以 deed state 为准」；有用例钉住这两点；不必改投递队列本身
   交付：adapters/dsh/verdicts.mjs 的 wakeMessage 给每一行带账本时刻（stampOf），尾句改成「已经走得更远的话，以 deed state 为准，这条只是排队晚到的」；test/adapter-verdicts.test.mjs 新增一条钉住时刻与这句话；期望：node --test test/adapter-verdicts.test.mjs => ℹ fail 0

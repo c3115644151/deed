@@ -168,6 +168,9 @@ export function apply(ctx, config = {}) {
       // 用户消息上——实测 user/message 落在第一个 pre-step 之后，那时注入已经错过了。
       if (type === "turn/start") {
         if (!sub) askPoint.add(session.id);
+        // 上一轮排着的那条已经送到：清掉记号，下一批结论才轮得到排队。
+        const row = watchers.get(session?.id);
+        if (row) row.queued = false;
         checkDue(session).catch((err) => note(root, "审查钩子异步出错 · " + clip(err?.message ?? err, 200)));
         return;
       }

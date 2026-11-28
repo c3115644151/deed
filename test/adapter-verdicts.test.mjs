@@ -154,3 +154,21 @@ test("every wake line says when it happened in the ledger", async () => {
   assert.match(text, /（\d{2}:\d{2}:\d{2}Z）/u, "带了账本上的时刻");
   assert.match(text, /以 deed state 为准/u, "说清晚到这件事");
 });
+
+// 正在跑的时候连落两条结论：只排一条。排三条旧事，下一轮开头读到的全是已经走过的东西。
+test("a running author gets one queued wake, not a stack of them", async () => {
+  const cwd = workspace("adapter-verdicts-queue");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" });
+  const queued = [];
+  const agent = { status: "running", send: (message, target) => queued.push({ message, target }) };
+  const state = { watermark: null };
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单出门");
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(queued.length, 1, "第一条排队");
+  assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status, 0);
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(queued.length, 1, "已经有一条排着，不再往里塞");
+});

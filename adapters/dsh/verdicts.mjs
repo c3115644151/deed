@@ -142,18 +142,30 @@ export async function pollVerdicts({ root, agent, state, log }) {
     const fresh = since ? rows.filter((one) => String(one.at) >= String(since)) : [];
     state.watermark = rows.at(-1)?.at ?? null;
     if (fresh.length === 0) return [];
-    const first = wakeMessage(fresh, null);
-    if (agent.status === "running" && typeof agent.send === "function") agent.send(first, "next-turn", true);
-    else agent.followup(first);
+    const first = wakeMessage(fresh.slice(-1), null);
+    if (agent.status === "running" && typeof agent.send === "function") {
+      state.queued = true;
+      agent.send(first, "next-turn", true);
+    } else agent.followup(first);
     log?.("结论落到账本 · 叫作者回来 · " + fresh.map((one) => one.k).join("+"));
     return fresh;
   }
   if (rows.length === 0) return [];
   state.watermark = rows.at(-1).at;
-  const message = wakeMessage(rows, null);
-  // 空闲就开新的一轮；正在跑就排到下一轮，不打断手上的活。
-  if (agent.status === "running" && typeof agent.send === "function") agent.send(message, "next-turn", true);
-  else agent.followup(message);
-  log?.("结论落到账本 · 叫作者回来 · " + rows.map((one) => one.k).join("+"));
+  // 正在跑的时候只排一条：排队的那条会在下一轮开头才被读，那时账本早走远了，
+  // 再往里塞第二条、第三条只是把"旧事"堆成一串，读的人还得逐条分辨。
+  if (agent.status === "running" && typeof agent.send === "function") {
+    if (state.queued) {
+      log?.("结论又落了，但已经有一条排着 · 合并进下一轮 · " + rows.at(-1).k);
+      return [];
+    }
+    state.queued = true;
+    agent.send(wakeMessage(rows.slice(-1), null), "next-turn", true);
+    log?.("结论落到账本 · 排到下一轮 · " + rows.at(-1).k);
+    return rows;
+  }
+  // 空闲：直接开一轮，把最新那一条说一遍（多条的，前几条已经没意义了）。
+  agent.followup(wakeMessage(rows.slice(-1), null));
+  log?.("结论落到账本 · 叫作者回来 · " + rows.at(-1).k);
   return rows;
 }

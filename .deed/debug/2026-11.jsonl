@@ -645,3 +645,38 @@
 {"at":"2026-11-28T06:31:45.136Z","verb":"review","code":0,"ms":39,"switches":["--due"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T06:32:02.525Z","verb":"submit","code":0,"ms":4891,"switches":[],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T06:32:05.229Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:34.623Z","verb":"point","code":0,"ms":60,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:34.851Z","verb":"state","code":0,"ms":62,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:37.240Z","verb":"review","code":0,"ms":37,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:38.263Z","verb":"state","code":0,"ms":97,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:52.459Z","verb":"reply","code":0,"ms":76,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:53.168Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:32:53.374Z","verb":"review","code":0,"ms":38,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:33:07.366Z","verb":"state","code":0,"ms":58,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:33:25.877Z","verb":"reply","code":0,"ms":96,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:33:26.563Z","verb":"review","code":0,"ms":37,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:33:29.605Z","verb":"review","code":0,"ms":36,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:34:03.058Z","verb":"check","code":0,"ms":74,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:34:13.028Z","verb":"check","code":0,"ms":9538,"switches":["--ledger"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:34:13.746Z","verb":"task","code":1,"ms":25,"switches":[],"why":"task 已经改成 写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:14.256Z","verb":"tick","code":1,"ms":22,"switches":[],"why":"tick 已经改成 deed say \"…\"（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:14.730Z","verb":"doctor","code":1,"ms":22,"switches":[],"why":"doctor 已经改成 deed check --ledger（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:15.244Z","verb":"goal","code":1,"ms":28,"switches":[],"why":"goal 已经改成 把目的写在清单第一行（# 这一期要做成什么 下面那一句），deed submit 记账（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:15.719Z","verb":"topic","code":1,"ms":26,"switches":[],"why":"议题的成立与出口在面板上按：命令行没有这条路（deed topic \"标题\" --points … 才是新建议题）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:16.225Z","verb":"say","code":1,"ms":26,"switches":["--who"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:34:20.772Z","verb":"task","code":1,"ms":23,"switches":[],"why":"task 已经改成 写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:21.273Z","verb":"tick","code":1,"ms":24,"switches":[],"why":"tick 已经改成 deed say \"…\"（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:21.787Z","verb":"doctor","code":1,"ms":24,"switches":[],"why":"doctor 已经改成 deed check --ledger（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:22.280Z","verb":"goal","code":1,"ms":22,"switches":[],"why":"goal 已经改成 把目的写在清单第一行（# 这一期要做成什么 下面那一句），deed submit 记账（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:22.795Z","verb":"topic","code":1,"ms":26,"switches":[],"why":"议题的成立与出口在面板上按：命令行没有这条路（deed topic \"标题\" --points … 才是新建议题）","v":"0.33.0"}
+{"at":"2026-11-28T06:34:23.404Z","verb":"review","code":0,"ms":82,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:35:16.702Z","verb":"task","code":1,"ms":31,"switches":[],"why":"task 已经改成 写清单：deed plan 编辑 .deed/plan.md，deed submit 一次记账；撤回就是把勾去掉，放弃就是划掉并写理由（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:35:16.869Z","verb":"tick","code":1,"ms":23,"switches":[],"why":"tick 已经改成 deed say \"…\"（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:35:17.050Z","verb":"doctor","code":1,"ms":26,"switches":[],"why":"doctor 已经改成 deed check --ledger（deed help 看全部）","v":"0.33.0"}
+{"at":"2026-11-28T06:35:17.252Z","verb":"topic","code":1,"ms":62,"switches":[],"why":"议题的成立与出口在面板上按：命令行没有这条路（deed topic \"标题\" --points … 才是新建议题）","v":"0.33.0"}
+{"at":"2026-11-28T06:35:17.434Z","verb":"say","code":1,"ms":28,"switches":["--who"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:35:17.666Z","verb":"review","code":0,"ms":70,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:35:51.054Z","verb":"submit","code":0,"ms":196,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:35:51.459Z","verb":"review","code":0,"ms":50,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:35:57.061Z","verb":"submit","code":0,"ms":5811,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T06:35:59.488Z","verb":"review","code":0,"ms":44,"switches":["--due"],"why":null,"v":"0.33.0"}
