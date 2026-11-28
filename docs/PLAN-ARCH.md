@@ -343,5 +343,31 @@ export const reduce = (ctx, ev) => {
 
 **还没做的**：`checks:tree`（地图 ↔ 目录对账，P2 结束前做成软报告）。
 
+### 附录 B：P2 的搬运清单（下一步的底稿）
+
+`fold` 里还有 30 个 case（uncarry 已移走）。它们依赖 19 个本地助手，先把助手移进 `core/facts`
+（一个域一个文件），再按域移 case：
+
+| 助手 | 去处 | 谁在用（case） |
+|---|---|---|
+| `noway` `blank` `lastSession` `newSession` `taken` `sessionOf` `segmentOf` | `facts/session.mjs` | 几乎每个 case |
+| `taskOf` `rederive` `onTheSheet` `lastResultOf` `settledSince` `awaitingJudgement` | `facts/task.mjs` | task.* · review.log |
+| `segmentById` `nextSegment` `nextOpen` `settle` `sealed` `editable` `awaitingVerdict` | `facts/segment.mjs` | task.done/undo/carry · review.* · segment.* · judge.* |
+
+域的边界（30 个 case 的归属）：
+
+- `talk`：turn · reply · point.add（3）
+- `topic`：topic.create · establish · release（3）
+- `work`：task.add · context · title · criteria · done · undo · defer · drop · carry · order（10，uncarry 已移）
+- `review`：review.brief · withdraw · log · verdict.pass · review.overturn（5）
+- `segment`：segment.plan · seal · judge.pass · judge.rework（4）
+- `session`：project.declare · config.change · goal.set · shelve（4）
+- `legacy`：ask.raise · ask.resolve · ask.withdraw（3）
+
+每个域移完：删那段 switch、跑该域用例、与 HEAD 的 `fold` 对拍（同一账本、同一 sha）。
+
+**已知小毛病**：`test/board.test.mjs` 与别的用例并发跑时会撞端口（单跑 25/25 全过）。
+全量验证时把 board 单独跑，或 `--test-concurrency=1`。
+
 7. **分支上限**：12 个分支／文件，这个数要不要按域调（`reducers/work` 天然分支多，可能要给 16）？
 8. **地图是否当硬门**：`docs/STRUCTURE.md` 与目录双向对账，缺一条就红——现在没有这份地图，等于要先补齐 35 个文件的行。
