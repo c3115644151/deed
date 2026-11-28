@@ -63,3 +63,33 @@ test("several rows landing together become one turn, and the message says what h
   assert.match(text, /判决通过/u);
   assert.equal(text.split("\n").filter((one) => one.startsWith("· ")).length, 2);
 });
+
+// 结论落到作者眼前时是完整的那一份：为什么、每条怎么判的、发现、清单在哪。
+test("the wake message carries the verdict in full, not just the names", () => {
+  const message = wakeMessage([
+    {
+      k: "review.log",
+      verdict: "fail",
+      segment: "S02.20",
+      why: "两条在这一份字节上不成立：一个是注释撞了守卫，一个是标准自己写错",
+      rework: ["T143", "T153"],
+      results: [
+        { id: "T97", verdict: "met", note: "三条断言都对" },
+        { id: "T143", verdict: "unmet", note: "交付记录还带 sha" },
+        { id: "T153", verdict: "unmet", note: "全量 282 条里 1 红在 docs" },
+      ],
+      findings: ["T143 的放弃没有可核的依据", "T153 那句话改成审查清单就可绿"],
+      brief: ".deed/review/S02.20-11281045.md",
+      at: "2026-01-01T00:00:00Z",
+    },
+  ], null);
+  const text = message.content.map((one) => one.text).join("\n");
+  assert.match(text, /不合格/u);
+  assert.match(text, /为什么：两条在这一份字节上不成立/u);
+  assert.match(text, /逐条 3 条 · 达成 1 · 没过 2/u);
+  assert.match(text, /T143 · unmet · 交付记录还带 sha/u);
+  assert.match(text, /T153 · unmet · 全量 282 条里 1 红在 docs/u);
+  assert.match(text, /发现 · T143 的放弃没有可核的依据/u);
+  assert.match(text, /清单 · .deed\/review\/S02\.20-11281045\.md/u);
+  assert.doesNotMatch(text, /T97 · met/u, "达成的只报数，不逐条念");
+});

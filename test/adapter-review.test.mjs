@@ -108,6 +108,8 @@ test("the same segment's review goes back to the same agent; a period review get
   assert.match(firstPrompts[0], /角色包（怎么审）/u, "第一次要他读角色包");
   assert.doesNotMatch(messaged[0].text, /角色包（怎么审）/u, "复审不重发角色包");
   assert.match(messaged[0].text, /第 \d+ 份清单/u, "复审说清这是第几份");
+  assert.match(messaged[0].text, /只判：T1/u, "复审点名要判哪几条");
+  assert.ok(messaged[0].text.split("\n").length <= 4, "复审就是几行，不是一份新的说明");
 });
 
 test("a period review opens its own agent, not the segment's", async () => {

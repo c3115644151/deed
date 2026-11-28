@@ -9,6 +9,31 @@ import { randomUUID } from "node:crypto";
 // 它自己的父会话，主会话这边收不到。盯账本这条路与谁起的审查者无关，因此可靠。
 const KINDS = new Set(["review.log", "verdict.pass", "review.overturn", "sign", "segment.seal"]);
 
+// 一条结论的完整模样：结论本身、为什么、逐条判定、发现。作者要照着改，
+// 只告诉他"打回了哪几条"不够——他得知道每条为什么没过、还有哪些话没被采纳。
+const clip = (text, max) => {
+  const one = String(text ?? "").replace(/\s+/gu, " ").trim();
+  return one.length > max ? one.slice(0, max) + "…" : one;
+};
+
+export function detail(row) {
+  const out = [say(row)];
+  if (row.k !== "review.log") return out;
+  if (row.why) out.push("  为什么：" + clip(row.why, 600));
+  const results = row.results ?? [];
+  const missed = results.filter((one) => one.verdict !== "met");
+  if (results.length > 0) {
+    out.push(
+      "  逐条 " + results.length + " 条 · 达成 " + (results.length - missed.length) + " · 没过 " + missed.length +
+        (row.resultsAll ? "（全部逐条给过）" : ""),
+    );
+    for (const one of missed) out.push("    " + one.id + " · " + one.verdict + (one.note ? " · " + clip(one.note, 600) : ""));
+  }
+  for (const one of row.findings ?? []) out.push("  发现 · " + clip(one, 600));
+  if (row.brief) out.push("  清单 · " + row.brief);
+  return out;
+}
+
 // 一句话说清这条结论是什么。
 export function say(row, doc) {
   const segment = String(row.segment ?? row.s ?? "");
@@ -71,7 +96,7 @@ export function newVerdicts(root, after) {
 
 // 一轮只唤醒一次：同一次落下的好几条（结论 + 判决）合成一句，别连开好几轮。
 export function wakeMessage(rows, doc) {
-  const lines = rows.map((one) => "· " + say(one, doc));
+  const lines = rows.flatMap((one) => detail(one).map((line, n) => (n === 0 ? "· " + line : line)));
   return {
     id: randomUUID(),
     role: "user",

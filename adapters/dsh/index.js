@@ -278,6 +278,17 @@ export function apply(ctx, config = {}) {
 
   const handKey = (due) => String(due?.hand ?? "");
 
+  // 这一份清单展开成"### T…"的那些条目就是要判的（沿用的一律压成一行，不展开）。
+  // 复审的消息只写这些号，审查者不必把整份清单再读一遍才知道该看哪。
+  const redoIds = (root, brief) => {
+    try {
+      const text = fs.readFileSync(path.join(root, String(brief)), "utf8");
+      return [...text.matchAll(/^### (T\d+) /gmu)].map((one) => one[1]);
+    } catch {
+      return [];
+    }
+  };
+
   // 这一段出过几份清单：盘上 S<段>-<时刻>.md 的个数（角色包不算）。
   const countBriefs = (root, segment) => {
     if (!segment) return 1;
@@ -294,7 +305,7 @@ export function apply(ctx, config = {}) {
 
   // 第一次：角色包 + 清单，一起读。复审：同一个人接着判，角色包不再发——
   // 上一份他已经读过，重发一遍只是让他把同一段话再读一次。
-  const promptFor = (root, due, nth = 1) => {
+  const promptFor = (root, due, nth = 1, redo = []) => {
     const { command, prefix } = deedInvocation(root, config);
     const deed = [command, ...prefix].join(" ");
     const segment = due.kind === "period" ? null : due.segment;
@@ -304,28 +315,24 @@ export function apply(ctx, config = {}) {
     const fail = segment
       ? deed + " review --segment " + segment + " --verdict fail --rework T1,T2 --why \"为什么\""
       : deed + " review --all --verdict fail --rework S01.1 --why \"为什么\"";
-    const head =
-      nth > 1
-        ? [
-            "你是 deed 的审查者，这一段还是你在审：这是第 " + nth + " 份清单。",
-            "",
-            "上一份你判过的那几条已经沿用了（清单上写着「上次 met（时间）· 之后没动过，判定沿用」），",
-            "这一份只有新交的、改过的、上次没过的那几条要判。角色包你读过，不再发。",
-            "",
-            "清单（这一份只列出要重判的）：" + path.join(root, due.brief),
-            "",
-            "按你上次那套方法判这几条就行；另外看一眼这一段整体的方向有没有被这几条改跑。",
-          ]
-        : [
-            "你是 deed 的审查者，只回答一件事：这份清单上写的标准，在这一份字节上成立不成立。",
-            "",
-            "清单（审什么）：" + path.join(root, due.brief),
-            "角色包（怎么审）：" + path.join(root, due.guide ?? ""),
-            "",
-            "先读角色包，再读清单，逐条核；每条给一个判断（达成／未达成／无法判断）与依据（命令、输出、文件:行）。",
-          ];
+    if (nth > 1) {
+      // 复审：同一个人接着判。角色包、方法、边界他都知道，这里只给这一份的
+      // 变量部分——清单在哪、哪几条要判、结论怎么落。多一个字都是让他重读。
+      const only = redo.join("、");
+      return [
+        "这一段还是你在审：第 " + nth + " 份清单。上一份判过的沿用，这次只判" + (only ? "：" + only : "「要重判的」那几条") + "。",
+        "清单：" + path.join(root, due.brief),
+        "落结论：" + verdict,
+        "        " + fail,
+      ].join("\n");
+    }
     return [
-      ...head,
+      "你是 deed 的审查者，只回答一件事：这份清单上写的标准，在这一份字节上成立不成立。",
+      "",
+      "清单（审什么）：" + path.join(root, due.brief),
+      "角色包（怎么审）：" + path.join(root, due.guide ?? ""),
+      "",
+      "先读角色包，再读清单，逐条核；每条给一个判断（达成／未达成／无法判断）与依据（命令、输出、文件:行）。",
       "",
       "结论用命令落（账本只有一个写入口，别直接改账本）：",
       "  " + verdict,
@@ -415,7 +422,7 @@ export function apply(ctx, config = {}) {
     // 这一段已经出过几份清单：第二份起只发增量（角色包不再重发）。
     // 数盘上的清单文件（S02.20-<时刻>.md），不新造一条命令去问账本。
     const which = countBriefs(root, due.segment);
-    const text = promptFor(root, due, which);
+    const text = promptFor(root, due, which, redoIds(root, due.brief));
     const prompt = [{ type: "text", text }];
     const signal = AbortSignal.timeout(REVIEW_TIMEOUT_MS);
 
