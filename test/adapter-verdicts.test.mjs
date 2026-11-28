@@ -118,3 +118,22 @@ test("a sheet going out is a step of the chain too: the author hears it, once", 
   await pollVerdicts({ root: cwd, agent, state });
   assert.equal(said.length, 1, "同一份清单只叫一次");
 });
+
+// 重启那一刻刚好有一份清单出门：那是"刚刚发生的事"，不是旧账，作者得听到。
+// 以前第一次轮询只记水线，把这一条也一起吞了——屏幕上什么都没发生，人以为链断了。
+test("a sheet written while the watcher is starting is news, not history", async () => {
+  const cwd = workspace("adapter-verdicts-restart");
+  deed(cwd, "init", "--said", "开始");
+  addTask(cwd, "做一", "跑得通");
+  deliverTask(cwd, "T1", "跑：跑得通", { file: "a.md" });
+
+  const since = new Date().toISOString();
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "清单在起这条线之后才出门");
+
+  const said = [];
+  const agent = { status: "idle", followup: (message) => said.push(message) };
+  const state = { watermark: null, since };
+  await pollVerdicts({ root: cwd, agent, state });
+  assert.equal(said.length, 1, "重启之后刚写的清单也要说一句");
+  assert.match(said[0].content.map((one) => one.text).join("\n"), /审查清单发出去了/u);
+});

@@ -534,3 +534,17 @@ test("a segment shows how it got here: every sheet, every verdict, and what each
   assert.match(page, /最近一次判定/u, "每条条目印它最近一次被判成什么");
   assert.match(page, /这条之后改过，判定说的是旧内容/u, "判过之后又改过的，不假装那句判定还算数");
 });
+
+// 清单交出去了、还没人回答：这一段此刻"在判"。屏上写成"要审"或"等判决"都说不清谁在动。
+test("a segment whose sheet is out says it is being judged", () => {
+  const ledger = [
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "做重放" },
+    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["core/fold.mjs"] },
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test", by: "agent" },
+    { v: 36, at: T(4), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "s011.md", guide: "s011-reviewer.md", tasks: ["T1"] },
+  ];
+  const page = renderBoard(fold(ledger), config, { zone, events: ledger.length });
+  const seg = page.slice(page.indexOf('id="S01.1"'));
+  assert.match(seg.slice(0, 400), /在判/u, "清单出去了，这一段在判");
+  assert.doesNotMatch(seg.slice(0, 400), /tag[^>]*>要审/u, "印花不是「要审」");
+});

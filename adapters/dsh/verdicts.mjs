@@ -130,8 +130,18 @@ export async function pollVerdicts({ root, agent, state, log }) {
   // 没有结论的时候水线停在 null，也要算"已经记过水线"，否则第一条结论会被吞掉。
   if (!state.armed) {
     state.armed = true;
+    // 「旧账不重播」指的是盯账之前就有的那些行，不是"重启这一秒刚写的"。起点由起这条线的人
+    // 给（state.since）；没给就退回水线，把刚发生的事吞掉——审查刚好在那一刻开始的时候，
+    // 作者就一条消息都收不到，看起来像什么都没发生。
+    const since = state.since ?? null;
+    const fresh = since ? rows.filter((one) => String(one.at) >= String(since)) : [];
     state.watermark = rows.at(-1)?.at ?? null;
-    return [];
+    if (fresh.length === 0) return [];
+    const first = wakeMessage(fresh, null);
+    if (agent.status === "running" && typeof agent.send === "function") agent.send(first, "next-turn", true);
+    else agent.followup(first);
+    log?.("结论落到账本 · 叫作者回来 · " + fresh.map((one) => one.k).join("+"));
+    return fresh;
   }
   if (rows.length === 0) return [];
   state.watermark = rows.at(-1).at;

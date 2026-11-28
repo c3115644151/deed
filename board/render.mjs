@@ -404,8 +404,14 @@ function segmentBlock(session, segment, index, config, zone, anchors) {
   // 收活的那一段才叫"手上这一段"；清单排在后头的段在这儿是"等前面"。
   const take = takingSegment(session);
   const here = take?.id === segment.id;
+  // 清单交出去了、还没人回答：这一段此刻"在判"——它既不是"要审"（已经发出去了），
+  // 也不是"等判决"（判决要等结论）。屏上得说出这一格，不然人看着分不清谁在动。
+  const judging = (session.briefs ?? []).some(
+    (one) => one.segment === segment.id && one.answeredBy === null && one.withdrawnAt === undefined,
+  );
   const stamp =
     segment.closedAt === null && !here ? tag("quiet", "等前面") :
+    judging && segment.closedAt === null ? tag("grit", "在判") :
     segment.verdict === "pass" && verdictStands(session, segment) ? tag("pass", "判过") :
     segment.verdict === "pass" ? tag("grit", "要重审") :
     segment.verdict === "exempt" ? tag("quiet", "免审") :
@@ -425,7 +431,11 @@ function segmentBlock(session, segment, index, config, zone, anchors) {
     (state === "missing" && needsReview(config, session, segment)
       ? '<p class="why">这一段碰了要审的路径：' + esc(pathsOf(session, segment).join("  ")) + "</p>"
       : "") +
-    (state === "stale" ? '<p class="why">结论早于最后一次交付：审的是旧内容，要重审一次</p>' : "") +
+    (state === "stale"
+      ? judging
+        ? '<p class="why">上一份结论审的是旧内容：新的一份已经交出去了，正在判</p>'
+        : '<p class="why">结论早于最后一次交付：审的是旧内容，要重审一次</p>'
+      : "") +
     (review
       ? '<p class="revline"><span class="k">审查</span>' + esc(review.by) + " · " + when(review.at, zone) +
         " · " + esc(String(review.brief).split(/[\\/]/).pop()) + (review.findings.length ? " · 发现 " + review.findings.length + " 条" : " · 无发现") +

@@ -539,7 +539,8 @@ export function apply(ctx, config = {}) {
     const root = session?.header?.cwd;
     if (!id || !root || !boundRoot(root)) return;
     if (watchers.has(id)) return;
-    const state = { watermark: null };
+    // 这条线从此刻起算：之后再写的行才算"新"，之前的一律不重播。
+    const state = { watermark: null, since: new Date().toISOString() };
     watchers.set(id, state);
     const timer = setInterval(() => {
       void (async () => {
