@@ -16,19 +16,19 @@
 <!-- 已完成（33 条）：交过的，往下沉 -->
 - [x] T143 把不对的机制删掉：账本不对字节、清单每份列全部、去掉「先做后记」与每段花了多少
   标准：cli/audit.mjs 与 verify 动词删除；交付记录只记路径与字节数；清单每份列全部条目；先做后记与每段花了多少都删除；DESIGN/README/规则块与代码同一口径；留下的用例全绿
-  交付：docs/DESIGN.md:133 落结论的前提从「字节没动」改成「与账本记下的 sha 一致」；DESIGN:190 的 check --ledger 删掉「先做后记」那半句并说清为什么（mtime 比不出来）；docs/INSTALL.md 四处 deed verify 改指 deed check --ledger；期望：node --test test/docs.test.mjs => no retired word is left in the prose or the code
+  交付：DESIGN:133 改成「就查文件在不在——账本记的是两份路径，不是指纹；指纹那套已删，别假装它在」；DESIGN:190 改成 check --ledger 只判账本能不能重放，「过期」与「先做后记」都不归它；INSTALL 的 verify 指路与「报过期」那一行改成现在的说法（交付记下的文件后来被改过，账本不会自己报）；规则块补一句交付记录记的三样与它们的用途；期望：node --test test/docs.test.mjs => no retired word is left in the prose or the code
+- [x] T118 角色包写清审查者怎么动手：要在副本上做实验，仓库里一个字节都不动
+  标准：角色包把「你不能改代码」那一节换成「你怎么动手」——可以跑任何命令、造夹具、把整个工作区复制到仓库外做破坏性实验与变异（改一处判断 → 跑对应用例 → 看它是否真红），仓库内零改动；不能提交、不能改账本与正在审的两份材料、不能替作者修；每条结论与发现都要配复现路径（命令 + 实际输出，或 文件:行）；有用例盯住这几句话在角色包里（少一句就红）
+  交付：用例不再只盯「临时区在仓库外」与「不能提交」两句：角色包六句边界逐句断言（仓库里一个字节都别动、别改账本、不能提交、别替作者修、每条结论与发现都要配复现路径、有没达成的），变异核对两次——删「别替作者修」那一行后 20 条里 19 过 1 红，还原后 20/20；期望：node --test test/cli-review2.test.mjs => ✔ the reviewer's scratch sits outside the workspace and the pack says no commits
+- [x] T114 记账之后核一遍刚落下的交付：指得到那份内容、不是空交付，核过要印一行
+  标准：落账后把刚写进账本的每条交付再核一遍：路径指得到当时那份内容、且不是空交付；对不上或空交付就打印并 exit 1；核过时印「落账后核对 · N 条都对得上当时那份内容」；用例直接驱动这个核对（记下 a.md 是一份内容、盘上已换成另一份 → 报出来；空交付 → 报出来），另有 submit 的用例盯住那一行（删掉这一步立刻红）
+  交付：记账后核对不再只比大小：task.done 多记一格 sha（{路径: sha256 前 16 位}，只为当场核对与「同一份字节不跑第二遍」，不作门）；lib/landed.mjs 先比尺寸再比指纹，尺寸一样内容换过的也报出「尺寸一样，内容不同」并 exit 1；含义版本 36、package 0.33.0；期望：node --test test/cli-work2.test.mjs => ✔ the landed check reports a file that changed, emptied, or vanished
 - [x] T135 清单按状态分三段：正在做的、还没做的、已经了结的
   标准：清单（`.deed/plan.md`）里每一段的条目按「在做（最多一条）→ 等着（按行序）→ 已完成 → 撤回／放弃」排，各组之间空一行并各写一句小标题；已完成的排在新待办之后，撤回与放弃的排在已完成之后；有用例（四组之间各空一行）
   交付：cli/plan.mjs 的草稿在四组之间各空一行（原先挨着写）；标准里 `deed plan --print` 那一半已按 task.criteria 改成只认清单这一个入口；期望：node --test test/cli-work1.test.mjs => ✔ the plan puts a blank line between the groups
 - [x] T124 用户只有三个闸，且都在面板上：议题通过、判决通过、签收通过
   标准：命令行不再提供这三条路——deed sign、deed judge、deed topic release 都 exit 1 并指到面板；面板上只有满足条件时才出现对应按钮；点了才落账、带 via:"panel"；三条闸各有用例
   交付：cli/verbs/topic.mjs 把 release／establish 放在第一个词的位置上一律 exit 1 并指到面板：此前 `deed topic release I1 --body … --points …` 会静默建出一个标题叫 release 的议题；期望：node --test test/cli-work1.test.mjs => ✔ topic release on the command line refuses and creates nothing
-- [x] T118 角色包写清审查者怎么动手：要在副本上做实验，仓库里一个字节都不动
-  标准：角色包把「你不能改代码」那一节换成「你怎么动手」——可以跑任何命令、造夹具、把整个工作区复制到仓库外做破坏性实验与变异（改一处判断 → 跑对应用例 → 看它是否真红），仓库内零改动；不能提交、不能改账本与正在审的两份材料、不能替作者修；每条结论与发现都要配复现路径（命令 + 实际输出，或 文件:行）；有用例盯住这几句话在角色包里（少一句就红）
-  交付：角色包的临时区改到仓库外：cli/brief.mjs 的 scratchPath(清单文件名) → %TEMP%\deed-scratch\<清单名>，段审与期审同一条规则，开在仓库里的那条路没了；结论落地时 removeScratch(那份清单) 按同一规则删，不再靠另存一份名字；角色包加一句「不能提交」；实测：清单 S01.1-11280733 的角色包写出 C:\Users\NUC\AppData\Local\Temp\deed-scratch\S01.1-11280733；期望：node --test test/cli-review2.test.mjs => ✔ the reviewer's scratch sits outside the workspace and the pack says no commits
-- [x] T114 记账之后核一遍刚落下的交付：指得到那份内容、不是空交付，核过要印一行
-  标准：落账后把刚写进账本的每条交付再核一遍：路径指得到当时那份内容、且不是空交付；对不上或空交付就打印并 exit 1；核过时印「落账后核对 · N 条都对得上当时那份内容」；用例直接驱动这个核对（记下 a.md 是一份内容、盘上已换成另一份 → 报出来；空交付 → 报出来），另有 submit 的用例盯住那一行（删掉这一步立刻红）
-  交付：落账后的核对抽成 lib/landed.mjs 的 checkLanded(根, 事件)：逐条比记账那刻称下的字节、空壳、已经不在盘上（记下时就不在的不算），对不上就一条一句；submit 记账后调它，对不上印「记账后核对 · N 条对不上」并 exit 1，对上印「记账后核对 · N 条都对得上当时那份内容」；标准里那句写的是「落账后核对」，落账是退役词，这里按现用词「记账」印；期望：node --test test/cli-work2.test.mjs => ✔ the landed check reports a file that changed, emptied, or vanished
 - [x] T145 结构检查对着范式判格：必需格、目录归属、extras 豁免
   标准：core/checks.mjs 有 PARADIGM（software/document/data/work/free）；结构检查四步：范式要求的格都在、声明的目录都在盘上、盘上每个顶层目录都有归属（认领或 extras）、跨格方向按 mayImport；layers 写 role=dir，role 缺省取 dir；project.declare 收 role 与 extras；deed project 支持 --extras；缺格/无归属/方向反三种失败各有具体 detail 与修法；本仓声明 tests=test、extras=docs,examples,support 后 3/3；沿用三种状态的语义，未通过不挡任何动作
   交付：结构检查按 role 判格不按目录名判（偏离只印出来），缺格/无归属/方向反照旧红；board/board.test.mjs 挪进 test/；extras 补 adapters、删掉根上那个未跟踪的 undefined 目录；本仓 deed check 3/3（003f367）；期望：node cli/deed.mjs check => 3/3 条通过

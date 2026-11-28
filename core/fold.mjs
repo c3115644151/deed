@@ -383,6 +383,8 @@ export function fold(events) {
           changed: ev.changed ?? [],
           // 交付那一刻称的各路径大小，随这条交付走：交付退回，它称过的数也一起退。
           sizes: ev.bytes ?? {},
+          // 同一路径的内容指纹：字节数一样、内容换过的，靠它看得出来。
+          shas: ev.sha ?? {},
           // 交付时跑的那条命令与它报的条数：清单上的数从这一格读，不从文本读。
           run: ev.run ?? null,
           expects: ev.expects ?? [],

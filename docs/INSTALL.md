@@ -118,7 +118,7 @@ cd /path/to/deed && git pull && npm test
 
 `npm link` 装的会立刻生效；vendor 的要重新拷。升级前后都跑一次 `deed check --ledger`：
 
-- **账本比 deed 新**（每条事件都记着事件含义的版本 `v` 与写它的版本 `w`，先比 `v`）：`doctor`／`state`／`verify`／面板都说「升级 deed 就能读」。**别删也别挪**，那一行是有效事实，不是坏账。
+- **账本比 deed 新**（每条事件都记着事件含义的版本 `v` 与写它的版本 `w`，先比 `v`）：`state`／`check`／面板都说「升级 deed 就能读」。**别删也别挪**，那一行是有效事实，不是坏账。
 - **deed 比账本新**：安全，事件类型只做加法，老事件照样折。
 
 账本是纯文本，崩了也不丢：`.deed/log/*.jsonl` 可以直接 `git diff` 看，`deed check --ledger` 是唯一的核对手段。
@@ -139,7 +139,7 @@ deed 没有守护进程、没有常驻的全局状态。面板跟着命令起来
 | `deed: 未知事件：x`，且写着「账本比 deed 新」 | 账本是更新的 deed 写的。升级 deed，不要动那一行 |
 | `deed check --ledger` 报「账本坏了 · 第 N 行」 | 那一行不是任何版本的 deed 写的。整行挪进 `.deed/log/rejected/`，并写下为什么 |
 | `deed: 已经有进程在写`（等 10 秒后） | 另一个进程正持有锁。看 `.deed/log/lock` 里的 pid：进程还在就等，没了直接重跑 |
-| `deed check --ledger` 报「过期」 | 交付记录记下的文件被改过，且之后没人重新记过它。在清单里重新勾一次再 `deed submit`，或在审查里点名退回 |
+| 交付记下的文件后来又被改过 | 账本只记路径与字节数，它不会自己报「过期」。这条路径现在长什么样，自己跑 `deed state` 或 `deed check --ledger` 之外的办法核；对不上就在清单里重新交一次，或在审查里点名退回 |
 | `deed check --ledger` 报「对不上」 | 发出去那份清单或角色包被改过、丢了、或没被账本记过。另出一份、重新审 |
 | `deed check --ledger` 报「审查设置对不上」 | `.deed/config.json` 被手改。用 `deed init --force --why "…"` 收进账本，或把文件改回去 |
 

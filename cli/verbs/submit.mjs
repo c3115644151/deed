@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { SEGMENT_MAX, nextAction, sessionById, takingSegment } from "../../core/rules.mjs";
 import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } from "../../lib/store.mjs";
-import { weigh } from "../pins.mjs";
+import { prints, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { EVENT_VERSION } from "../../core/events.mjs";
 import { frozenFor } from "../../core/fold.mjs";
@@ -223,6 +223,8 @@ export default function submit(argv) {
       const scanned = changedPaths(ROOT);
       const by = "agent";
       const sizes = weigh(ROOT, scanned.changed);
+      // 同一路径可能被换成同尺寸的另一份，字节数看不出来：当场把内容也算一遍。
+      const shas = prints(ROOT, scanned.changed);
       // 记账之后核对发现的对不上的交付：对上了才安静，对不上要以非零退出码结束——
       // 只印一行的话，读的人照样往下走，那条记录就永远是"看着成立"。
       const brokenAfter = [];
@@ -480,6 +482,7 @@ export default function submit(argv) {
                 files: scanned.changed.map((one) => ({ path: one })),
                 changed: scanned.changed,
                 bytes: sizes,
+                sha: shas,
               });
               continue;
             }

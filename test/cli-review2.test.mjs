@@ -570,7 +570,16 @@ test("the reviewer's scratch sits outside the workspace and the pack says no com
   assert.ok(line, "角色包写出了临时区在哪");
   const scratch = line.trim();
   assert.ok(!path.resolve(scratch).startsWith(path.resolve(cwd) + path.sep), "临时区在仓库外：" + scratch);
-  assert.match(guide, /不能提交/u);
+  // 六句话各是一个边界：少一句要红（不是"写了就算"）。
+  for (const one of [
+    "仓库里的东西一个字节都别动",
+    "别改账本",
+    "不能提交",
+    "别替作者修",
+    "每条结论与发现都要配复现路径",
+    "有没达成的：",
+  ])
+    assert.ok(guide.includes(one), "角色包里少了这一句：" + one);
 
   // 结论一落，临时区连同里面的一切一起没了。
   assert.equal(deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet",

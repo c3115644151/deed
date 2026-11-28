@@ -616,13 +616,19 @@ test("a delivery that points at an empty file lands but says so and exits nonzer
   assert.ok(rows.slice(first).some((one) => one.k === "task.done"), "记还是记上了：它说的是这条记录指不到东西");
 });
 
+const createHashOf = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
+
 // 那条核对能直接被驱动：记下 a.mjs 是 10 字节，盘上已经换成另一份；空壳；已经不在。
 test("the landed check reports a file that changed, emptied, or vanished", async () => {
   const { checkLanded } = await import("../lib/landed.mjs");
   const cwd = workspace("landed-check");
   fs.writeFileSync(path.join(cwd, "a.md"), "0123456789", "utf8");
-  const row = (bytes) => ({ k: "task.done", files: [{ path: "a.md" }], bytes });
-  assert.deepEqual(checkLanded(cwd, [row({ "a.md": 10 })]), [], "盘上就是称过的那一份");
+  const sha = (text) => createHashOf(text);
+  const row = (bytes, text) => ({ k: "task.done", files: [{ path: "a.md" }], bytes, sha: text === undefined ? {} : { "a.md": sha(text) } });
+  assert.deepEqual(checkLanded(cwd, [row({ "a.md": 10 }, "0123456789")]), [], "盘上就是称过的那一份");
+  // 同尺寸换内容：字节数一样，指纹不一样——这才叫"指得到当时那份内容"。
+  assert.match(checkLanded(cwd, [row({ "a.md": 10 }, "ABCDEFGHIJ")])[0], /尺寸一样，内容不同/u);
+  assert.deepEqual(checkLanded(cwd, [row({ "a.md": 10 })]), [], "没有指纹的老行只比大小");
   assert.match(checkLanded(cwd, [row({ "a.md": 4 })])[0], /换成另一份/u);
   fs.writeFileSync(path.join(cwd, "a.md"), "", "utf8");
   assert.match(checkLanded(cwd, [row({ "a.md": 0 })])[0], /0 字节/u);

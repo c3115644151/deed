@@ -1,6 +1,6 @@
 {
   "name": "deed",
-  "version": "0.32.1",
+  "version": "0.33.0",
   "private": true,
   "description": "A workspace as an append-only ledger: facts in, judgment and the next step out.",
   "license": "MIT",
