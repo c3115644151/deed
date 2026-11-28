@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
   byOrder,
+  stalePeriod,
   needsReview,
   nextAction,
   reading,
@@ -366,4 +367,21 @@ test("tasks are read in the order they were given, and the ones without one come
     { id: "T2", order: 1 },
   ];
   assert.deepEqual(byOrder(tasks).map((one) => one.id), ["T2", "T3", "T1"]);
+});
+
+// T97：期审清单发出那一刻的段才算它的范围；之后预备段里新加的活不让它过期。
+test("a period brief goes stale only for segments that existed when it went out", () => {
+  const at = "2026-01-02T01:00:00Z";
+  const base0 = {
+    segments: [{ id: "S01.1", closedAt: "2026-01-01T00:00:00Z" }],
+    briefs: [{ scope: "session", at, answeredBy: null }],
+    reviews: [{ scope: "session", at, v: 20, verdict: "pass", voidedAt: null }],
+    tasks: [],
+  };
+  assert.equal(stalePeriod(base0), false, "发出之后什么都没动：结论还是这一期的");
+  // 发出之后又落了一条段结论：这一期又动了，期审要重出。
+  assert.equal(
+    stalePeriod({ ...base0, reviews: [...base0.reviews, { scope: "segment", at: "2026-01-02T02:00:00Z" }] }),
+    true,
+  );
 });
