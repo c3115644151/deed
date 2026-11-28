@@ -7,6 +7,8 @@
 // reaches the ledger. Nothing outside this file decides what can be written.
 
 import { MEANING, UnknownKindError, meaningOf } from "./events.mjs";
+// 移出去的重放：core/replay 的注册表。没有注册的 kind 仍然走这个文件里的 switch。
+import { reduce } from "./replay/index.mjs";
 
 const noway = (message) => {
   throw new Error(message);
@@ -237,6 +239,9 @@ export const settledSince = (session, task) => {
 export function fold(events) {
   const doc = blank();
   for (const ev of events) {
+    // 先问注册表（core/replay）：移出去的 kind 由各自的 reducer 处理。
+    // 没移的仍然走下面那个 switch——过渡期的兜底，P2 移完一个域删一段。
+    if (reduce(ev.k, { doc, ev, at: ev.at, meaning: meaningOf(ev), sessionOf, taskOf, editable, noway })) continue;
     switch (ev.k) {
       case "turn": {
         const session = sessionOf(doc, ev);
@@ -474,28 +479,6 @@ export function fold(events) {
       }
       // 改到下一段是决定，不是判决：它也能撤回——条目回到"现在收活的那一段"接着做。
       // 撤回要说清为什么（与撤回一条放弃、一条交付同一套）。
-      case "task.uncarry": {
-        const session = sessionOf(doc, ev);
-        const task = taskOf(session, ev.id);
-        editable(session, task);
-        if (task.status !== "todo")
-          noway(`${task.id} 不是还没动手的条目（${task.status}）：只有没做的能从下一段拿回来`);
-        const take = session.segments.find((one) => one.closedAt === null && one.plannedAt === null) ?? null;
-        const to = ev.to ? session.segments.find((one) => one.id === ev.to) : take;
-        if (!to) noway(`${task.id} 要回到哪一段？现在没有收活的段`);
-        if (to.closedAt !== null) noway(`${to.id} 已经封闭：条目回不去`);
-        if (to.id === task.segment) noway(`${task.id} 已经在这一段（${to.id}）：没有可撤回的`);
-        const from = task.segment;
-        task.segment = to.id;
-        // 走了空的段跟着消失：一个只剩格子的"下一段"会让下一条新活落进谁也没打算做的段。
-        const left = session.segments.find((one) => one.id === from);
-        const used =
-          session.tasks.some((one) => one.segment === from) ||
-          (session.briefs ?? []).some((one) => (one.segment ?? null) === from) ||
-          session.reviews.some((one) => one.segment === from);
-        if (left && !used) session.segments = session.segments.filter((one) => one.id !== from);
-        break;
-      }
       case "task.carry": {
         const session = sessionOf(doc, ev);
         const task = taskOf(session, ev.id);

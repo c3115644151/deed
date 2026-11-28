@@ -22,6 +22,44 @@ export const PARADIGM = {
   free: [],
 };
 
+
+// ---- 系统结构那三条（docs/PLAN-ARCH.md 的 R1/R2/R3）----------------------------------
+// 这三条不判"这个工作区的项目像不像个项目"，判的是**deed 自己这套源码**的结构：
+// 一次改动要读多少、一条事件的处理散没散、依赖有没有反着走。它们读盘上的事实（tree），
+// 不自己读文件——体检层是纯的。
+
+// 路径 → 层。两个目录以下的都算它所在的那一层（replay/reducers/work.mjs 算 replay）。
+const layerOf = (file) => {
+  const parts = String(file).split("/");
+  if (parts[0] === "adapters") return "adapters";
+  return parts.length > 1 ? parts[0] : ""; // core / lib / cli / board / adapters
+};
+
+// 只允许这些方向：谁可以 import 谁。反着的每一条都报出来，附文件与它引了谁。
+const MAY_IMPORT = {
+  core: ["core"],
+  lib: ["lib", "core"],
+  cli: ["cli", "lib", "core", "board"],
+  board: ["board", "lib", "core"],
+  adapters: ["adapters", "lib", "core"],
+};
+
+// 单文件上限：分支数硬、行数软。数值与 docs/PLAN-ARCH.md §4 的表是同一份。
+const LIMITS = [
+  // 今天的热点：拆完就该落回上限内。把它们写在这里，红的就是"要拆的地方"，不是"新写的代码"。
+  { match: /^core\/fold\.mjs$/u, lines: 80, branches: 6, what: "core/fold.mjs（目标：分发器）" },
+  { match: /^core\/rules\.mjs$/u, lines: 150, branches: 8, what: "core/rules.mjs（目标：拆成 policy）" },
+  { match: /^core\/events\.mjs$/u, lines: 220, branches: 12, what: "core/events.mjs（目标：拆成 events/<域>）" },
+  { match: /^cli\/session\.mjs$/u, lines: 150, branches: 8, what: "cli/session.mjs（目标：只剩 io 帮助）" },
+  { match: /^board\/render\.mjs$/u, lines: 400, branches: 12, what: "board/render.mjs（目标：拆成 render/*）" },
+  { match: /^core\/events\//u, lines: 220, branches: 12, what: "events/*" },
+  { match: /^core\/replay\/reducers\//u, lines: 260, branches: 16, what: "replay/reducers/*" },
+  { match: /^core\/policy\//u, lines: 150, branches: 8, what: "policy/*" },
+  { match: /^core\/facts\//u, lines: 200, branches: 8, what: "facts/*" },
+  { match: /^cli\/verbs\//u, lines: 200, branches: 10, what: "cli/verbs/*" },
+  { match: /^board\/render\//u, lines: 400, branches: 12, what: "board/render/*" },
+];
+
 export const CHECKS = [
   {
     id: "workspace",
@@ -124,6 +162,78 @@ export const CHECKS = [
       const text = String(project.background ?? "").trim();
       if (text === "") return { verdict: "fail", detail: "背景是空的：签收与期审没有尺子可用" };
       return { verdict: "pass", detail: text.length + " 字" };
+    },
+  },
+  {
+    id: "system-layers",
+    title: "deed 自己的依赖方向",
+    capability: "结构约束（R3）",
+    fix: "把查询下沉 core/facts，把 io 推回 cli；需要的值当参数传进来",
+    judge: ({ tree }) => {
+      if (!tree) return { verdict: "na", detail: "这次没带目录快照" };
+      // 这三条量的是 deed 这套源码；用户项目有自己的分层声明（由 shape 那条判）。
+      if (!tree.self) return { verdict: "na", detail: "这个工作区不是 deed 自己" };
+      const broken = [];
+      for (const edge of tree.imports) {
+        // 测试是"用这套结构的人"，它可以引任何一层；结构约束只管产品代码。
+        if (edge.from.startsWith("test/")) continue;
+        const from = layerOf(edge.from);
+        const to = layerOf(edge.to);
+        if (!from || !to || from === to) continue;
+        // 只判 deed 自己那五层：别的名字（app/tests/docs…）不归这条管。
+        if (!MAY_IMPORT[from] || !MAY_IMPORT[to]) continue;
+        if (!MAY_IMPORT[from].includes(to)) broken.push(edge.from + " → " + to + "（" + edge.to + "）");
+      }
+      if (broken.length > 0)
+        return { verdict: "fail", detail: broken.length + " 处反向依赖：" + [...new Set(broken)].slice(0, 3).join("；") };
+      return { verdict: "pass", detail: tree.imports.length + " 条相对引用，方向都对" };
+    },
+  },
+  {
+    id: "file-size",
+    title: "单文件的分支数在上限内",
+    capability: "结构约束（R1）",
+    fix: "说清它其实在答的第二个问题并据此拆文件；数据与逻辑分家；都不成立就写 why-long 登记豁免",
+    judge: ({ tree }) => {
+      if (!tree || !tree.stats) return { verdict: "na", detail: "这次没带目录快照" };
+      if (!tree.self) return { verdict: "na", detail: "这个工作区不是 deed 自己" };
+      const over = [];
+      const long = [];
+      for (const one of tree.stats) {
+        const rule = LIMITS.find((limit) => limit.match.test(one.file));
+        if (!rule) continue;
+        if (one.branches > rule.branches) over.push(rule.what + " · " + one.file + " 分支 " + one.branches + ">" + rule.branches);
+        else if (one.lines > rule.lines) long.push(rule.what + " · " + one.file + " 行 " + one.lines + ">" + rule.lines);
+      }
+      if (over.length > 0)
+        return {
+          verdict: "fail",
+          detail: over.length + " 个文件分支超限：" + over.slice(0, 4).join("；") + (long.length ? "（另有 " + long.length + " 个文件行数超限，只列不判）" : ""),
+        };
+      return {
+        verdict: "pass",
+        detail: tree.stats.length + " 个源文件，分支都在上限内" + (long.length ? "；行数超限 " + long.length + " 个（软）" : ""),
+      };
+    },
+  },
+  {
+    id: "registry",
+    title: "每一种事件都有它的处理处",
+    capability: "结构约束（R2）",
+    fix: "在 core/events/<域>.mjs 里登记这一种，在 core/replay/reducers/<域>.mjs 里写它的处理",
+    judge: ({ tree }) => {
+      if (!tree) return { verdict: "na", detail: "这次没带目录快照" };
+      if (!tree.self) return { verdict: "na", detail: "这个工作区不是 deed 自己" };
+      const handlers = new Set();
+      // 过渡期：旧的 fold switch 也算"有处理处"；移完之后这条检查自然会要求注册表。
+      for (const hit of tree.foldCases ?? []) handlers.add(hit);
+      for (const hit of tree.reducerKinds ?? []) handlers.add(hit);
+      if (handlers.size === 0) return { verdict: "na", detail: "没有找到任何事件处理处" };
+      const missing = (tree.eventKinds ?? []).filter((kind) => !handlers.has(kind));
+      const extra = [...handlers].filter((kind) => !(tree.eventKinds ?? []).includes(kind) && kind !== "default");
+      if (missing.length > 0) return { verdict: "fail", detail: missing.length + " 种事件没有处理处：" + missing.slice(0, 4).join("、") };
+      if (extra.length > 0) return { verdict: "fail", detail: "这些处理处没有对应的事件定义：" + extra.slice(0, 4).join("、") };
+      return { verdict: "pass", detail: (tree.eventKinds ?? []).length + " 种事件，都有处理处" };
     },
   },
 ];

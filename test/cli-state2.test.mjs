@@ -280,14 +280,14 @@ test("a workspace is not a project until it says so, and the standing is compute
   assert.equal(kinds(cwd).filter((one) => one === "project.declare").length, 1, "声明是账本上的一行");
 
   const declared = deed(cwd, "check");
-  assert.match(declared.stdout, /项目 · software · 3\/3 条通过/u);
-  assert.match(deed(cwd, "state").stdout, /项目 · software · 3\/3/u);
+  assert.match(declared.stdout, /项目 · software · 6\/6 条通过/u);
+  assert.match(deed(cwd, "state").stdout, /项目 · software · 6\/6/u);
 
   // 树一走样，状态自己掉回去：它是当前值，不是一次性的徽章。
   fs.writeFileSync(path.join(cwd, "core", "a.mjs"), 'import "../app/x.mjs";\nexport const a = 1;\n');
   const fell = deed(cwd, "check");
   assert.equal(fell.status, 0, "未通过也不是命令失败：它不挡三种状态");
-  assert.match(fell.stdout, /2\/3 条通过/u);
+  assert.match(fell.stdout, /5\/6 条通过/u);
   assert.match(fell.stdout, /✗ 文件树符合范式/u);
   assert.match(fell.stdout, /未通过 1 条；它们不挡三种状态/u);
 });

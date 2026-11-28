@@ -6,11 +6,11 @@
 
 ---
 
-## 1. 目标与判据
+## 1. 目标与标准
 
-三条可量的判据，缺一条这套方案就不成立：
+三条可量的标准，缺一条这套方案就不成立：
 
-| 判据 | 今天 | 目标 |
+| 标准 | 今天 | 目标 |
 |---|---|---|
 | **加一条事件要读多少** | 在 `core/events.mjs`(545 行) 与 `core/fold.mjs`(1149 行) 里各找一处，两处必须同步 | 新建 2 个文件 + 注册表 1 行；不读别人的分支 |
 | **改一个概念要动几层** | 「谁能启动审查」散在 verbs / gates / render / adapter / rules / 测试，一次动 23 个文件 | 一处判（`policy/review.mjs`），其余三层都问它；改动 ≤ 5 文件 |
@@ -70,7 +70,7 @@ cli/verbs/submit.mjs   608 行 · cli/session.mjs 445 行 · 21 个导出
   兼容层之所以不需要，是因为注册表把"谁处理哪种事实"的接线集中在一处，加一个 kind 不触碰别的 kind 的代码。
 - **与 R1 的冲突**：只有当同一个域文件也超过分支上限时才冲突，处置见 R1 的三选一（通常是"这个域在管两件事"，再分一次域）。
 - **检测** `checks:registry`：KINDS ↔ reducers 双向对账；再加一条"同域新增分支必须在该域文件内"（对比上一版，若某 kind 的处理散落到两个文件就报）。
-- **修法**：把分支搬回它的域文件，注册表补一行。
+- **修法**：把分支移回它的域文件，注册表补一行。
 
 ### R3 依赖方向必须可断言
 
@@ -94,7 +94,7 @@ cli/verbs/submit.mjs   608 行 · cli/session.mjs 445 行 · 21 个导出
   是这条规则的真实收益——不只是"少改几个文件"，而是**审查有一个可指的地方**。
 - **检测** `checks:outlets`：对登记过的概念，扫源码里是否还有第二处"同义判断"（先用人工登记的关键词 +
   函数名近似匹配）；第一版只列候选，人工确认后才升级为红。
-- **修法**：把判断搬进出口文件，其余处改成调用；调用方若需要不同的措辞，那是**话术**，留在调用方。
+- **修法**：把判断移进出口文件，其余处改成调用；调用方若需要不同的措辞，那是**话术**，留在调用方。
 
 ### R5a 机制改动要留"为什么现在动它"
 
@@ -140,7 +140,7 @@ core/
     review.mjs         该不该审、清单过没过期、结论立不立得住、审查门（R4 的出口）
     step.mjs           下一步是谁、做什么（只问 facts 与 policy，不做别的判断）
     sign.mjs           能不能签、能不能封、带着走哪些未结项
-    session.mjs        谁在推进、什么形态、目的、压力读数
+    session.mjs        谁在推进、什么形态、目的、压力数
     segment.mjs        哪一段收活、段还能不能再进条目
   facts/
     tasks.mjs          tasksIn / countIn / byOrder / lastDelivery / pointsAtNothing / unpinned
@@ -228,7 +228,7 @@ export const reduce = (ctx, ev) => {
 
 ## 7. 概念出口（R4 的首批落地）
 
-三个概念先收口，每个只留一处判断：
+三个概念先结束，每个只留一处判断：
 
 1. **审查能不能开始**：`policy/review.mjs` 出 `reviewDoor(config, session, segment) → { can, why, segment }`。
    `board/gates.mjs`、`board/render.mjs`、`adapters/dsh`、`cli/verbs/review.mjs` 全部问它，
@@ -245,15 +245,15 @@ export const reduce = (ctx, ev) => {
 - 新增三条检查：`layers`、`registry`（此时必然全过）、`file-size`（此时必然全红，全红正是基线）。
 - 把 34 个 case、42 个导出、每个文件行数记成基线表，写进本文件附录。
 
-**P1 纵向切片：只搬 `task.uncarry`**
+**P1 纵向切片：只移 `task.uncarry`**
 - 新建 `events/work.mjs` + `replay/reducers/work.mjs`，注册表只有一条；
   `fold` 的 `case "task.uncarry"` 删除，改为分发时查注册表、查不到再走旧 switch。
 - 验收：`task.uncarry` 的三个用例照旧过；新旧两条路在同一个账本上重放出同一份文档（对拍）。
 - 量：碰了 4 个文件、写了多少行、读了多少行——写进本文件附录，作为"手感"的第一个数据点。
 
-**P2 按域搬完重放**
+**P2 按域移完重放**
 - 顺序：work → review → segment → talk/topic/session → legacy。
-- 每搬一个域：删 `fold` 里对应的 case、补用例、对拍（旧账本上新旧重放结果逐字段相等）。
+- 每移一个域：删 `fold` 里对应的 case、补用例、对拍（旧账本上新旧重放结果逐字段相等）。
 - 一个域一个提交，禁止跨域混提。
 
 **P3 策略按问题拆**
@@ -261,11 +261,11 @@ export const reduce = (ctx, ev) => {
   同时改调用点；转出口的 owner 与删除日期写进 `docs/DESIGN.md`。
 - 验收：`rules.mjs` 少于 60 行，且没有任何判断逻辑；调用点全部指向 `policy/*`。
 
-**P4 概念出口收口**（§7）
+**P4 概念出口结束**（§7）
 - 验收：`render/gates/adapter` 里不再出现"该审 + 没在判"的特征串；`checks:outlets` 通过。
 
 **P5 cli 瘦身**
-- `submit` 拆成 `plan-apply`（把清单变更转成事件，纯函数）+ `submit`（读盘、落账、话术）；
+- `submit` 拆成 `plan-apply`（把清单变更转成事件，纯函数）+ `submit`（读盘、记账、话术）；
   `review` 同样拆成 `verdict-apply` + `review`。
 - 验收：每个 verb ≤ 200 行；`cli/session.mjs` 只留 io 帮助（≤ 150 行）。
 
@@ -293,7 +293,7 @@ export const reduce = (ctx, ev) => {
 - **命令面**：全程不改动词与开关；只在 P5 拆内部分层，外部行为不变。
 - **面板**：P4 之后 `gates`/`render` 只问 policy；渲染断言保持"关键句 + 按钮在不在"，不做 HTML 全等。
 - **文档**：`docs/DESIGN.md` 补一节「结构与边界」；`AGENTS.md` 的规则块由 `deed init --print-agents` 重新出。
-- **测试**：每搬一个域补该域的 reducer 用例（同一账本、同一期望）；CLI 用例只测话术与流程。
+- **测试**：每移一个域补该域的 reducer 用例（同一账本、同一期望）；CLI 用例只测话术与流程。
 
 ---
 
@@ -301,7 +301,7 @@ export const reduce = (ctx, ev) => {
 
 | 风险 | 说明 | 处置 |
 |---|---|---|
-| 拆分期间双路径 | 旧 switch 与新注册表并存 | P1 就定"注册表优先、旧 switch 兜底"，每搬完一个域立即删掉那段 switch |
+| 拆分期间双路径 | 旧 switch 与新注册表并存 | P1 就定"注册表优先、旧 switch 兜底"，每移完一个域立即删掉那段 switch |
 | 对拍成本被低估 | 旧账本 1000+ 事件，字段多 | 对拍不逐事件，只比最终 doc 的 JSON（排序稳定化后深比较） |
 | 概念出口检查太粗 | 特征串会误报 | 首版只列候选，人工确认后才升级 |
 | 迁移把当前进度拖住 | 系统处于"暂停使用"状态 | 正好：没有真实使用在推进，迁移窗口是干净的 |
@@ -319,12 +319,29 @@ export const reduce = (ctx, ev) => {
 
 ---
 
-## 附录 A：基线（P0 之后填）
+## 附录 A：基线（2026-11-29 · P0/P1 之后）
 
-- 文件行数表：待填
-- 34 case → 域映射：见 §4
-- 42 导出 → 文件映射：见 §6
-- `task.uncarry` 切片实测（P1 后填）：碰了几个文件 / 读了多少行 / 与旧的对照
+**体检现在的样子**（`deed check`，`lib/tree.mjs` 提供目录快照，检查层是纯的）：
+
+```
+✓ 账本可读、审查设置已声明 · 2 期
+✓ 文件树符合范式 · 5 个目录，格都在、都有归属、方向都对（偏离：app 用 cli、tests 用 test）
+✓ 项目背景已写 · 55 字
+✓ deed 自己的依赖方向 · 242 条相对引用，方向都对
+✗ 单文件的分支数在上限内 · 10 个文件分支超限（render 143·session 55·submit 107·review 72 …）
+✓ 每一种事件都有它的处理处 · 34 种事件，都有处理处
+```
+
+三条新检查都只在"这个工作区是 deed 自己"（`package.json` 的 name）时成立——用户项目不该被 deed 的分层判。
+
+**P1 切片实测（`task.uncarry`）**：
+
+- 新建：`core/replay/index.mjs`（24 行，注册表与分发）、`core/replay/reducers/work.mjs`（28 行，一个函数）
+- 改动：`core/fold.mjs`（删掉那一段 case、循环开头加一行询问、import 一行）
+- 对拍：同一份账本（2 期、645482 字）上，HEAD 的 `fold` 与新的 `fold` 输出 sha256 前 16 位相同（`0ff0ad27be65b7ad`）
+- 结论：**新增一类事实不再需要读 1149 行**——找到 `reducers/work.mjs` 就是全部上下文
+
+**还没做的**：`checks:tree`（地图 ↔ 目录对账，P2 结束前做成软报告）。
 
 7. **分支上限**：12 个分支／文件，这个数要不要按域调（`reducers/work` 天然分支多，可能要给 16）？
 8. **地图是否当硬门**：`docs/STRUCTURE.md` 与目录双向对账，缺一条就红——现在没有这份地图，等于要先补齐 35 个文件的行。

@@ -12,7 +12,8 @@ const doc = (project = null) => ({
   project,
 });
 
-const tree = (files, imports = [], plan = true) => ({ files, imports, plan });
+// 三条"deed 自己的结构"检查只在这个工作区是 deed 时成立：fixtures 默认带 self。
+const tree = (files, imports = [], plan = true, extra = {}) => ({ files, imports, plan, self: true, ...extra });
 const declared = (extra = {}) => ({
   shape: "software",
   background: "一个本地工具，给一个人用；不碰网络。",
@@ -27,7 +28,7 @@ const declared = (extra = {}) => ({
 test("the registry is an ordered list of named checks", () => {
   assert.deepEqual(
     CHECKS.map((one) => one.id),
-    ["workspace", "shape", "background"],
+    ["workspace", "shape", "background", "system-layers", "file-size", "registry"],
     "顺序就是它们成立的顺序：能记账 → 树对不对 → 背景写没写",
   );
   for (const one of CHECKS) {
@@ -41,7 +42,10 @@ test("without a project, only the workspace check applies", () => {
   const state = projectState(doc(), tree([]));
   assert.equal(state.declared, false);
   assert.equal(state.missing.length, 0, "不适用不算未结项");
-  assert.deepEqual(checkAll(doc(), tree([])).map((one) => one.verdict), ["pass", "na", "na"]);
+  assert.deepEqual(checkAll(doc(), tree([])).map((one) => one.verdict), ["pass", "na", "na", "pass", "na", "na"]);
+  // 用户工作区不该被 deed 自己的分层判：三条都显示 na。
+  const user = checkAll(doc(), tree([], [], true, { self: false })).map((one) => one.verdict);
+  assert.deepEqual(user, ["pass", "na", "na", "na", "na", "na"], "不当成 deed 时结构三条不适用");
 });
 
 test("a declared project passes when the tree keeps the declared directions", () => {
@@ -54,7 +58,7 @@ test("a declared project passes when the tree keeps the declared directions", ()
     tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "app/b.mjs", to: "core/a.mjs" }]),
   );
   assert.equal(state.declared, true);
-  assert.equal(state.passed, 3);
+  assert.equal(state.passed, 6);
   assert.deepEqual(state.missing, []);
 });
 
@@ -116,12 +120,12 @@ test("a ledger that cannot be read turns the first check red, before anything el
 
 test("the standing falls back when the tree moves: it is a value, not a badge", () => {
   const before = projectState(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"]));
-  assert.equal(before.passed, 3);
+  assert.equal(before.passed, 6);
   const after = projectState(
     doc(software()),
     tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "core/a.mjs", to: "app/b.mjs" }]),
   );
-  assert.equal(after.passed, 2);
+  assert.equal(after.passed, 5);
   assert.deepEqual(after.missing, ["文件树符合范式"]);
 });
 
@@ -195,5 +199,66 @@ test("the structure is not a set of empty folders: the plan and the tests must r
 
 test("a project that opted out of structure says so instead of passing it", () => {
   const list = checkAll(doc(declared({ shape: "free", layers: [] })), null);
-  assert.deepEqual(list.map((one) => one.verdict), ["pass", "na", "pass"], "不适用就是 na：它没通过，只是这条对它不成立");
+  assert.deepEqual(
+    list.map((one) => one.verdict),
+    ["pass", "na", "pass", "na", "na", "na"],
+    "不适用就是 na：它没通过，只是这条对它不成立",
+  );
+});
+
+// ---- 系统结构那三条：它们是 deed 自己的检查，与"这个工作区是不是项目"无关 ----------
+
+test("a branch count over the limit is red, and it names the file", () => {
+  const stats = [
+    { file: "cli/verbs/wide.mjs", lines: 90, branches: 14 },
+    { file: "cli/verbs/narrow.mjs", lines: 90, branches: 5 },
+  ];
+  const one = checkAll(doc(software()), tree(["core/a.mjs"], [], true, { stats })).find((x) => x.id === "file-size");
+  assert.equal(one.verdict, "fail");
+  assert.match(one.detail, /wide\.mjs 分支 14>10/u);
+  assert.doesNotMatch(one.detail, /narrow/u, "没超的不该出现");
+});
+
+test("a file that is long but has few branches is only listed, not failed", () => {
+  const stats = [{ file: "cli/verbs/long.mjs", lines: 400, branches: 6 }];
+  const one = checkAll(doc(software()), tree(["core/a.mjs"], [], true, { stats })).find((x) => x.id === "file-size");
+  assert.equal(one.verdict, "pass");
+  assert.match(one.detail, /行数超限 1 个/u, "软指标只列出来");
+});
+
+test("a dependency that points the wrong way is red, with the edge", () => {
+  const list = checkAll(
+    doc(software()),
+    tree(["core/a.mjs", "cli/b.mjs"], [{ from: "core/a.mjs", to: "cli/b.mjs" }]),
+  );
+  const one = list.find((x) => x.id === "system-layers");
+  assert.equal(one.verdict, "fail");
+  assert.match(one.detail, /core\/a\.mjs → cli/u);
+});
+
+test("tests may import anything: they are users of the structure, not part of it", () => {
+  const one = checkAll(doc(software()), tree(["core/a.mjs"], [{ from: "test/x.test.mjs", to: "board/render.mjs" }])).find(
+    (x) => x.id === "system-layers",
+  );
+  assert.equal(one.verdict, "pass", one.detail);
+});
+
+test("every event kind has a handler, and a handler without a kind is red too", () => {
+  const ok = checkAll(
+    doc(software()),
+    tree(["core/a.mjs"], [], true, { eventKinds: ["turn", "task.add"], foldCases: ["turn", "task.add"], reducerKinds: [] }),
+  ).find((x) => x.id === "registry");
+  assert.equal(ok.verdict, "pass");
+  const missing = checkAll(
+    doc(software()),
+    tree(["core/a.mjs"], [], true, { eventKinds: ["turn", "task.add"], foldCases: ["turn"], reducerKinds: [] }),
+  ).find((x) => x.id === "registry");
+  assert.equal(missing.verdict, "fail");
+  assert.match(missing.detail, /task\.add/u);
+  const extra = checkAll(
+    doc(software()),
+    tree(["core/a.mjs"], [], true, { eventKinds: ["turn"], foldCases: ["turn", "ghost.kind"], reducerKinds: [] }),
+  ).find((x) => x.id === "registry");
+  assert.equal(extra.verdict, "fail");
+  assert.match(extra.detail, /ghost\.kind/u);
 });
