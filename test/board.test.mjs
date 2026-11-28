@@ -501,3 +501,36 @@ test("a task exported from a topic says so, and the topic is one click away", ()
   assert.match(html, /<a class="xref" href="#I1" data-screen="discuss">I1<\/a>/u, "议题号是直链");
   assert.match(html, /已经出口：T1/u, "议题卡说出出口了哪几条");
 });
+
+// 一段走过不止一帧：几份清单、几次结论都看得见，作废的也在时间线上标出来；
+// 每条条目印它最近一次被判成什么。屏上原来只剩最后那一帧，读不出"怎么走过来的"。
+test("a segment shows how it got here: every sheet, every verdict, and what each item was judged", () => {
+  const sheet = (n, name, tasks) => ({ v: 36, at: T(n), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: name, guide: name.replace(".md", "-reviewer.md"), tasks });
+  const log = (n, verdict, results, brief = "b.md") => ({
+    v: 35, at: T(n), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict, brief, findings: [], results,
+    ...(verdict === "fail" ? { rework: results.filter((one) => one.verdict === "unmet").map((one) => one.id) } : {}),
+  });
+  const ledger = [
+    { v: 1, at: T(1), k: "turn", s: null, who: "user", said: "做重放" },
+    { v: 1, at: T(2), k: "task.add", s: null, id: "T1", title: "重放", criteria: "同账本同文档", files: ["core/fold.mjs"] },
+    { v: 1, at: T(3), k: "task.done", s: null, id: "T1", evidence: "node --test", by: "agent" },
+    sheet(4, "s011-a.md", ["T1"]),
+    log(5, "fail", [{ id: "T1", verdict: "unmet", note: "重放里还有一处读时钟" }], "s011-a.md"),
+    { v: 1, at: T(5), k: "task.done", s: null, id: "T1", evidence: "node --test 又跑一遍", by: "agent" },
+    sheet(6, "s011-b.md", ["T1"]),
+    log(7, "fail", [{ id: "T1", verdict: "unmet", note: "第二遍还是慢" }], "s011-b.md"),
+    { v: 1, at: T(7), k: "task.done", s: null, id: "T1", evidence: "node --test 第三遍", by: "agent" },
+    sheet(8, "s011-c.md", ["T1"]),
+    log(9, "fail", [{ id: "T1", verdict: "unmet", note: "又读时钟了" }], "s011-c.md"),
+    { v: 1, at: T(10), k: "task.done", s: null, id: "T1", evidence: "node --test 第四遍", by: "agent" },
+  ];
+  const one = fold(ledger);
+  const page = renderBoard(one, config, { zone, events: ledger.length });
+  assert.match(page, /第 3 份清单 · 判过 3 次/u, "走过几份、判过几次");
+  const hist = page.slice(page.indexOf('class="hist"'));
+  assert.match(hist, /s011-a\.md/u, "第一份清单在时间线上");
+  assert.match(hist, /s011-c\.md/u, "最后一份也在");
+  assert.match(hist, /作废/u, "被后来的结论顶掉的要标出来");
+  assert.match(page, /最近一次判定/u, "每条条目印它最近一次被判成什么");
+  assert.match(page, /这条之后改过，判定说的是旧内容/u, "判过之后又改过的，不假装那句判定还算数");
+});

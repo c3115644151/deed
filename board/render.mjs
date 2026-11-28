@@ -280,7 +280,23 @@ function discussScreen(session, zone, on) {
     "</div></section>"
   );
 }
-function taskRow(task, zone, anchors) {
+// 一条条目最近一次被判成什么：结论按条记在 results 里，屏上不该只看得见最后那一帧。
+// 判过之后这条又改过的，那句判定说的是旧内容——照实标出来，不假装它还算数。
+function judgementOf(session, task) {
+  const rows = [];
+  for (const rv of session?.reviews ?? []) {
+    if (rv.scope !== "segment") continue;
+    for (const one of rv.results ?? []) {
+      if (one.id !== task.id) continue;
+      rows.push({ verdict: one.verdict, note: one.note ?? "", at: rv.at, by: rv.by, voidedAt: rv.voidedAt ?? null });
+    }
+  }
+  const last = rows.at(-1);
+  if (!last) return null;
+  return { ...last, outgrown: Boolean(task.touchedAt && task.touchedAt > last.at) };
+}
+
+function taskRow(task, zone, anchors, session) {
   const pins = task.evidence.length === 0 ? 0 : pinsOf(task.evidence[task.evidence.length - 1]).length;
   const proofs = task.evidence
     .map(
@@ -307,6 +323,7 @@ function taskRow(task, zone, anchors) {
         : "未声明路径";
   const last = task.evidence[task.evidence.length - 1];
   const batched = Boolean(last && last.batch);
+  const judged = judgementOf(session, task);
   return (
     '<details class="task" data-status="' + task.status + '">' +
     "<summary>" +
@@ -318,6 +335,9 @@ function taskRow(task, zone, anchors) {
     (batched ? '<span class="tbatch">同批</span>' : "") +
     ((task.undone && task.undone.length > 0) ? '<span class="tundone">撤 ' + task.undone.length + "</span>" : "") +
     ((task.revived && task.revived.length > 0) ? '<span class="trevived">撤回过放弃</span>' : "") +
+    (judged && !judged.outgrown && !judged.voidedAt
+      ? '<span class="tjudge ' + (judged.verdict === "met" ? "ok" : "no") + '">' + (judged.verdict === "met" ? "判过" : "没过") + "</span>"
+      : "") +
     (task.order === null || task.order === undefined ? "" : '<span class="torder">先 ' + task.order + "</span>") +
     "</span>" +
     '<span class="tfiles">' + esc(files) + "</span>" +
@@ -332,6 +352,13 @@ function taskRow(task, zone, anchors) {
       : "") +
     (task.source ? '<p class="k">依据</p><p class="crit">' + linkRefs(task.source, anchors) + "</p>" : "") +
     '<p class="k">做完的标准</p><p class="crit">' + esc(task.criteria) + "</p>" +
+    (judged
+      ? '<p class="k">最近一次判定</p><p class="judged ' + (judged.verdict === "met" ? "ok" : "no") + '">' +
+        esc(judged.verdict === "met" ? "达成" : judged.verdict === "unmet" ? "没达成" : judged.verdict) +
+        " · " + esc(judged.by ?? "审查者") + " · " + when(judged.at, zone) +
+        (judged.voidedAt ? "（那条结论作废了）" : judged.outgrown ? "（这条之后改过，判定说的是旧内容）" : "") +
+        (judged.note ? " · " + esc(judged.note) : "") + "</p>"
+      : "") +
     '<p class="k">交付记录</p>' +
     (proofs ? '<ul class="proofs">' + proofs + "</ul>" : '<p class="quiet">还没有交付</p>') +
     (undone ? '<ul class="undones">' + undone + "</ul>" : "") +
@@ -388,7 +415,6 @@ function segmentBlock(session, segment, index, config, zone, anchors) {
     '<span class="sidx">' + String(index).padStart(2, "0") + "</span>" +
     '<span class="sid">' + esc(segment.id) + "</span>" +
     '<span class="scount">' + count.total + " 条 · 未做 " + count.todo + " · 已交付 " + (count.done + count.accepted) + "</span>" +
-    "</span>" +
     '<span class="smeter2" title="' + (count.done + count.accepted) + " / " + count.total + '">' +
     '<span class="sfill" style="width:' + Math.round(((count.done + count.accepted) / Math.max(1, count.total)) * 100) + '%"></span></span>' +
     '<span class="swhen">' + when(segment.openedAt, zone) + (segment.closedAt ? " → " + when(segment.closedAt, zone) : "") + "</span>" +
@@ -412,7 +438,7 @@ function segmentBlock(session, segment, index, config, zone, anchors) {
       groupsOf(tasks)
         .map((group) =>
           '<p class="tgroup" data-group="' + group.key + '">' + group.label + " · " + group.tasks.length + " 条</p>" +
-          group.tasks.map((task) => taskRow(task, zone, anchors)).join(""),
+          group.tasks.map((task) => taskRow(task, zone, anchors, session)).join(""),
         )
         .join("") +
       "</div>" +
@@ -459,6 +485,9 @@ function acceptScreen(doc, session, config, zone, on) {
       const review = reviewOf(session, segment);
       const state = reviewState(config, session, segment);
       const count = countIn(session, segment);
+      // 一段走过几份清单、被判过几次：屏上原来只剩最后那一帧，看不出这一段怎么走过来的。
+      const sheets = session.briefs.filter((one) => (one.segment ?? null) === segment.id);
+      const logs = session.reviews.filter((one) => one.scope === "segment" && one.segment === segment.id);
       const queued = segment.closedAt === null && taking !== segment;
       const waiting = segment.verdict === "pass" && segment.closedAt === null;
       const word = queued
@@ -478,10 +507,37 @@ function acceptScreen(doc, session, config, zone, on) {
             : segment.verdict === "exempt" ? "免审 · " + (segment.sealedWhy ? esc(segment.sealedWhy) : "当时没写理由")
             : "还没有结论") + "</span>" +
         '<span class="vcount">' + count.total + " 条 · " + (review ? "点了 " + review.findings.length + " 条" : "没有发现") + "</span>" +
+        (logs.length > 1 || sheets.length > 1
+          ? '<span class="vtrace">第 ' + sheets.length + " 份清单 · 判过 " + logs.length + " 次</span>"
+          : "") +
         "</div>" +
         (review
           ? '<p class="vbrief"><span class="k">清单</span>' + esc(String(review.brief).split(/[\\/]/).pop()) +
             (review.rework && review.rework.length ? '　<span class="k">退回</span>' + esc(review.rework.join("、")) : "") + "</p>"
+          : "") +
+        (logs.length > 1 || sheets.length > 1
+          ? '<details class="hist"><summary>走过 ' + logs.length + " 份结论" + (sheets.length ? "、出过 " + sheets.length + " 份清单" : "") +
+            "</summary><ol>" +
+            logs
+              .map((one) => {
+                const met = (one.results ?? []).filter((r) => r.verdict === "met").length;
+                const unmet = (one.results ?? []).filter((r) => r.verdict === "unmet").length;
+                const unknown = (one.results ?? []).filter((r) => r.verdict === "unknown").length;
+                return (
+                  '<li class="' + (one.verdict === "pass" ? "ok" : "no") + (one.voidedAt ? " void" : "") + '">' +
+                  '<span class="hline"><span class="hat">' + when(one.at, zone) + "</span>" +
+                  '<span class="hv">' + (one.verdict === "pass" ? "通过" : "不合格") + "</span>" +
+                  '<span class="hb">' + esc(String(one.brief).split(/[\\/]/).pop()) + "</span>" +
+                  '<span class="hwho">' + esc(one.by ?? "") + "</span></span>" +
+                  '<span class="hn">' +
+                  (one.results && one.results.length
+                    ? "达成 " + met + " · 没过 " + unmet + (unknown ? " · 判不了 " + unknown : "")
+                    : one.rework && one.rework.length ? "点名 " + esc(one.rework.join("、")) : "没有逐条判定") +
+                  (one.voidedAt ? " · 作废" : "") + "</span></li>"
+                );
+              })
+              .join("") +
+            "</ol></details>"
           : "") +
         (review && review.findings.length ? '<div class="fds">' + findingList(review.findings) + "</div>" : "") +
         (waiting
@@ -947,7 +1003,7 @@ details.tsaid[open] > summary { color: var(--dim); }
   white-space: nowrap; }
 .gpress:hover { background: var(--signal); color: var(--bg); }
 .gpress:disabled { opacity: .5; cursor: default; }
-.gate.small { margin-top: 8px; align-items: center; }
+.gate.small { margin-top: 8px; align-items: center; padding: 0 14px; }
 .gask { font-size: 12px; color: var(--dim); white-space: nowrap; }
 .gate.small .gpress { font-size: 10px; padding: 4px 8px; }
 .exempts { list-style: none; margin: 0; padding: 0; }
@@ -995,6 +1051,30 @@ body.only-debt .task[data-status="accepted"], body.only-debt .task[data-status="
 @media (prefers-reduced-motion: reduce) {
   .hud::after, .tab.on .tmark, .screen.on { animation: none; }
 }
+.tjudge{margin-left:6px;padding:0 5px;border:1px solid currentColor;border-radius:2px;font-size:10px;letter-spacing:.06em}
+.tjudge.ok{color:var(--signal)}
+.tjudge.no{color:var(--fail)}
+.judged{margin:2px 0 0;font-size:12px;line-height:1.5;color:var(--dim)}
+.judged.ok{color:#8fd9c9}
+.judged.no{color:#d99a9a}
+.vtrace{margin-left:8px;font-size:10px;letter-spacing:.06em;color:var(--dim);border:1px solid var(--line2);padding:0 5px;border-radius:2px}
+.hist{margin:6px 0 0;border-top:1px dashed var(--line);padding-top:6px}
+.hist>summary{cursor:pointer;font-size:11px;letter-spacing:.08em;color:var(--dim);list-style:none}
+.hist>summary::-webkit-details-marker{display:none}
+.hist>summary:before{content:"▸ ";color:var(--line2)}
+.hist[open]>summary:before{content:"▾ "}
+.hist ol{list-style:none;margin:6px 0 0;padding:0 14px}
+.hist li{display:block;padding:6px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.6}
+.hist .hline{display:flex;gap:10px;align-items:baseline}
+.hist .hb{margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)}
+.hist .hn{display:block;color:var(--ink);padding-left:2px}
+.hist li:last-child{border-bottom:0}
+.hist .hat{color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hist .hwho{color:var(--dim)}
+.hist li.ok .hv{color:var(--signal)}
+.hist li.no .hv{color:var(--fail)}
+.hist li.void{opacity:.55}
+
 </style>`;
 
 const SCRIPT = `<script>
