@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { fold } from "../core/fold.mjs";
 import {
   byOrder,
+  freshBrief,
   reviewDue,
+  sheetHolds,
   verdictStands,
   stalePeriod,
   needsReview,
@@ -446,4 +448,22 @@ test("a pass the segment has outgrown asks for a new sheet instead of a verdict"
   assert.equal(due.segment, "S01.1");
   assert.equal(verdictStands(session, session.segments[0]), false, "过期的 pass 不算数");
   assert.deepEqual(signBlockers(doc, session, config), ["S01.1 还没有审查通过（审查者判的是这一段通不通过）"], "不再说等判决");
+});
+
+// 清单一变就换，会把审查者手上的活反复作废：一份也判不完，作者每交一条就换一份。
+// 清单是一份固定的卷子——不在这份卷子上的条目是下一份的事。
+test("a new entry does not invalidate the sheet in the reviewer's hands", () => {
+  const ledger = [
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), done(4, "T1"),
+    { v: 36, at: T(5), k: "review.brief", s: null, segment: "S01.1", by: "agent", brief: "s1.md", guide: "s1-reviewer.md", tasks: ["T1"] },
+    { v: 1, at: T(6), k: "task.add", s: null, id: "T2", title: "T2", criteria: "c", files: ["core/rules.mjs"] },
+    { v: 1, at: T(7), k: "task.done", s: null, id: "T2", evidence: "ran", by: "agent", digest: "b".repeat(64), digestPath: "core/rules.mjs", changed: ["core/rules.mjs"], bytes: { "core/rules.mjs": 100 } },
+  ];
+  const doc = fold(ledger);
+  const session = doc.sessions[0];
+  assert.equal(sheetHolds(session, session.segments[0]), true, "卷子上的 T1 没动过，这份清单还算数");
+  assert.equal(freshBrief(session, session.segments[0]).brief, "s1.md", "手上还是那一份，不另出一份");
+  // 但结论要是 pass，它不覆盖 T2——所以它不能算"这一段已经审过"。
+  const judged = fold([...ledger, { v: 35, at: T(8), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "s1.md", findings: [], results: [{ id: "T1", verdict: "met" }] }]);
+  assert.equal(verdictStands(judged.sessions[0], judged.sessions[0].segments[0]), false, "T2 没在这份结论里，pass 不算覆盖这一段");
 });

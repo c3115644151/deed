@@ -715,7 +715,16 @@ export function fold(events) {
         if (segment && sealed(segment)) noway(`段 ${segment.id} 已经封存，结论不能再落`);
         const subject = segment ? `段 ${segment.id}` : `这一期 ${session.id}`;
         const inScope = segment ? session.tasks.filter((one) => one.segment === segment.id) : session.tasks;
-        const missing = inScope.filter((one) => one.status === "todo");
+        // 结论回答的是它那份清单："卷子上列出的条目都交完了"就够。
+        // 清单记了它要判哪几条（含义第 36 版起）；没记的老清单照旧当整段。
+        // 卷子外新加的条目不在这一问里：以前它们会把结论直接挡死，于是作者每加一条就得换一份
+        // 清单，审查者手上那份永远判不完。
+        const sheet = (() => {
+          const handed = ev.brief ? session.briefs.find((one) => one.brief === ev.brief && one.segment === (segment ? segment.id : null)) : null;
+          const listed = handed?.tasks;
+          return Array.isArray(listed) && segment ? new Set(listed) : null;
+        })();
+        const missing = inScope.filter((one) => one.status === "todo" && (sheet === null || sheet.has(one.id)));
         if (missing.length > 0)
           noway(`${subject} 还有没交付的（${missing.map((one) => one.id).join("、")}）：结论只能落在交付之后`);
         // 两种对象各有一份"在案结论"：整体审的互斥只看本段，签收核对的只看整期。
@@ -785,6 +794,8 @@ export function fold(events) {
           // 沿用的判定也算数：这一条自上次判定以来没动过，那一判还是对它下的。
           const bare = inScope
             .filter((one) => one.status !== "dropped" && one.status !== "deferred")
+            // 只问卷子上那几条：清单外新加的条目是下一份的事。
+            .filter((one) => sheet === null || sheet.has(one.id))
             .filter((one) => !judged.has(one.id))
             .filter((one) => settledSince(session, one) === null)
             .map((one) => one.id);

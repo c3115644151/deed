@@ -3,7 +3,6 @@ import path from "node:path";
 import {
   lastBrief,
   lastPeriodBrief,
-  lastSegmentChange,
   needsPeriodReview,
   needsReview,
   nextAction,
@@ -11,6 +10,7 @@ import {
   reviewDue,
   sealBlockers,
   stalePeriod,
+  sheetHolds,
   takingSegment,
   tasksIn,
   verdictStands,
@@ -229,9 +229,8 @@ export default function review(argv) {
           const intact = fs.existsSync(file) && (!pack || fs.existsSync(pack));
           // 清单写的是它发出那一刻的条目与交付记录。之后这一段又动了（加任务、
           // 交付、收回），这份清单就不再说这一段现在的事——换一份，别让人审旧内容。
-          const moved = lastSegmentChange(one, seg);
-          const stale = moved !== null && moved > handed.at;
-          if (intact && stale) console.log("上一份清单(" + handed.brief + ")出在这一段最近一次改动之前：另出一份");
+          const stale = !sheetHolds(one, seg);
+          if (intact && stale) console.log("上一份清单(" + handed.brief + ")写的那几条在它出门之后又动过：另出一份");
           else if (intact) {
             console.log("审查清单 · " + handed.brief + "（这一段已经出过，等结论落盘）");
             console.log("  结论用 deed review --segment " + seg.id + " --verdict pass|fail");
@@ -282,9 +281,9 @@ export default function review(argv) {
         const pack = path.resolve(ROOT, handed.guide);
         if (!fs.existsSync(pack)) fail("角色包不在了（" + handed.guide + "）：先 deed review --segment " + seg.id + " 重出一份");
       }
-      // 清单变了，结论就没法回答它：那一份写的不是现在这一段。
-      const moved = lastSegmentChange(one, seg);
-      if (moved !== null && moved > handed.at)
+      // 结论回答的是卷子上那几条：卷子上的条目在它出门之后被动过，这份清单就不再说现在的事。
+      // 卷子外新加的条目不算（它们进下一份）——否则作者每加一条，审查者手上的活就作废一次。
+      if (!sheetHolds(one, seg))
         fail("这一段在清单出过之后又动过（" + handed.brief + "）：结论只能回答清单上那几条，deed review --segment " + seg.id + " 另出一份再审");
       const findings = list(flags.finding);
       // 按条落下：每条标准一个判定，判定里带着它判的那几份字节。pass 要求这一段每条都有判定——

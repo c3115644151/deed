@@ -30,7 +30,7 @@
  "cli/verbs/point.mjs": "8796abd92ac15149c657edd20d8dbe629df5277990f4303747e6ccc6fdc4aae3",
  "cli/verbs/project.mjs": "0e142a16667836f40b4c2bf0eb77c9a743266687968540588cfefe8fe6601baa",
  "cli/verbs/reply.mjs": "c8595a05e9ad55fc4814a52a7660c74b9ce7fc63a517cd85d36e6e1f331a9fd2",
- "cli/verbs/review.mjs": "e9b62722fce690a8ddb7d3c6b7f3325a599d0cabcb0c78a3715cbf4be47f3f2e",
+ "cli/verbs/review.mjs": "2e2e77ab9bfa85a4096bb7ab823132bb065c690029257a4ee0b71f00fce12262",
  "cli/verbs/say.mjs": "a6fd93468eb08f06e00fbcc51ab4763e7ea726ba1c2dc979cd0f7ce8ebe13c75",
  "cli/verbs/serve.mjs": "6974e40988dbb28814e956a1c08dfea368230d2a4bfda93c83e67cb5856ee945",
  "cli/verbs/sign.mjs": "873dc2506695095f6d3dd8c29a955223d8620994e495e90ab6d3cab3a46d621b",
@@ -40,8 +40,8 @@
  "core/checks.mjs": "398be1e006d4d34bdf1a132cebbe4a318c14373c44c14e6260cd3818c3798adb",
  "core/digest.mjs": "7be393423ab6a946e6089dc00ba40d0c71a04c6c2bfe00b6219cf86691907685",
  "core/events.mjs": "02011efde68db1bd8c219b3538e0e2a23088a129d56a5e360b6d21f9d202c339",
- "core/fold.mjs": "dd1f3aae4c7ad1ce91a6d6c77024590dfb201294d8ab6b6eaaa258bd59e43554",
- "core/rules.mjs": "db20e47065929e3ee792b99c6929624599bd7a28a39296a5e0efff2b40b7ed16",
+ "core/fold.mjs": "4f3baf3d6fd14634d4bf9ba597e57f527c7baa217de3c7ee3ccd6b2ed5d40a25",
+ "core/rules.mjs": "90e4f6abada2a6c94b979cf22de93f28cc429bdf936a0bdfed42975e131f8f0c",
  "core/stale.mjs": "7ce235a9772a1d3d24e31adb325d6b6546fbd2651be1145a9fb9e911b5a12f8f",
  "docs/DESIGN.md": "20534df431e76441b6a70aa3e1b3fad15a0801106cf4a764081045a9fe06aadb",
  "docs/INSTALL.md": "1eefa270b37f771c300e09cf213d0d497a040acfd7a1b12fff877f37649989a3",
@@ -86,7 +86,7 @@
  "test/fold.test.mjs": "537e49dd92559bc1af9bb94476a666902b9cda19427da82257c1b2e0fd407053",
  "test/heartbeat.test.mjs": "629a7b1c2515dd97703b19912945c87b39bc10a253b7259c7eb08a27240d0587",
  "test/plan.test.mjs": "64c704e374cc40478217c99b3a5072e02962f7a719b41faf9e31d08c47bfb9d9",
- "test/rules.test.mjs": "612308d315518ff8a958a064272c37d7e94b1e4d579928827142e3a65d349f47",
+ "test/rules.test.mjs": "1a9528c89a08fe077c1737c2482f34f8e56f1138e12a34374c0fa588c10a589b",
  "test/support/cli.mjs": "e2a51b5cac47321b48b1264a7354894c119d2a389228c3ac16f1d0c784cc59af",
  "test/version.test.mjs": "8225cb695bbd7ab2ef44bb3bd836972164f32a69c9cbe428323b406762871de9"
 }

@@ -210,15 +210,35 @@ export const lastBrief = (session, segmentId) =>
 
 // 手上那份清单还新鲜吗：发出去之后这一段没有再动过，也还没有人回答。
 // 新鲜的、没人回答的那份，下一步是落结论——再发一份只会让审查者去读旧纸。
+// 清单是一份固定的卷子：它写的是"这几条、这几份交付"。段里新加的条目不在卷子上，
+// 它们进的是下一份——以前任何一次交付都让整份清单作废，于是作者每交一条就换一份，
+// 审查者手上的活被反复作废，一份也判不完。
+const movedSince = (session, segment, at, only = null) => {
+  const times = tasksIn(session, segment)
+    .filter((one) => only === null || only.includes(one.id))
+    .flatMap((one) => [one.touchedAt, ...one.evidence.map((proof) => proof.at), ...(one.undone ?? []).map((gone) => gone.at)])
+    .filter(Boolean)
+    .sort();
+  const last = times[times.length - 1] ?? null;
+  return last !== null && last > at;
+};
+
+const sheetOf = (brief) => (Array.isArray(brief?.tasks) ? brief.tasks : null);
+
+export const sheetHolds = (session, segment) => {
+  const handed = lastBrief(session, segment.id);
+  if (!handed || handed.withdrawnAt !== undefined) return false;
+  if (session.reviews.some((one) => one.scope !== "session" && one.brief === handed.brief)) return false;
+  return !movedSince(session, segment, handed.at, sheetOf(handed));
+};
+
 export const freshBrief = (session, segment) => {
   const handed = lastBrief(session, segment.id);
   if (!handed) return null;
   // 撤回过的清单不再是"手上这一份"：它作废了，下一步是重新发一份。
   if (handed.withdrawnAt !== undefined) return null;
   if (session.reviews.some((one) => one.scope !== "session" && one.brief === handed.brief)) return null;
-  const moved = lastSegmentChange(session, segment);
-  if (moved !== null && moved > handed.at) return null;
-  return handed;
+  return sheetHolds(session, segment) ? handed : null;
 };
 
 // 一期要做成什么：签收拿它当尺子。可以改，账本留每一次。
@@ -226,8 +246,28 @@ export const goalOf = (session) => session?.goal?.text ?? null;
 
 // 一句结论算不算数，看它判的那份内容还是不是现在这份。三处（下一步、该谁审、签收）
 // 各自判一遍"pass 还成不成立"，就会各说各话：本该重审的段，一处说等判决、一处说没due。
-export const verdictStands = (session, segment) =>
-  Boolean(segment) && segment.verdict === "pass" && !staleReview(session, segment);
+export const verdictStands = (session, segment) => {
+  if (!segment || segment.verdict !== "pass") return false;
+  const review = reviewOf(session, segment);
+  if (!review) return false;
+  // 还有没交付的条目：这一段还没做完，判决不该落（pass 说的是"这一段做成这样就够了"）。
+  if (tasksIn(session, segment).some((one) => one.status === "todo")) return false;
+  const delivered = tasksIn(session, segment).filter((one) => one.status === "done" || one.status === "accepted");
+  // 老账本里的结论没有逐条判定：那时"判过"就是整段，只能按时间算。
+  if (!Array.isArray(review.results) || review.results.length === 0) {
+    const moved = lastSegmentChange(session, segment);
+    return !(moved !== null && moved > review.at);
+  }
+  return delivered.every((one) => {
+    const verdict = review.results.find((r) => r.id === one.id);
+    if (!verdict) return false;
+    // 判过之后这一条又动过：那句判定说的是旧内容。
+    const moved = [one.touchedAt, ...one.evidence.map((proof) => proof.at), ...(one.undone ?? []).map((gone) => gone.at)]
+      .filter(Boolean)
+      .some((at) => at > review.at);
+    return !moved;
+  });
+};
 
 const staleReview = (session, segment) => {
   const review = reviewOf(session, segment);
@@ -240,7 +280,7 @@ const staleReview = (session, segment) => {
 export function reviewState(config, session, segment) {
   const review = reviewOf(session, segment);
   if (review?.verdict === "fail") return "fail";
-  if (review?.verdict === "pass" && staleReview(session, segment)) return "stale";
+  if (review?.verdict === "pass" && !verdictStands(session, segment)) return "stale";
   if (!needsReview(config, session, segment)) return review?.verdict === "pass" ? "pass" : "exempt";
   return review?.verdict === "pass" ? "pass" : "missing";
 }
