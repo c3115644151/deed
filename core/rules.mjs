@@ -566,7 +566,9 @@ export function nextAction(doc, config) {
     };
   }
   // 审查通过只把这一段交回来：此刻轮到人判，它不是签收，也不是再审。
-  if (awaitingJudgement(session, segment))
+  // 但判决只能落在那份被判过的字节上：之后这一段又有了新活，那份结论就旧了，
+  // 下一步是把新活做完、再出一份清单，而不是让人去判一份已经不对的内容。
+  if (awaitingJudgement(session, segment) && reviewState(config, session, segment) !== "stale")
     return {
       who: "user",
       what: "判决",

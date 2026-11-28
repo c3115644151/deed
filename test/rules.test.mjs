@@ -413,3 +413,17 @@ test("whether a segment needs another review is asked of the items still open, n
   // T1（碰过 core/**）已经判过、之后没动过：它不参与下一份清单，也就不再把这段拖进审查。
   assert.equal(needsReview(config, session, session.segments[0]), false, "新的一条只碰 docs/** 的小改动，这段不必再出清单");
 });
+
+// 判过之后这一段又有了新活：那份结论判的不是现在的内容，"等你判决"这句话就不成立——
+// 下一步是把新活做完、再出一份清单，而不是让一个人去判一份已经不对的东西。
+test("a pass that the segment has outgrown asks for the new work, not for a judgement", () => {
+  const doc = fold([
+    turn(1), goal(2), add(3, "T1", ["core/fold.mjs"]), done(4, "T1"),
+    { v: 35, at: T(5), k: "review.log", s: null, segment: "S01.1", by: "qa", verdict: "pass", brief: "b.md", findings: [], results: [{ id: "T1", verdict: "met" }] },
+    { v: 1, at: T(6), k: "task.add", s: null, id: "T2", title: "T2", criteria: "c", files: ["core/rules.mjs"] },
+  ]);
+  const step = nextAction(doc, config);
+  assert.equal(step.who, "agent");
+  assert.equal(step.what, "交付", "先做新的一条");
+  assert.match(step.text, /T2/u);
+});
