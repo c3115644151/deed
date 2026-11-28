@@ -296,6 +296,10 @@ export function apply(ctx, config = {}) {
       });
       return { childId: started.childId, api: "startContinuable" };
     }
+    // 本机装的是 startActivation：它要 delivery:"caller" 才把结果交给调用方，
+    // 而 dsh-subagent 的 notifySettlement 在 delivery === "caller" 时直接返回——
+    // 完成通知根本不会发给父会话（实测：审查者落了结论，主会话什么都没收到）。
+    // 所以"叫作者回来"这件事不能靠子代理的完成提示，只能靠账本（见 verdicts.mjs）。
     if (typeof subagents.startActivation === "function") {
       const started = await subagents.startActivation({
         provider: "spawn",

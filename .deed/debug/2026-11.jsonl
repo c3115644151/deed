@@ -438,3 +438,4 @@
 {"at":"2026-11-28T02:02:25.314Z","verb":"submit","code":1,"ms":2518,"switches":[],"why":"T154 的期望没跑出来：命令「node --test test/adapter-verdicts.test.mjs」要看到「✔ a verdict on the ledger is what wakes the author, once；期望：node --test test/adapter-verdicts.test.mjs => ✔ while the author is running」，实际是「✔ a verdict on the ledger is what wa","v":"0.33.0"}
 {"at":"2026-11-28T02:02:47.882Z","verb":"submit","code":1,"ms":2577,"switches":[],"why":"T154 在段 S02.21 里，轮到它的那一段还没开（现在收活的是 S02.20：它判过、关闭之后这一段才接过活）：清单上这一节是排好的下一段，它只记条目，交付等轮到再做","v":"0.33.0"}
 {"at":"2026-11-28T02:03:19.147Z","verb":"state","code":0,"ms":78,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:04:01.750Z","verb":"point","code":0,"ms":66,"switches":[],"why":null,"v":"0.33.0"}
