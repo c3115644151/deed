@@ -56,15 +56,17 @@ test("the same segment's review goes back to the same agent; a period review get
 
   const started = [];
   const messaged = [];
+  const firstPrompts = [];
   const services = {
     agents: { get: (id) => ({ session: sessionOf(cwd) }) },
     subagents: {
       startContinuable: async (args) => {
         started.push(args.label);
+        firstPrompts.push(args.request?.prompt?.[0]?.text ?? "");
         return { childId: "child-" + started.length };
       },
       sendMessage: async (agent, childId, prompt) => {
-        messaged.push({ childId });
+        messaged.push({ childId, text: prompt?.[0]?.text ?? "" });
       },
       listChildren: async () => [],
     },
@@ -81,12 +83,31 @@ test("the same segment's review goes back to the same agent; a period review get
   assert.ok(await waitFor(() => started.length === 1), "起了一个审查者");
   const firstChild = started.length;
 
-  // 第二次问同一段：账本里那份清单还在等结论 → 该交给原来那个审查者，不是再起一个。
+  // 第二次问同一段、同一份清单：它还在他手上，不重发。
   handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
-  assert.ok(await waitFor(() => messaged.length >= 1), "把清单与角色包发回给同一个审查者");
+  assert.ok(await waitFor(() => /还在他手上/u.test(logText(cwd))), "同一份不再发第二遍");
+  assert.equal(messaged.length, 0, "一个字都没重发");
+
+  // 判一份不合格、修完再交：这才真的出了第二份清单。同一个人接着判，但只发增量。
+  assert.equal(
+    deed(cwd, "review", "--segment", "S01.1", "--verdict", "fail", "--result", "T1=unmet", "--rework", "T1", "--why", "没做到").status,
+    0,
+  );
+  fs.writeFileSync(path.join(cwd, "a.md"), "改动 · 第二版\n");
+  deliverTask(cwd, "T1", "跑：跑得通 v2", { file: "a.md" });
+  assert.equal(deed(cwd, "review", "--segment", "S01.1").status, 0, "出第二份清单");
+  console.log("DEBUG due", deed(cwd, "review", "--due").stdout.trim());
+  handlers.get("session/event")(sessionOf(cwd), { type: "turn/start" });
+  const sent = await waitFor(() => messaged.length >= 1);
+  if (!sent) console.log("DEBUG log\n" + logText(cwd));
+  assert.ok(sent, "把第二份发回给同一个审查者");
   assert.equal(started.length, firstChild, "没有再起一个审查者");
   assert.equal(messaged[0].childId, "child-1", "发回的是第一个那个");
   assert.match(logText(cwd), /重审交给 child-1/u);
+  // 第一次发全（清单 + 角色包）；第二份起只发增量，角色包不再重发。
+  assert.match(firstPrompts[0], /角色包（怎么审）/u, "第一次要他读角色包");
+  assert.doesNotMatch(messaged[0].text, /角色包（怎么审）/u, "复审不重发角色包");
+  assert.match(messaged[0].text, /第 \d+ 份清单/u, "复审说清这是第几份");
 });
 
 test("a period review opens its own agent, not the segment's", async () => {

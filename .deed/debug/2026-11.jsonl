@@ -439,3 +439,17 @@
 {"at":"2026-11-28T02:02:47.882Z","verb":"submit","code":1,"ms":2577,"switches":[],"why":"T154 在段 S02.21 里，轮到它的那一段还没开（现在收活的是 S02.20：它判过、关闭之后这一段才接过活）：清单上这一节是排好的下一段，它只记条目，交付等轮到再做","v":"0.33.0"}
 {"at":"2026-11-28T02:03:19.147Z","verb":"state","code":0,"ms":78,"switches":[],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T02:04:01.750Z","verb":"point","code":0,"ms":66,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:04:46.397Z","verb":"review","code":0,"ms":58,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:05:12.885Z","verb":"reply","code":0,"ms":93,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:05:38.004Z","verb":"init","code":0,"ms":39,"switches":["--said"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:11:20.227Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:11:20.669Z","verb":"review","code":0,"ms":46,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:11:21.458Z","verb":"say","code":0,"ms":85,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:12:13.656Z","verb":"serve","code":0,"ms":56,"switches":["--port"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:12:13.846Z","verb":"state","code":0,"ms":426,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:12:47.282Z","verb":"review","code":0,"ms":48,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:13:10.894Z","verb":"reply","code":0,"ms":102,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:17:31.818Z","verb":"init","code":0,"ms":26,"switches":["--print-agents"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:18:59.983Z","verb":"review","code":0,"ms":54,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:19:00.624Z","verb":"say","code":0,"ms":117,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:21:14.120Z","verb":"review","code":0,"ms":347,"switches":["--segment","--verdict","--why","--rework","--finding","--finding","--finding","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result","--result"],"why":null,"v":"0.33.0"}

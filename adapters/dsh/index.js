@@ -95,8 +95,29 @@ const deedInvocation = (root, config) => {
 
 export function apply(ctx, config = {}) {
   const live = new Map(); // 会话 id → 活着的 agent（起子代理要用「精确的在线父级」）
-  const hands = new Map(); // hand → { childId, name }：同一个段的重审交给同一个审查者
-  const running = new Set(); // 正在跑的那个会话的审查，防止一轮里反复问
+  // hand → { childId }：同一个段的重审交给同一个审查者。落盘是因为重启之后内存就空了，
+  // 而"这一段一直由同一个人判"这件事不该因为宿主重启而换人。
+  const hands = new Map();
+  let handsRoot = null;
+  const handsFile = (root) => path.join(root, ".deed", "tmp", "hands.json");
+  const loadHands = (root) => {
+    if (handsRoot === root) return;
+    handsRoot = root;
+    try {
+      const saved = JSON.parse(fs.readFileSync(handsFile(root), "utf8"));
+      for (const [key, one] of Object.entries(saved ?? {})) if (one?.childId && !hands.has(key)) hands.set(key, one);
+    } catch {
+      // 没有就没有：第一次起审查者的时候自然会写出来。
+    }
+  };
+  const saveHands = (root) => {
+    try {
+      fs.mkdirSync(path.join(root, ".deed", "tmp"), { recursive: true });
+      fs.writeFileSync(handsFile(root), JSON.stringify(Object.fromEntries(hands), null, 1), "utf8");
+    } catch (err) {
+      note(root, "存审查者名册失败 · " + clip(err?.message ?? err, 160));
+    }
+  };
   const inflight = new Set(); // 正在起/正在发的那一个 hand，防止同一份材料被起两次
   const logFile = (root) => path.join(root, ".deed", "tmp", "dsh.log");
 
@@ -257,7 +278,23 @@ export function apply(ctx, config = {}) {
 
   const handKey = (due) => String(due?.hand ?? "");
 
-  const promptFor = (root, due) => {
+  // 这一段出过几份清单：盘上 S<段>-<时刻>.md 的个数（角色包不算）。
+  const countBriefs = (root, segment) => {
+    if (!segment) return 1;
+    try {
+      const dir = path.join(root, ".deed", "review");
+      return Math.max(
+        1,
+        fs.readdirSync(dir).filter((one) => one.startsWith("S" + String(segment).replace(/^S/u, "") + "-") && one.endsWith(".md") && !one.endsWith("-reviewer.md")).length,
+      );
+    } catch {
+      return 1;
+    }
+  };
+
+  // 第一次：角色包 + 清单，一起读。复审：同一个人接着判，角色包不再发——
+  // 上一份他已经读过，重发一遍只是让他把同一段话再读一次。
+  const promptFor = (root, due, nth = 1) => {
     const { command, prefix } = deedInvocation(root, config);
     const deed = [command, ...prefix].join(" ");
     const segment = due.kind === "period" ? null : due.segment;
@@ -267,13 +304,29 @@ export function apply(ctx, config = {}) {
     const fail = segment
       ? deed + " review --segment " + segment + " --verdict fail --rework T1,T2 --why \"为什么\""
       : deed + " review --all --verdict fail --rework S01.1 --why \"为什么\"";
+    const head =
+      nth > 1
+        ? [
+            "你是 deed 的审查者，这一段还是你在审：这是第 " + nth + " 份清单。",
+            "",
+            "上一份你判过的那几条已经沿用了（清单上写着「上次 met（时间）· 之后没动过，判定沿用」），",
+            "这一份只有新交的、改过的、上次没过的那几条要判。角色包你读过，不再发。",
+            "",
+            "清单（这一份只列出要重判的）：" + path.join(root, due.brief),
+            "",
+            "按你上次那套方法判这几条就行；另外看一眼这一段整体的方向有没有被这几条改跑。",
+          ]
+        : [
+            "你是 deed 的审查者，只回答一件事：这份清单上写的标准，在这一份字节上成立不成立。",
+            "",
+            "清单（审什么）：" + path.join(root, due.brief),
+            "角色包（怎么审）：" + path.join(root, due.guide ?? ""),
+            "",
+            "先读角色包，再读清单，逐条核；每条给一个判断（达成／未达成／无法判断）与依据（命令、输出、文件:行）。",
+          ];
     return [
-      "你是 deed 的审查者，只回答一件事：这份清单上写的标准，在这一份字节上成立不成立。",
+      ...head,
       "",
-      "清单（审什么）：" + path.join(root, due.brief),
-      "角色包（怎么审）：" + path.join(root, due.guide ?? ""),
-      "",
-      "先读角色包，再读清单，逐条核；每条给一个判断（达成／未达成／无法判断）与依据（命令、输出、文件:行）。",
       "结论用命令落（账本只有一个写入口，别直接改账本）：",
       "  " + verdict,
       "不合格：",
@@ -303,7 +356,9 @@ export function apply(ctx, config = {}) {
     if (typeof subagents.startActivation === "function") {
       const started = await subagents.startActivation({
         provider: "spawn",
-        label: "deed review",
+        // 标签用与段绑定的那个名字（不是笼统的 "deed review"）：重启之后靠它从
+        // 子代理目录里把同一个审查者找回来，找不到才会另起一个。
+        label: key,
         prompt,
         parent: agent,
         signal,
@@ -327,6 +382,7 @@ export function apply(ctx, config = {}) {
       return;
     }
     const key = handKey(due);
+    loadHands(root);
     if (inflight.has(key)) return; // 同一份材料只起一次：并发问两次会起两个审查者
 
     // 重载或重启之后内存里的那张表没了：先去父会话的子代理目录里找同名的那一个。
@@ -353,25 +409,37 @@ export function apply(ctx, config = {}) {
   };
 
   const deliverOnce = async (root, due, key, { subagents, agent }) => {
-    const known = hands.get(key);
-    const text = promptFor(root, due);
+    const known = due.kind === "period" ? null : hands.get(key);
+    // 这一段已经出过几份清单：第二份起只发增量（角色包不再重发）。
+    // 数盘上的清单文件（S02.20-<时刻>.md），不新造一条命令去问账本。
+    const which = countBriefs(root, due.segment);
+    const text = promptFor(root, due, which);
     const prompt = [{ type: "text", text }];
     const signal = AbortSignal.timeout(REVIEW_TIMEOUT_MS);
 
+    if (known && known.brief === due.brief) {
+      // 这一份已经在他手上：再发一遍只是让他把同一段话再读一次。
+      note(root, "这一份还在他手上 · " + (due.segment ?? "整期"));
+      return;
+    }
     if (known && typeof subagents.sendMessage === "function") {
-      // 同一个段的重审：交给原来那个审查者，它手上还留着上一份。
+      // 同一个人接着判新的一份：只发增量（角色包不再重发），并把这一份记在他名下。
       try {
         await subagents.sendMessage(agent, known.childId, prompt, { signal });
+        hands.set(key, { ...known, brief: due.brief });
+        saveHands(root);
         note(root, "重审交给 " + known.childId.slice(0, 12) + " · " + (due.segment ?? "整期"));
         return;
       } catch (err) {
         note(root, "重审没送到，另起一个 · " + clip(err?.message ?? err, 160));
         hands.delete(key);
+        saveHands(root);
       }
     }
 
     const started = await spawnChild(subagents, agent, prompt, signal, key);
-    hands.set(key, { childId: started.childId });
+    hands.set(key, { childId: started.childId, brief: due.brief });
+    saveHands(root);
     note(root, "起了审查者 · " + started.api + " · " + String(started.childId).slice(0, 12) + " · " + (due.segment ?? "整期"));
     started.result?.then?.(
       (result) => note(root, "审查者收工 · " + clip(result?.stopReason ?? "?", 80)),
@@ -383,8 +451,8 @@ export function apply(ctx, config = {}) {
     const root = session?.header?.cwd;
     if (!root || !boundRoot(root)) return;
     note(root, "问 due · " + (session?.id ?? "?"));
-    if (running.has(session.id)) return;
-    running.add(session.id);
+    // 并发问两次不会起两个审查者：inflight 与「这一份还在他手上」两道都在 deliver 里。
+
     try {
       let asked = runDeed(root, ["review", "--due"]);
       if (asked.code !== 0) {
@@ -395,8 +463,11 @@ export function apply(ctx, config = {}) {
       try {
         due = JSON.parse(asked.out.split("\n").pop());
       } catch {
+        // 读不出来就说出来：安静地跳过，看起来和"还没到时候"一模一样。
+        note(root, "due 读不出来 · " + clip(asked.out || "(空)", 120));
         return;
       }
+      note(root, "该谁 · " + (due ? String(due.needs ?? due.kind) + " · " + String(due.segment ?? due.kind) : "空"));
       if (!due || due.kind === null) return;
       due.session = session.id;
       if (due.needs === "brief") {
@@ -418,8 +489,6 @@ export function apply(ctx, config = {}) {
       await deliver(root, due);
     } catch (err) {
       note(root, "审查钩子出错 · " + clip(err?.message ?? err, 200));
-    } finally {
-      running.delete(session.id);
     }
   };
 
