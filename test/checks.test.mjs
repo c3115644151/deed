@@ -13,7 +13,15 @@ const doc = (project = null) => ({
 });
 
 // 三条"deed 自己的结构"检查只在这个工作区是 deed 时成立：fixtures 默认带 self。
-const tree = (files, imports = [], plan = true, extra = {}) => ({ files, imports, plan, self: true, ...extra });
+const tree = (files, imports = [], plan = true, extra = {}) => ({
+  files,
+  imports,
+  plan,
+  self: true,
+  // 地图默认覆盖这些 fixture 文件：检查 tree 那条要的是"目录 ↔ 地图"对上。
+  map: files.filter((f) => /\.mjs$/u.test(f) && /^(core|cli|board|lib|adapters)\//u.test(f)),
+  ...extra,
+});
 const declared = (extra = {}) => ({
   shape: "software",
   background: "一个本地工具，给一个人用；不碰网络。",
@@ -28,7 +36,7 @@ const declared = (extra = {}) => ({
 test("the registry is an ordered list of named checks", () => {
   assert.deepEqual(
     CHECKS.map((one) => one.id),
-    ["workspace", "shape", "background", "system-layers", "file-size", "registry"],
+    ["workspace", "shape", "background", "system-layers", "file-size", "registry", "tree"],
     "顺序就是它们成立的顺序：能记账 → 树对不对 → 背景写没写",
   );
   for (const one of CHECKS) {
@@ -42,10 +50,10 @@ test("without a project, only the workspace check applies", () => {
   const state = projectState(doc(), tree([]));
   assert.equal(state.declared, false);
   assert.equal(state.missing.length, 0, "不适用不算未结项");
-  assert.deepEqual(checkAll(doc(), tree([])).map((one) => one.verdict), ["pass", "na", "na", "pass", "na", "na"]);
+  assert.deepEqual(checkAll(doc(), tree([])).map((one) => one.verdict), ["pass", "na", "na", "pass", "na", "na", "pass"]);
   // 用户工作区不该被 deed 自己的分层判：三条都显示 na。
   const user = checkAll(doc(), tree([], [], true, { self: false })).map((one) => one.verdict);
-  assert.deepEqual(user, ["pass", "na", "na", "na", "na", "na"], "不当成 deed 时结构三条不适用");
+  assert.deepEqual(user, ["pass", "na", "na", "na", "na", "na", "na"], "不当成 deed 时结构三条不适用");
 });
 
 test("a declared project passes when the tree keeps the declared directions", () => {
@@ -58,7 +66,7 @@ test("a declared project passes when the tree keeps the declared directions", ()
     tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "app/b.mjs", to: "core/a.mjs" }]),
   );
   assert.equal(state.declared, true);
-  assert.equal(state.passed, 6);
+  assert.equal(state.passed, 7);
   assert.deepEqual(state.missing, []);
 });
 
@@ -120,13 +128,13 @@ test("a ledger that cannot be read turns the first check red, before anything el
 
 test("the standing falls back when the tree moves: it is a value, not a badge", () => {
   const before = projectState(doc(software()), tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"]));
-  assert.equal(before.passed, 6);
+  assert.equal(before.passed, 7);
   const after = projectState(
     doc(software()),
     tree(["core/a.mjs", "app/b.mjs", "tests/c.test.mjs"], [{ from: "core/a.mjs", to: "app/b.mjs" }]),
   );
-  assert.equal(after.passed, 5);
-  assert.deepEqual(after.missing, ["文件树符合范式"]);
+  assert.equal(after.passed, 6);
+  assert.ok(after.missing.includes("文件树符合范式"), after.missing.join("、"));
 });
 
 // 结构检查对着范式的"格"来判：一类项目至少要有的角色，目录名可以不同。
@@ -201,7 +209,7 @@ test("a project that opted out of structure says so instead of passing it", () =
   const list = checkAll(doc(declared({ shape: "free", layers: [] })), null);
   assert.deepEqual(
     list.map((one) => one.verdict),
-    ["pass", "na", "pass", "na", "na", "na"],
+    ["pass", "na", "pass", "na", "na", "na", "na"],
     "不适用就是 na：它没通过，只是这条对它不成立",
   );
 });

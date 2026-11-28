@@ -235,6 +235,24 @@ export const CHECKS = [
       return { verdict: "pass", detail: (tree.eventKinds ?? []).length + " 种事件，都有处理处" };
     },
   },
+  {
+    id: "tree",
+    title: "每个文件都在这份地图上，地图上每一行也真有文件",
+    capability: "结构约束（R4 的前置：找得到才改得对）",
+    fix: "新文件先在 docs/STRUCTURE.md 占一行再写实现；删掉的文件把它那一行删掉",
+    judge: ({ tree }) => {
+      if (!tree) return { verdict: "na", detail: "这次没带目录快照" };
+      if (!tree.self) return { verdict: "na", detail: "这个工作区不是 deed 自己" };
+      const listed = tree.map ?? null;
+      if (listed === null) return { verdict: "fail", detail: "docs/STRUCTURE.md 不在：没有地图就没有「该去哪儿改」" };
+      const onDisk = new Set((tree.files ?? []).filter((f) => /\.mjs$/u.test(f) && /^(core|cli|board|lib|adapters)\//u.test(f)));
+      const missing = [...onDisk].filter((f) => !listed.includes(f));
+      const stale = listed.filter((f) => !onDisk.has(f));
+      if (missing.length > 0) return { verdict: "fail", detail: missing.length + " 个文件不在地图上：" + missing.slice(0, 4).join("、") };
+      if (stale.length > 0) return { verdict: "fail", detail: "地图上有 " + stale.length + " 行已经没有文件了：" + stale.slice(0, 4).join("、") };
+      return { verdict: "pass", detail: onDisk.size + " 个文件，地图一一对上" };
+    },
+  },
 ];
 
 export const projectOf = (doc) => doc?.project ?? null;
