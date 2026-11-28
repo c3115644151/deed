@@ -471,3 +471,17 @@
 {"at":"2026-11-28T02:45:27.292Z","verb":"review","code":0,"ms":72,"switches":["--due"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T02:45:28.495Z","verb":"say","code":0,"ms":202,"switches":["--from"],"why":null,"v":"0.33.0"}
 {"at":"2026-11-28T02:48:01.834Z","verb":"init","code":0,"ms":37,"switches":["--print-agents"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:50:21.027Z","verb":"reply","code":0,"ms":116,"switches":["--from"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:50:55.995Z","verb":"review","code":0,"ms":164,"switches":["--segment","--verdict","--why","--rework","--finding","--finding","--result","--result","--result"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:50:56.847Z","verb":"review","code":0,"ms":73,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:51:38.083Z","verb":"state","code":0,"ms":74,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:52:52.627Z","verb":"submit","code":1,"ms":200,"switches":[],"why":"T143 的标准和账本不一样，但它引用的命令与开关今天都还在：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做","v":"0.33.0"}
+{"at":"2026-11-28T02:53:18.700Z","verb":"submit","code":1,"ms":159,"switches":[],"why":"T143 的标准和账本不一样，但它引用的命令与开关今天都还在：清单不改已经写下的标准；做法变了就新开一条，把旧的那条说清为什么不做","v":"0.33.0"}
+{"at":"2026-11-28T02:53:45.044Z","verb":"plan","code":1,"ms":48,"switches":[],"why":"清单已经在 .deed/plan.md：直接改它，改完 deed submit（记账之后这份会按账本重画一遍）","v":"0.33.0"}
+{"at":"2026-11-28T02:54:06.036Z","verb":"state","code":0,"ms":74,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:54:33.713Z","verb":"submit","code":0,"ms":212,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:55:38.721Z","verb":"state","code":0,"ms":83,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:55:55.102Z","verb":"submit","code":1,"ms":244,"switches":[],"why":"T153 的期望没跑出来：命令「node --test test/docs.test.mjs,test/adapter-review.test.mjs」要看到「✔ the README carries exactly the block init --print-agents prints」，实际是「Could not find 'test/docs.test.mjs,test/adapter-review.test.mjs'」","v":"0.33.0"}
+{"at":"2026-11-28T02:56:13.040Z","verb":"submit","code":0,"ms":456,"switches":[],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:56:31.824Z","verb":"review","code":0,"ms":53,"switches":["--due"],"why":null,"v":"0.33.0"}
+{"at":"2026-11-28T02:56:32.117Z","verb":"state","code":0,"ms":90,"switches":[],"why":null,"v":"0.33.0"}

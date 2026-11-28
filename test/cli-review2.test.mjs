@@ -587,7 +587,7 @@ test("the reviewer's scratch sits outside the workspace and the pack says no com
   assert.equal(fs.existsSync(scratch), false, "结论落地时临时区被删掉");
 });
 
-// 交付记录里的那三样只服务当场核对与不重跑：清单与审查材料里不出现它们（尤其是指纹）。
+// 交付记录里的那三样只服务当场核对与不重跑：审查清单里不出现它们（尤其是指纹）。
 test("the review sheet carries the claim, not the byte counts or fingerprints", () => {
   const cwd = workspace("sheet-hides-hashes");
   deed(cwd, "init", "--said", "开始");
