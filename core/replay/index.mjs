@@ -7,13 +7,18 @@
 import * as talk from "./reducers/talk.mjs";
 import * as topic from "./reducers/topic.mjs";
 import * as work from "./reducers/work.mjs";
-import * as review from "./reducers/review.mjs";
+import * as delivery from "./reducers/delivery.mjs";
+import * as brief from "./reducers/brief.mjs";
+import * as verdict from "./reducers/verdict.mjs";
 import * as segment from "./reducers/segment.mjs";
 import * as session from "./reducers/session.mjs";
 import * as legacy from "./reducers/legacy.mjs";
 
 const REGISTRY = new Map(
-  Object.entries({ ...talk.HANDLERS, ...topic.HANDLERS, ...work.HANDLERS, ...review.HANDLERS, ...segment.HANDLERS, ...session.HANDLERS, ...legacy.HANDLERS }),
+  Object.entries({
+    ...talk.HANDLERS, ...topic.HANDLERS, ...work.HANDLERS, ...delivery.HANDLERS,
+    ...brief.HANDLERS, ...verdict.HANDLERS, ...segment.HANDLERS, ...session.HANDLERS, ...legacy.HANDLERS,
+  }),
 );
 
 export const kinds = () => [...REGISTRY.keys()];
