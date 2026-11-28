@@ -159,7 +159,8 @@ test("taking back a delivery that never landed is refused, and nothing is writte
   addTask(cwd, "一条还没交的任务", "做完了");
   const run = undoDelivery(cwd, "T1", "手滑");
   assert.equal(run.status, 1);
-  assert.match(run.stderr, /没有要落的改动|没有可撤回的交付/u);
+  // 拒的时候要点名说是哪一条：只回一句"没有要落的改动"，写的人不知道该去哪找。
+  assert.match(run.stderr, /T1 没有改到下一段，也没有交付或放弃可撤回/u);
   assert.equal(kinds(cwd).includes("task.undo"), false);
 });
 
