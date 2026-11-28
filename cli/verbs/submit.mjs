@@ -6,7 +6,7 @@ import { changedPaths, rel, snapshotPath, workspaceFingerprint, writeSnapshot } 
 import { prints, weigh } from "../pins.mjs";
 import { draft as planDraft, parse as parsePlan } from "../plan.mjs";
 import { EVENT_VERSION } from "../../core/events.mjs";
-import { onTheSheet } from "../../core/fold.mjs";
+import { onTheSheet } from "../../core/facts/task.mjs";
 import { findStaleTasks } from "../../core/stale.mjs";
 import { checkLanded } from "../../lib/landed.mjs";
 import { ROOT, parse, load, transactMany, targetSession, nextId, fail, guard, undoesOf, commandSurface } from "../session.mjs";

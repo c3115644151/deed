@@ -6,7 +6,8 @@
 // editing the plan is not a change to the workspace, it is a change to say what
 // the work was.
 
-import { awaitingJudgement, awaitingVerdict } from "../core/fold.mjs";
+import { awaitingJudgement } from "../core/facts/review.mjs";
+import { awaitingVerdict } from "../core/facts/review.mjs";
 import { groupsOf } from "../core/rules.mjs";
 
 export const HEAD = "# 这一期要做成什么";

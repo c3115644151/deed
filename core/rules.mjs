@@ -1,6 +1,7 @@
 // rules: the questions a projection asks about the document. No clock, no IO.
 import { MEANING } from "./events.mjs";
-import { awaitingJudgement, settledSince } from "./fold.mjs";
+import { settledSince  } from "./facts/task.mjs";
+import { awaitingJudgement } from "./facts/review.mjs";
 // If a rule here disagrees with what fold allows, fold wins and this file is
 // wrong -- these functions explain a state, they never permit one.
 

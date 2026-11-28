@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { awaitingJudgement, fold, onTheSheet, settledSince } from "../core/fold.mjs";
+import { fold } from "../core/fold.mjs";
+import { onTheSheet, settledSince  } from "../core/facts/task.mjs";
+import { awaitingJudgement } from "../core/facts/review.mjs";
 import {
   byOrder,
   freshBrief,

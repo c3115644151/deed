@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { tasksIn } from "../core/rules.mjs";
-import { settledSince } from "../core/fold.mjs";
+import { settledSince } from "../core/facts/task.mjs";
 import { ensureDirs } from "../lib/store.mjs";
 import { fileStamp, stamp0 } from "../lib/format.mjs";
 

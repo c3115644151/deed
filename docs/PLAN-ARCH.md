@@ -341,9 +341,21 @@ export const reduce = (ctx, ev) => {
 - 对拍：同一份账本（2 期、645482 字）上，HEAD 的 `fold` 与新的 `fold` 输出 sha256 前 16 位相同（`0ff0ad27be65b7ad`）
 - 结论：**新增一类事实不再需要读 1149 行**——找到 `reducers/work.mjs` 就是全部上下文
 
-**还没做的**：`checks:tree`（地图 ↔ 目录对账，P2 结束前做成软报告）。
+**P2 完成（同一份账本 2804 行、33 种事件全部移出 `fold`）**：
 
-### 附录 B：P2 的搬运清单（下一步的底稿）
+- `core/fold.mjs`：1132 行 → **19 行**（只剩遍历与分发）
+- `core/replay/reducers/`：talk 61 · topic 77 · work 270 · review 342 · segment 97 · session 83 · legacy 42（行）
+- `core/facts/`：errors 7 · session 72 · segment 93 · task 66 · review 23（行）
+- 对拍：旧 fold 与新 fold 在同一份账本上 sha256 前 16 位一致（`0ff0ad27be65b7ad`，645482 字）
+- 用例：分三批跑完 172 + 119 + 37（board/适配器单跑）= 全部通过
+
+**还没做的**：
+- `checks:tree`（地图 ↔ 目录对账，P2 结束前做成软报告）——尚未实现。
+- 分支数检查现在点了 13 个文件：`render`/`session`/`submit`/`review`（cli 侧）与 `events.mjs`（129）——
+  下一段（P2.5/P5）按"第二个问题"拆；`reducers/work`(37) 与 `reducers/review`(57) 也超 16，
+  说明这两个域还混着两件事，按"交付与撤回" / "清单与结论"再分。
+
+### 附录 B：P2 的移运清单（下一步的底稿）
 
 `fold` 里还有 30 个 case（uncarry 已移走）。它们依赖 19 个本地助手，先把助手移进 `core/facts`
 （一个域一个文件），再按域移 case：

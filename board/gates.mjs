@@ -3,7 +3,7 @@
 // 面板只收本机、只收同源，落下的行写着 by 与 via:"panel"。
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { awaitingJudgement } from "../core/fold.mjs";
+import { awaitingJudgement } from "../core/facts/review.mjs";
 import {
   signBlockers, exemptSegments, debt, openSegment, needsReview, needsPeriodReview, reviewable, lastBrief, lastPeriodBrief,
 } from "../core/rules.mjs";

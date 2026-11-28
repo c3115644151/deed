@@ -18,7 +18,7 @@ import {
 import { rel } from "../../lib/store.mjs";
 import { planBrief, planWhole, removeScratch, writeBrief } from "../brief.mjs";
 import { draft as planDraft } from "../plan.mjs";
-import { settledSince } from "../../core/fold.mjs";
+import { settledSince } from "../../core/facts/task.mjs";
 import { ROOT, stamp, parse, load, transact, session, targetSession, fail, guard, split, list } from "../session.mjs";
 
 
